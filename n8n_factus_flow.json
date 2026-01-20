@@ -1,0 +1,169 @@
+{
+    "name": "Factus_Integracion_DIAN",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "factus-emitir-factura",
+                "options": {}
+            },
+            "name": "Webhook_Dashboard",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT o.*, c.name as customer_name, c.email_tributario, c.identification_number, c.identification_type, c.person_type FROM orders o JOIN customers c ON o.customer_phone = c.phone_number WHERE o.id = {{$json.body.order_id}}"
+            },
+            "name": "Get_Order_Data",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                300,
+                300
+            ],
+            "credentials": {
+                "postgresql": "Postgres_Easypanel"
+            }
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api-sandbox.factus.com.co/oauth/token",
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "grant_type",
+                            "value": "password"
+                        },
+                        {
+                            "name": "client_id",
+                            "value": "REEMPLAZAR_CLIENT_ID"
+                        },
+                        {
+                            "name": "client_secret",
+                            "value": "REEMPLAZAR_CLIENT_SECRET"
+                        },
+                        {
+                            "name": "username",
+                            "value": "islansantiago11@gmail.com"
+                        },
+                        {
+                            "name": "password",
+                            "value": "1000789002"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Factus_Login",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                500,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api-sandbox.factus.com.co/v1/bills",
+                "authentication": "predefinedCredentialType",
+                "nodeCredentialType": "httpHeaderAuth",
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "numbering_range_id",
+                            "value": "1"
+                        },
+                        {
+                            "name": "reference_code",
+                            "value": "={{$node[\"Get_Order_Data\"].json[\"id\"]}}"
+                        },
+                        {
+                            "name": "customer",
+                            "value": "={{JSON.stringify({\n  \"identification\": $node[\"Get_Order_Data\"].json[\"identification_number\"],\n  \"names\": $node[\"Get_Order_Data\"].json[\"customer_name\"],\n  \"email\": $node[\"Get_Order_Data\"].json[\"email_tributario\"],\n  \"document_type\": $node[\"Get_Order_Data\"].json[\"identification_type\"],\n  \"type_person\": $node[\"Get_Order_Data\"].json[\"person_type\"]\n})}}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Factus_Crear_Factura",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                700,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "UPDATE orders SET status = 'pagado', is_electronic_invoiced = true, cufe = '{{$json.data.bill.cufe}}', pdf_url = '{{$json.data.bill.public_url}}', factus_invoice_status = 'issued' WHERE id = {{$node[\"Get_Order_Data\"].json[\"id\"]}}"
+            },
+            "name": "Update_Order_Factus",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                900,
+                300
+            ],
+            "credentials": {
+                "postgresql": "Postgres_Easypanel"
+            }
+        }
+    ],
+    "connections": {
+        "Webhook_Dashboard": {
+            "main": [
+                [
+                    {
+                        "node": "Get_Order_Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get_Order_Data": {
+            "main": [
+                [
+                    {
+                        "node": "Factus_Login",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Factus_Login": {
+            "main": [
+                [
+                    {
+                        "node": "Factus_Crear_Factura",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Factus_Crear_Factura": {
+            "main": [
+                [
+                    {
+                        "node": "Update_Order_Factus",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

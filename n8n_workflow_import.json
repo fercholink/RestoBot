@@ -1,0 +1,186 @@
+{
+    "name": "RestoBot_Completo_V2_Recordatorios",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-webhook",
+                "options": {}
+            },
+            "name": "Webhook_WhatsApp",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                -600,
+                400
+            ],
+            "webhookId": "whatsapp-restobot-webhook"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{$json.body.entry[0].changes[0].value.messages[0].type}}",
+                            "value2": "image"
+                        }
+                    ]
+                }
+            },
+            "name": "Es_Imagen/Comprobante?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                -350,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "toPhoneNumber",
+                "phoneNumber": "={{$node[\"Webhook_WhatsApp\"].json[\"body\"][\"entry\"][0][\"changes\"][0][\"value\"][\"contacts\"][0][\"wa_id\"]}}",
+                "textBody": "✅ ¡Comprobante recibido! Procesando..."
+            },
+            "name": "Confirmar_Recibo",
+            "type": "n8n-nodes-base.whatsApp",
+            "typeVersion": 1,
+            "position": [
+                -100,
+                250
+            ],
+            "credentials": {
+                "whatsAppCloudApi": "Meta_Cloud_API_Credentials"
+            }
+        },
+        {
+            "parameters": {
+                "unit": "minutes",
+                "amount": 5
+            },
+            "name": "Esperar_5_Minutos",
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1,
+            "position": [
+                150,
+                450
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT status FROM orders WHERE customer_phone = '{{$node[\"Webhook_WhatsApp\"].json[\"body\"][\"entry\"][0][\"changes\"][0][\"value\"][\"contacts\"][0][\"wa_id\"]}}' ORDER BY created_at DESC LIMIT 1"
+            },
+            "name": "Verificar_Status_Pago",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                350,
+                450
+            ],
+            "credentials": {
+                "postgresql": "Postgres_Easypanel"
+            }
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{$json.status}}",
+                            "operation": "notEqual",
+                            "value2": "pagado"
+                        }
+                    ]
+                }
+            },
+            "name": "Sigue_Sin_Pagar?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                550,
+                450
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "toPhoneNumber",
+                "phoneNumber": "={{$node[\"Webhook_WhatsApp\"].json[\"body\"][\"entry\"][0][\"changes\"][0][\"value\"][\"contacts\"][0][\"wa_id\"]}}",
+                "textBody": "🔔 Recordatorio: Tu pedido aún aparece como pendiente de pago. ¡No olvides enviarnos tu comprobante para agilizar tu orden! 😊"
+            },
+            "name": "Enviar_Recordatorio",
+            "type": "n8n-nodes-base.whatsApp",
+            "typeVersion": 1,
+            "position": [
+                750,
+                450
+            ],
+            "credentials": {
+                "whatsAppCloudApi": "Meta_Cloud_API_Credentials"
+            }
+        }
+    ],
+    "connections": {
+        "Webhook_WhatsApp": {
+            "main": [
+                [
+                    {
+                        "node": "Es_Imagen/Comprobante?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Es_Imagen/Comprobante?": {
+            "main": [
+                [
+                    {
+                        "node": "Confirmar_Recibo",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Esperar_5_Minutos",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Esperar_5_Minutos": {
+            "main": [
+                [
+                    {
+                        "node": "Verificar_Status_Pago",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Verificar_Status_Pago": {
+            "main": [
+                [
+                    {
+                        "node": "Sigue_Sin_Pagar?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Sigue_Sin_Pagar?": {
+            "main": [
+                [
+                    {
+                        "node": "Enviar_Recordatorio",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

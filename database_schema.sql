@@ -1,0 +1,103 @@
+-- Script de Creación de Tablas para PostgreSQL
+-- Ejecuta este script en tu instancia de Postgres en Easypanel
+
+-- TABLA DE SEDES
+CREATE TABLE IF NOT EXISTS branches (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    address TEXT,
+    phone TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- TABLA DE USUARIOS (STAFF)
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    branch_id INTEGER REFERENCES branches(id),
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT CHECK (role IN ('cajero', 'admin', 'gerente')) DEFAULT 'cajero',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de Clientes (Marketing)
+CREATE TABLE IF NOT EXISTS customers (
+    phone_number VARCHAR(20) PRIMARY KEY,
+    branch_id INTEGER REFERENCES branches(id), -- Added branch_id
+    name TEXT,
+    address TEXT, -- Para domicilios
+    total_orders INT DEFAULT 0,
+    marketing_opt_in BOOLEAN DEFAULT TRUE,
+    identification_type TEXT, -- 13: CC, 31: NIT, etc.
+    identification_number TEXT,
+    email_tributario TEXT,
+    person_type TEXT, -- 1: Natural, 2: Juridica
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    last_interaction TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabla de Mesas
+CREATE TABLE IF NOT EXISTS tables (
+    id SERIAL PRIMARY KEY,
+    branch_id INTEGER REFERENCES branches(id), -- Added branch_id
+    name VARCHAR(50) NOT NULL,
+    qr_code_id VARCHAR(100) UNIQUE NOT NULL -- ID que vendrá en la URL del QR
+);
+
+-- Tabla de Productos (Menú)
+CREATE TABLE IF NOT EXISTS products (
+    id SERIAL PRIMARY KEY,
+    branch_id INTEGER REFERENCES branches(id), -- Added branch_id
+    name VARCHAR(100) NOT NULL,
+    category VARCHAR(50) NOT NULL, -- hamburguesas, perros, granizados, coripapa, salchipapa, bebidas
+    subcategory VARCHAR(50), -- gaseosa, limonada, granizada
+    price DECIMAL(10, 2) NOT NULL,
+    description TEXT,
+    available BOOLEAN DEFAULT TRUE
+);
+
+-- Tabla de Pedidos
+CREATE TYPE order_type AS ENUM ('mesa', 'domicilio');
+CREATE TYPE order_status AS ENUM ('nuevo', 'fabricacion', 'despachado', 'pagado', 'cancelado');
+
+CREATE TABLE IF NOT EXISTS orders (
+    id SERIAL PRIMARY KEY,
+    customer_phone VARCHAR(20) REFERENCES customers(phone_number),
+    type order_type NOT NULL,
+    table_id INT REFERENCES tables(id), -- Null si es domicilio
+    status order_status DEFAULT 'nuevo',
+    total_price DECIMAL(10, 2) DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    payment_proof_url TEXT, -- URL de la imagen del soporte
+    is_paid BOOLEAN DEFAULT FALSE,
+    is_electronic_invoiced BOOLEAN DEFAULT FALSE,
+    factus_invoice_status TEXT, -- pending, issued, failed
+    cufe TEXT,
+    pdf_url TEXT,
+    tax_data JSONB -- Transmitido a Factus
+);
+
+-- Items del Pedido
+CREATE TABLE IF NOT EXISTS order_items (
+    id SERIAL PRIMARY KEY,
+    order_id INT REFERENCES orders(id) ON DELETE CASCADE,
+    product_id INT REFERENCES products(id),
+    quantity INT DEFAULT 1,
+    unit_price DECIMAL(10, 2),
+    notes TEXT
+);
+
+-- Insertar Datos Iniciales (Ejemplos)
+INSERT INTO products (name, category, price, description) VALUES
+('Hamburguesa Clásica', 'hamburguesas', 15000, 'Carne 150g, queso, lechuga, tomate'),
+('Hamburguesa Especial', 'hamburguesas', 18000, 'Carne 150g, tocineta, huevo, queso'),
+('Perro Caliente Sencillo', 'perros', 8000, 'Salchicha, ripio, salsas'),
+('Salchipapa Pequeña', 'salchipapa', 12000, 'Papa frita, salchicha, queso'),
+('Gaseosa 350ml', 'bebidas', 4000, 'Coca-Cola, Postobón'),
+('Limonada Natural', 'bebidas', 6000, 'Limón fresco y azúcar');
+
+INSERT INTO tables (name, qr_code_id) VALUES
+('Mesa 1', 'mesa_01'),
+('Mesa 2', 'mesa_02'),
+('Mesa 3', 'mesa_03');
