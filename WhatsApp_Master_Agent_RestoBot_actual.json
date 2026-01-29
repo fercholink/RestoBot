@@ -1,0 +1,455 @@
+{
+  "name": "WhatsApp_Master_Agent_RestoBot",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "orders/update",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook_Update_Order",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1424,
+        -272
+      ],
+      "webhookId": "update-order-webhook",
+      "id": "6b01dc47-e920-4d6c-9747-867ae3f50508"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "orders",
+        "filterType": "string",
+        "filterString": "=id=eq.{{ $json.body.orderId }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "id",
+              "fieldValue": "={{ $json.body.customer_phone }}"
+            }
+          ]
+        }
+      },
+      "name": "Update_Order_Status",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1216,
+        -272
+      ],
+      "id": "a629c61c-68fc-4dfa-9d82-ff484942a07d",
+      "credentials": {
+        "supabaseApi": {
+          "id": "v34Aaw7E1kJsUlwX",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.status }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "despachado"
+            },
+            {
+              "value2": "fabricacion"
+            }
+          ]
+        }
+      },
+      "name": "Check_Status",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        -1024,
+        -272
+      ],
+      "id": "b08f5d41-b6d6-4ab4-bb3f-34511817c76d"
+    },
+    {
+      "parameters": {
+        "path": "orders",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook_Get_Orders",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1424,
+        -464
+      ],
+      "webhookId": "get-orders-webhook",
+      "id": "37e9d484-93aa-4c9b-9051-e54b1c4a06ab"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "orders",
+        "returnAll": true
+      },
+      "name": "Get_All_Orders",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1216,
+        -464
+      ],
+      "id": "a2462e99-8078-478d-aba6-df2063bb2034",
+      "credentials": {
+        "supabaseApi": {
+          "id": "v34Aaw7E1kJsUlwX",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "customers",
+        "options": {
+          "allowedOrigins": "*"
+        }
+      },
+      "name": "Webhook_Get_Customers",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1424,
+        -64
+      ],
+      "webhookId": "get-customers-webhook",
+      "id": "ec34252a-fb9e-4587-bb4e-438d6c8c248e"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "orders",
+        "returnAll": true
+      },
+      "name": "Get_All_Customers",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1216,
+        -64
+      ],
+      "id": "aaaf7874-64ad-4dd0-8229-927196b47cc2",
+      "credentials": {
+        "supabaseApi": {
+          "id": "v34Aaw7E1kJsUlwX",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-ai-agent",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "name": "WhatsApp_Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -1280,
+        384
+      ],
+      "webhookId": "whatsapp-master-webhook",
+      "id": "9a79f97b-f3c6-47e0-bdd2-41146a21e67b"
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.body.message.type }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "image"
+            }
+          ]
+        }
+      },
+      "name": "Check_Input_Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        -1088,
+        384
+      ],
+      "id": "2c5c13b8-54f8-41da-89da-281de5bcef00"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "menu_view",
+        "returnAll": true
+      },
+      "name": "Get_Menu",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        480
+      ],
+      "id": "72d1439d-867e-446c-8a44-e298a8237710",
+      "credentials": {
+        "supabaseApi": {
+          "id": "v34Aaw7E1kJsUlwX",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Formatear Menú para la IA\nconst products = items.map(item => item.json);\nconst menuByCategory = {};\nproducts.forEach(p => {\n  if (!menuByCategory[p.category_name]) menuByCategory[p.category_name] = [];\n  menuByCategory[p.category_name].push({\n    name: p.name,\n    price: p.price,\n    description: p.description,\n    image: p.image_url,\n    ingredients: p.base_ingredients,\n    extras: p.extras\n  });\n});\n\nreturn [{ json: { menu_context: JSON.stringify(menuByCategory, null, 2) } }];"
+      },
+      "name": "Format_Menu_Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        -688,
+        480
+      ],
+      "id": "14f0ee5c-11ae-4638-8412-1cf81b769746"
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "prompt": "Analiza esta imagen. ¿Es un comprobante de pago?\nExtrae en JSON:\n{\n  \"is_payment_proof\": boolean,\n  \"date\": string,\n  \"status\": string,\n  \"amount\": number\n}\nHoy es: {{ $today }}",
+        "options": {},
+        "requestOptions": {}
+      },
+      "name": "Analyze_Image",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        -880,
+        272
+      ],
+      "id": "0aa574c3-99eb-404c-81e6-26e1fb10ccec",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "OpenAI_Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o",
+        "options": {},
+        "requestOptions": {}
+      },
+      "name": "Master_Brain_AI",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        384
+      ],
+      "id": "ae6d7ffa-3a6c-4b35-a830-d18f9bd0c1b3",
+      "credentials": {
+        "openAiApi": {
+          "id": null,
+          "name": "OpenAI_Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.ready_to_order }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "name": "Is_Order_Confirmed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        384
+      ],
+      "id": "1949b0fe-2a11-4893-bcbd-0be86b6ed286"
+    },
+    {
+      "parameters": {
+        "tableId": "orders"
+      },
+      "name": "Save_Order",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        384
+      ],
+      "id": "3731f4bd-311b-4199-90a2-1f38aa1aea87",
+      "credentials": {
+        "supabaseApi": {
+          "id": "v34Aaw7E1kJsUlwX",
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook_Update_Order": {
+      "main": [
+        [
+          {
+            "node": "Update_Order_Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update_Order_Status": {
+      "main": [
+        [
+          {
+            "node": "Check_Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook_Get_Orders": {
+      "main": [
+        [
+          {
+            "node": "Get_All_Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook_Get_Customers": {
+      "main": [
+        [
+          {
+            "node": "Get_All_Customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check_Status": {
+      "main": [
+        []
+      ]
+    },
+    "WhatsApp_Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check_Input_Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check_Input_Type": {
+      "main": [
+        [
+          {
+            "node": "Analyze_Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get_Menu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get_Menu": {
+      "main": [
+        [
+          {
+            "node": "Format_Menu_Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format_Menu_Context": {
+      "main": [
+        [
+          {
+            "node": "Master_Brain_AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze_Image": {
+      "main": [
+        [
+          {
+            "node": "Master_Brain_AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Master_Brain_AI": {
+      "main": [
+        [
+          {
+            "node": "Is_Order_Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is_Order_Confirmed": {
+      "main": [
+        [
+          {
+            "node": "Save_Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "ca7fa621-6839-4448-a9c2-be8b60d59f00",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f6e50490fbe2032c05caa44d3eef505b824a6d748296a169f408f7fa6fe70a6f"
+  },
+  "id": "tkcjtW37jAApgtWfmoVIV",
+  "tags": []
+}
