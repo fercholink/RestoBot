@@ -575,8 +575,8 @@ const MenuManagement = () => {
                                 </h4>
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-5 gap-2">
-                                        <input id="extra-name" type="text" placeholder="Extra" className="col-span-3 px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[10px] outline-none" />
-                                        <input id="extra-price" type="number" placeholder="$" className="col-span-1 px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[10px] outline-none font-bold" />
+                                        <input id="extra-name" type="text" placeholder="Extra" className="col-span-2 px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[10px] outline-none" />
+                                        <input id="extra-price" type="number" placeholder="$ Precio" className="col-span-2 px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[10px] outline-none font-bold" />
                                         <button type="button" onClick={() => { handleAddExtra(document.getElementById('extra-name').value, document.getElementById('extra-price').value); document.getElementById('extra-name').value = ''; document.getElementById('extra-price').value = ''; }} className="col-span-1 flex items-center justify-center bg-success text-white rounded-xl hover:brightness-110 transition-all"><Plus size={16} /></button>
                                     </div>
                                     <div className="space-y-2">
@@ -613,20 +613,22 @@ const MenuManagement = () => {
                             </div>
 
                             {/* Footer del Modal */}
-                            <div className="p-8 bg-gray-50 flex gap-4">
-                                <button
-                                    type="submit"
-                                    className="flex-1 bg-primary text-white py-4 rounded-2xl font-black shadow-premium hover:brightness-110 active:scale-95 transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-3"
-                                >
-                                    <Save size={20} />
-                                    {editingProduct ? 'Actualizar' : 'Guardar'} Configuración de Producto
-                                </button>
+                            {/* Footer del Modal (Sticky) */}
+                            <div className="p-6 bg-white/95 backdrop-blur-sm border-t border-gray-100 flex gap-4 sticky bottom-0 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                                 <button
                                     type="button"
                                     onClick={() => { setShowProductModal(false); setEditingProduct(null); setTempIngredients([]); setTempExtras([]); }}
-                                    className="px-8 py-4 bg-white border border-gray-200 text-secondary rounded-2xl font-black hover:bg-gray-100 transition-all text-sm uppercase tracking-widest"
+                                    className="flex-1 py-4 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-2xl border-2 border-transparent hover:border-red-100 transition-all font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2"
                                 >
-                                    Descartar
+                                    <XCircle size={20} />
+                                    <span>Descartar</span>
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 py-4 bg-secondary text-white rounded-2xl font-black shadow-premium hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 transition-all text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3"
+                                >
+                                    <Save size={20} className="text-primary" />
+                                    <span>{editingProduct ? 'Guardar Cambios' : 'Crear Producto'}</span>
                                 </button>
                             </div>
                         </form>

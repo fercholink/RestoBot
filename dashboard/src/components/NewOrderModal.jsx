@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Minus, ShoppingCart, Check, Trash2, PlusCircle, MinusCircle, AlertCircle, ChevronRight } from 'lucide-react';
+import { X, Plus, Minus, ShoppingCart, Check, Trash2, PlusCircle, MinusCircle, AlertCircle, ChevronRight, MapPin } from 'lucide-react';
 
 
 
@@ -8,6 +8,15 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
     const [customerPhone, setCustomerPhone] = useState('');
     const [orderType, setOrderType] = useState('mesa');
     const [tableId, setTableId] = useState('');
+    const [deliveryDetails, setDeliveryDetails] = useState({
+        housingType: 'casa', // 'casa' | 'apto'
+        city: 'Montería',
+        address: '',
+        neighborhood: '',
+        complex: '',
+        unit: '',
+        notes: ''
+    });
     const [cart, setCart] = useState([]);
 
     // Cargar datos si estamos editando
@@ -95,10 +104,15 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
     const confirmCustomization = () => {
         if (!customizingProduct) return;
 
+        // Calcular precio total incluyendo extras
+        const extrasCost = tempCustomization.added_extras.reduce((sum, extra) => sum + (extra.price || 0), 0);
+        const finalPrice = (customizingProduct.price || 0) + extrasCost;
+
         const customizedItem = {
             ...customizingProduct,
+            price: finalPrice, // Actualizamos el precio unitario con los extras
             customizations: tempCustomization,
-            cartId: Date.now() // ID único para el carrito
+            cartId: Date.now()
         };
 
         addToCart(customizedItem);
@@ -144,8 +158,15 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
         e.preventDefault();
         if (cart.length === 0) return alert('El carrito está vacío');
 
+        if (orderType === 'domicilio') {
+            if (!deliveryDetails.address || !deliveryDetails.neighborhood) {
+                return alert('Por favor completa la Dirección y el Barrio para el domicilio.');
+            }
+        }
+
         // Validar si la mesa ya está ocupada
         if (orderType === 'mesa') {
+            if (!tableId) return alert('Por favor ingresa el número de mesa');
             const isTableOccupied = orders.some(o =>
                 o.type === 'mesa' &&
                 o.table_id === tableId &&
@@ -174,7 +195,8 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                 product_name: item.name,
                 unit_price: item.price,
                 customizations: item.customizations
-            }))
+            })),
+            delivery: orderType === 'domicilio' ? deliveryDetails : null,
         };
 
         if (editingOrder) {
@@ -316,7 +338,86 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                                         </div>
                                     )}
                                 </div>
+                                {orderType === 'domicilio' && (
+                                    <div className="space-y-3 mt-3 animate-in fade-in slide-in-from-top-2">
+
+                                        {/* Tipo de Vivienda */}
+                                        <div className="flex gap-2">
+                                            {[
+                                                { id: 'casa', label: '🏡 Casa' },
+                                                { id: 'apto', label: '🏢 Apto / Conjunto' }
+                                            ].map(type => (
+                                                <button
+                                                    key={type.id}
+                                                    type="button"
+                                                    onClick={() => setDeliveryDetails({ ...deliveryDetails, housingType: type.id })}
+                                                    className={`flex-1 py-2 rounded-xl text-xs font-black border transition-all ${deliveryDetails.housingType === type.id
+                                                            ? 'bg-secondary text-white border-secondary'
+                                                            : 'bg-white text-gray-400 border-gray-200 hover:border-secondary'
+                                                        }`}
+                                                >
+                                                    {type.label}
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <input
+                                                type="text"
+                                                placeholder="Ciudad"
+                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none"
+                                                value={deliveryDetails.city}
+                                                onChange={e => setDeliveryDetails({ ...deliveryDetails, city: e.target.value })}
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="Barrio *"
+                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none"
+                                                value={deliveryDetails.neighborhood}
+                                                onChange={e => setDeliveryDetails({ ...deliveryDetails, neighborhood: e.target.value })}
+                                            />
+                                        </div>
+
+                                        <div className="col-span-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Dirección Exacta *"
+                                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 outline-none"
+                                                value={deliveryDetails.address}
+                                                onChange={e => setDeliveryDetails({ ...deliveryDetails, address: e.target.value })}
+                                            />
+                                        </div>
+
+                                        {deliveryDetails.housingType === 'apto' && (
+                                            <div className="grid grid-cols-2 gap-3 animate-in zoom-in duration-200">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Conjunto / Edificio"
+                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none"
+                                                    value={deliveryDetails.complex}
+                                                    onChange={e => setDeliveryDetails({ ...deliveryDetails, complex: e.target.value })}
+                                                />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Torre / Apto / Interior"
+                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none"
+                                                    value={deliveryDetails.unit}
+                                                    onChange={e => setDeliveryDetails({ ...deliveryDetails, unit: e.target.value })}
+                                                />
+                                            </div>
+                                        )}
+
+                                        <input
+                                            type="text"
+                                            placeholder="Notas de Entrega (Opcional)"
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none"
+                                            value={deliveryDetails.notes}
+                                            onChange={e => setDeliveryDetails({ ...deliveryDetails, notes: e.target.value })}
+                                        />
+                                    </div>
+                                )}
                             </div>
+
 
                             <div className="flex-1 flex flex-col pt-4 border-t border-gray-50 min-h-[300px]">
                                 <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 mb-4 flex justify-between items-center">
@@ -379,113 +480,115 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
             </div>
 
             {/* Modal de Personalización (Overlay) */}
-            {customizingProduct && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-secondary/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-[2.5rem] w-full max-w-xl overflow-hidden shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-300">
-                        <div className="p-8 pb-4">
-                            <div className="flex justify-between items-start mb-6">
-                                <div className="space-y-1">
-                                    <h3 className="text-2xl font-black text-secondary tracking-tight">Personalizar</h3>
-                                    <p className="text-primary font-black text-lg">${(customizingProduct.price || 0).toLocaleString()} base</p>
+            {
+                customizingProduct && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-secondary/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                        <div className="bg-white rounded-[2.5rem] w-full max-w-xl overflow-hidden shadow-2xl animate-in zoom-in slide-in-from-bottom-4 duration-300">
+                            <div className="p-8 pb-4">
+                                <div className="flex justify-between items-start mb-6">
+                                    <div className="space-y-1">
+                                        <h3 className="text-2xl font-black text-secondary tracking-tight">Personalizar</h3>
+                                        <p className="text-primary font-black text-lg">${(customizingProduct.price || 0).toLocaleString()} base</p>
+                                    </div>
+                                    <button onClick={() => setCustomizingProduct(null)} className="p-2 text-gray-300 hover:text-secondary transition-colors"><X size={28} /></button>
                                 </div>
-                                <button onClick={() => setCustomizingProduct(null)} className="p-2 text-gray-300 hover:text-secondary transition-colors"><X size={28} /></button>
+
+                                <div className="space-y-8 py-4">
+                                    {/* Ingredientes Base (Permitir quitar) */}
+                                    {customizingProduct.base_ingredients?.length > 0 && (
+                                        <div className="space-y-4">
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 bg-red-400 rounded-full" />
+                                                ¿Quitar algo? (Opcional)
+                                            </h4>
+                                            <div className="flex flex-wrap gap-2">
+                                                {customizingProduct.base_ingredients?.map(ing => {
+                                                    if (!ing) return null;
+                                                    const isExcluded = tempCustomization.excluded_ingredients.includes(ing);
+                                                    return (
+                                                        <button
+                                                            key={ing}
+                                                            onClick={() => {
+                                                                setTempCustomization(prev => ({
+                                                                    ...prev,
+                                                                    excluded_ingredients: isExcluded
+                                                                        ? prev.excluded_ingredients.filter(i => i !== ing)
+                                                                        : [...prev.excluded_ingredients, ing]
+                                                                }));
+                                                            }}
+                                                            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[10px] font-black transition-all border ${isExcluded
+                                                                ? 'bg-red-50 border-red-200 text-red-500 scale-95'
+                                                                : 'bg-gray-50 border-gray-100 text-secondary hover:bg-gray-100'
+                                                                }`}
+                                                        >
+                                                            {isExcluded ? <X size={12} /> : <Check size={12} className="text-success" />}
+                                                            {ing}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Extras (Permitir añadir) */}
+                                    {customizingProduct.extras?.length > 0 && (
+                                        <div className="space-y-4">
+                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 bg-success rounded-full" />
+                                                ¿Añadir extras? (+ costo)
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {customizingProduct.extras?.map(extra => {
+                                                    if (!extra || !extra.name) return null;
+                                                    const isAdded = tempCustomization.added_extras.some(e => e.name === extra.name);
+                                                    return (
+                                                        <button
+                                                            key={extra.name}
+                                                            onClick={() => {
+                                                                setTempCustomization(prev => ({
+                                                                    ...prev,
+                                                                    added_extras: isAdded
+                                                                        ? prev.added_extras.filter(e => e.name !== extra.name)
+                                                                        : [...prev.added_extras, extra]
+                                                                }));
+                                                            }}
+                                                            className={`flex items-center justify-between px-5 py-4 rounded-3xl text-xs font-black transition-all border ${isAdded
+                                                                ? 'bg-success/5 border-success text-success ring-1 ring-success animate-in pulse duration-500'
+                                                                : 'bg-white border-gray-100 text-secondary hover:border-success/30'
+                                                                }`}
+                                                        >
+                                                            <div className="flex flex-col items-start translate-y-[-1px]">
+                                                                <span>{extra.name}</span>
+                                                                <span className="text-[10px] font-bold opacity-60">+${(extra.price || 0).toLocaleString()}</span>
+                                                            </div>
+                                                            {isAdded ? <CheckCircle2 size={18} /> : <PlusCircle size={18} className="text-gray-200 group-hover:text-success transition-colors" />}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
-                            <div className="space-y-8 py-4">
-                                {/* Ingredientes Base (Permitir quitar) */}
-                                {customizingProduct.base_ingredients?.length > 0 && (
-                                    <div className="space-y-4">
-                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 bg-red-400 rounded-full" />
-                                            ¿Quitar algo? (Opcional)
-                                        </h4>
-                                        <div className="flex flex-wrap gap-2">
-                                            {customizingProduct.base_ingredients?.map(ing => {
-                                                if (!ing) return null;
-                                                const isExcluded = tempCustomization.excluded_ingredients.includes(ing);
-                                                return (
-                                                    <button
-                                                        key={ing}
-                                                        onClick={() => {
-                                                            setTempCustomization(prev => ({
-                                                                ...prev,
-                                                                excluded_ingredients: isExcluded
-                                                                    ? prev.excluded_ingredients.filter(i => i !== ing)
-                                                                    : [...prev.excluded_ingredients, ing]
-                                                            }));
-                                                        }}
-                                                        className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[10px] font-black transition-all border ${isExcluded
-                                                            ? 'bg-red-50 border-red-200 text-red-500 scale-95'
-                                                            : 'bg-gray-50 border-gray-100 text-secondary hover:bg-gray-100'
-                                                            }`}
-                                                    >
-                                                        {isExcluded ? <X size={12} /> : <Check size={12} className="text-success" />}
-                                                        {ing}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Extras (Permitir añadir) */}
-                                {customizingProduct.extras?.length > 0 && (
-                                    <div className="space-y-4">
-                                        <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 bg-success rounded-full" />
-                                            ¿Añadir extras? (+ costo)
-                                        </h4>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {customizingProduct.extras?.map(extra => {
-                                                if (!extra || !extra.name) return null;
-                                                const isAdded = tempCustomization.added_extras.some(e => e.name === extra.name);
-                                                return (
-                                                    <button
-                                                        key={extra.name}
-                                                        onClick={() => {
-                                                            setTempCustomization(prev => ({
-                                                                ...prev,
-                                                                added_extras: isAdded
-                                                                    ? prev.added_extras.filter(e => e.name !== extra.name)
-                                                                    : [...prev.added_extras, extra]
-                                                            }));
-                                                        }}
-                                                        className={`flex items-center justify-between px-5 py-4 rounded-3xl text-xs font-black transition-all border ${isAdded
-                                                            ? 'bg-success/5 border-success text-success ring-1 ring-success animate-in pulse duration-500'
-                                                            : 'bg-white border-gray-100 text-secondary hover:border-success/30'
-                                                            }`}
-                                                    >
-                                                        <div className="flex flex-col items-start translate-y-[-1px]">
-                                                            <span>{extra.name}</span>
-                                                            <span className="text-[10px] font-bold opacity-60">+${(extra.price || 0).toLocaleString()}</span>
-                                                        </div>
-                                                        {isAdded ? <CheckCircle2 size={18} /> : <PlusCircle size={18} className="text-gray-200 group-hover:text-success transition-colors" />}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
+                            <div className="p-8 bg-gray-50 flex gap-4">
+                                <button
+                                    onClick={confirmCustomization}
+                                    className="flex-1 bg-primary text-white py-5 rounded-[1.5rem] font-black shadow-premium hover:brightness-110 active:scale-95 transition-all text-xs uppercase tracking-[0.2em]"
+                                >
+                                    Añadir {customizingProduct.name} al Carrito
+                                </button>
+                                <button
+                                    onClick={() => setCustomizingProduct(null)}
+                                    className="px-8 py-5 bg-white border border-gray-200 text-secondary rounded-[1.5rem] font-black hover:bg-gray-100 transition-all text-xs uppercase tracking-widest"
+                                >
+                                    Cancelar
+                                </button>
                             </div>
-                        </div>
-
-                        <div className="p-8 bg-gray-50 flex gap-4">
-                            <button
-                                onClick={confirmCustomization}
-                                className="flex-1 bg-primary text-white py-5 rounded-[1.5rem] font-black shadow-premium hover:brightness-110 active:scale-95 transition-all text-xs uppercase tracking-[0.2em]"
-                            >
-                                Añadir {customizingProduct.name} al Carrito
-                            </button>
-                            <button
-                                onClick={() => setCustomizingProduct(null)}
-                                className="px-8 py-5 bg-white border border-gray-200 text-secondary rounded-[1.5rem] font-black hover:bg-gray-100 transition-all text-xs uppercase tracking-widest"
-                            >
-                                Cancelar
-                            </button>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
         </div>
     );
 };

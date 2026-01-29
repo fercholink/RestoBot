@@ -14,6 +14,18 @@ const RestaurantManagement = ({ orders, onStatusChange, onEdit, onDelete, onPrin
         date: 'today'
     });
     const [showPaidTotal, setShowPaidTotal] = useState(false);
+    const [shouldAutoOpenShift, setShouldAutoOpenShift] = useState(false);
+
+    React.useEffect(() => {
+        const handleOpenShiftModal = () => {
+            setActiveSubTab('turnos');
+            setShouldAutoOpenShift(true);
+            // Reset after a delay to allow consuming the prop
+            setTimeout(() => setShouldAutoOpenShift(false), 2000);
+        };
+        window.addEventListener('open-shift-modal', handleOpenShiftModal);
+        return () => window.removeEventListener('open-shift-modal', handleOpenShiftModal);
+    }, []);
 
     const subMenuItems = [
         { id: 'board', label: 'Monitor de Pedidos', icon: LayoutGrid, description: 'Vista de pedidos en tiempo real' },
@@ -332,7 +344,7 @@ const RestaurantManagement = ({ orders, onStatusChange, onEdit, onDelete, onPrin
                             transition={{ duration: 0.3 }}
                             className="h-full overflow-y-auto"
                         >
-                            <ShiftManagement orders={orders} />
+                            <ShiftManagement orders={orders} onPrint={onPrint} autoOpen={shouldAutoOpenShift} />
                         </motion.div>
                     )}
                 </AnimatePresence>

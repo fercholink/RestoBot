@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutPanelLeft, Users, Utensils, Settings, Menu, X, LogOut, ChevronLeft, ChevronRight, Building2, Wallet, ShieldAlert, Zap } from 'lucide-react';
+import { LayoutPanelLeft, Users, Utensils, Settings, Menu, X, LogOut, ChevronLeft, ChevronRight, Building2, Wallet, ShieldAlert, Zap, Megaphone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed }) => {
@@ -13,6 +13,7 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed }) => {
         { id: 'contabilidad', label: 'Contabilidad', icon: Wallet, roles: ['gerente', 'admin'] },
         { id: 'sedes', label: 'Sucursales', icon: Building2, roles: ['gerente'] },
         { id: 'users', label: 'Personal', icon: Users, roles: ['admin', 'gerente'] },
+        { id: 'marketing', label: 'Marketing AI', icon: Megaphone, roles: ['admin', 'gerente'] },
         { id: 'operaciones', label: 'Seguridad / Logs', icon: ShieldAlert, roles: ['gerente'] },
     ].filter(item => item.roles.includes(user?.role || 'cajero'));
 

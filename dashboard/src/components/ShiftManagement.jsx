@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Wallet, Clock, ArrowRightLeft, CheckCircle2, AlertCircle, History, User, Building2, TrendingUp, TrendingDown, Landmark, Banknote, Save, X, Plus, Minus, Download, Send, XCircle } from 'lucide-react';
 
-const ShiftManagement = ({ orders = [] }) => {
+const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
     // Persistencia en LocalStorage
     const [shifts, setShifts] = useState(() => {
         const saved = localStorage.getItem('restobot_shifts');
@@ -12,6 +12,12 @@ const ShiftManagement = ({ orders = [] }) => {
     });
 
     const [showOpenModal, setShowOpenModal] = useState(false);
+
+    useEffect(() => {
+        if (autoOpen) {
+            setShowOpenModal(true);
+        }
+    }, [autoOpen]);
     const [showCloseModal, setShowCloseModal] = useState(false);
     const [showExpenseModal, setShowExpenseModal] = useState(false);
     const [initialCash, setInitialCash] = useState(50000);
@@ -303,7 +309,18 @@ const ShiftManagement = ({ orders = [] }) => {
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-primary transition-all"><Send size={16} /></button>
-                                            <button className="text-[10px] font-black text-secondary hover:text-primary uppercase tracking-widest border border-gray-100 px-3 py-2 rounded-xl">Reporte</button>
+                                            <button
+                                                onClick={() => {
+                                                    const shiftToPrint = { ...shift };
+                                                    if (!shift.metrics && shift.status === 'abierto') {
+                                                        shiftToPrint.metrics = getShiftMetrics(shift);
+                                                    }
+                                                    onPrint && onPrint(shiftToPrint, 'cierre_caja');
+                                                }}
+                                                className="text-[10px] font-black text-secondary hover:text-primary uppercase tracking-widest border border-gray-100 px-3 py-2 rounded-xl"
+                                            >
+                                                Reporte
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
