@@ -1,0 +1,123 @@
+{
+    "name": "WhatsApp_Product_Query_Agent",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-product-query",
+                "options": {}
+            },
+            "name": "Webhook_WhatsApp",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "getAll",
+                "tableStr": "menu_view",
+                "returnAll": true,
+                "options": {}
+            },
+            "name": "Get_Menu_Data",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                300,
+                300
+            ],
+            "credentials": {
+                "supabaseApi": "Supabase_Creds"
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const products = items.map(item => item.json);\n\n// Agrupar por categoría para un contexto más limpio\nconst menuByCategory = {};\nproducts.forEach(p => {\n  if (!menuByCategory[p.category_name]) menuByCategory[p.category_name] = [];\n  menuByCategory[p.category_name].push({\n    name: p.name,\n    price: p.price,\n    description: p.description,\n    image: p.image_url,\n    included: p.base_ingredients,\n    extras_available: p.extras // Extras es un JSONB array [{name, price}]\n  });\n});\n\nreturn [{ json: { menu_context: JSON.stringify(menuByCategory, null, 2), user_query: $('Webhook_WhatsApp').first().json.body.message } }];"
+            },
+            "name": "Format_Context",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                500,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o",
+                "prompt": "Eres un asistente virtual amable y servicial para un restaurante. \nTu objetivo es responder a las preguntas de los clientes en WhatsApp sobre el men\u00fa.\n\nContexto del Men\u00fa (Productos disponibles, precios, ingredientes, extras e im\u00e1genes):\n{{$json.menu_context}}\n\nConsulta del Usuario: \"{{$json.user_query}}\"\n\nInstrucciones:\n1. Responde de manera concisa pero amigable.\n2. Si el usuario pregunta por una categor\u00eda (ej. hamburguesas), lista las opciones disponibles con sus precios.\n3. Si pregunta por un producto espec\u00edfico, detalla sus ingredientes base y qu\u00e9 extras puede agregar (con sus costos).\n4. Si los extras tienen precio 0 o no est\u00e1n, no los menciones como costo extra.\n5. Usa emojis para que el mensaje se vea visualmente atractivo en WhatsApp. \uD83C\uDF54 \uD83C\uDF2D \uD83C\uDF79\n6. Si el producto tiene una imagen (campo 'image'), incl\u00fayela en tu respuesta indicando el enlace.\n7. Si el usuario quiere pedir, ind\u00edcale amablemente que puede hacerlo a trav\u00e9s del enlace de la web (o como sea el flujo de venta).\n8. El precio est\u00e1 en pesos colombianos (COP), usa formato $15.000."
+            },
+            "name": "AI_Response_Generator",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                700,
+                300
+            ],
+            "credentials": {
+                "openAiApi": "OpenAI_Credentials"
+            }
+        },
+        {
+            "parameters": {
+                "options": {}
+            },
+            "name": "Respond_to_Webhook",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                900,
+                300
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook_WhatsApp": {
+            "main": [
+                [
+                    {
+                        "node": "Get_Menu_Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get_Menu_Data": {
+            "main": [
+                [
+                    {
+                        "node": "Format_Context",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format_Context": {
+            "main": [
+                [
+                    {
+                        "node": "AI_Response_Generator",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI_Response_Generator": {
+            "main": [
+                [
+                    {
+                        "node": "Respond_to_Webhook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

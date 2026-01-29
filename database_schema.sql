@@ -54,7 +54,10 @@ CREATE TABLE IF NOT EXISTS products (
     subcategory VARCHAR(50), -- gaseosa, limonada, granizada
     price DECIMAL(10, 2) NOT NULL,
     description TEXT,
-    available BOOLEAN DEFAULT TRUE
+    available BOOLEAN DEFAULT TRUE,
+    image_url TEXT,
+    base_ingredients TEXT, -- Lista de ingredientes separados por coma o JSON
+    extras JSONB -- Estructura JSON para extras [{name, price}]
 );
 
 -- Tabla de Pedidos

@@ -18,16 +18,53 @@
         },
         {
             "parameters": {
+                "dataType": "string",
+                "value1": "={{ $json.body.message.type }}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": "image"
+                        }
+                    ]
+                }
+            },
+            "name": "Check_Message_Type",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 1,
+            "position": [
+                300,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o",
+                "prompt": "Analiza esta imagen. ¿Es un comprobante de pago o transferencia bancaria?\nExtrae la siguiente información en formato JSON:\n{\n  \"is_payment_proof\": boolean,\n  \"date\": string (DD/MM/YYYY),\n  \"time\": string,\n  \"amount\": number,\n  \"status\": string (exitoso, pendiente, fallido, o desconocido),\n  \"sender\": string,\n  \"receiver\": string\n}\n\nSi no es un comprobante, devuelve { \"is_payment_proof\": false }.\nHoy es: {{ $today }}",
+                "options": {}
+            },
+            "name": "Analyze_Payment_Proof",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                500,
+                200
+            ],
+            "credentials": {
+                "openAiApi": "YOUR_OPENAI_CREDENTIALS"
+            }
+        },
+        {
+            "parameters": {
                 "model": "gpt-4o",
                 "options": {
-                    "systemMessage": "Eres un mesero virtual del restaurante 'RestoBot'. Tu trabajo es tomar pedidos. \n\n1. Saluda amablemente si es el primer mensaje.\n2. Si el cliente pide algo, identifica los productos del menú (Hamburguesas, Perros, Bebidas).\n3. Extrae la cantidad y el nombre del producto.\n4. Si falta información (ej. dirección para domicilio), pídela.\n5. Cuando el pedido esté claro, genera un JSON con la estructura: \n{ \"type\": \"domicilio|mesa\", \"items\": [{ \"product\": \"Hamburguesa Clásica\", \"quantity\": 2 }] }\n\nNO inventes productos. Usa solo lo que sabes que existe."
+                    "systemMessage": "Eres un mesero virtual del restaurante 'RestoBot'. Tu trabajo es tomar pedidos.\n\nCONTEXTO ACTUAL:\n- Tipo de mensaje: {{ $('Check_Message_Type').item.json.body.message.type }}\n- Análisis de Imagen (si existe): {{ JSON.stringify($('Analyze_Payment_Proof').item ? $('Analyze_Payment_Proof').item.json : {}) }}\n\nREGLAS DE NEGOCIO:\n1. TIPOS DE PEDIDO: 'mesa' o 'domicilio'.\n2. SI ES DOMICILIO:\n   - DEBES pedir la dirección exacta.\n   - DEBES SOLICITAR UN COMPROBANTE DE PAGO VÁLIDO (Imagen).\n   - Verifica que el comprobante sea de HOY y la transferencia sea EXITOSA.\n   - Si el comprobante es válido, procede.\n   - Si es inválido o de otra fecha, RECHAZA amablemente y pide uno válido.\n3. MENÚ:\n   - Identifica productos: Hamburguesas, Perros, Bebidas, etc.\n   - No inventes productos.\n\nSALIDA REQUERIDA (JSON):\nCuando tengas TODO listo (productos, cantidad, tipo, y pago validado si es domicilio), genera:\n{ \n  \"ready_to_order\": true,\n  \"type\": \"domicilio|mesa\", \n  \"customer_name\": \"...\",\n  \"customer_address\": \"...\",\n  \"items\": [{ \"product\": \"...\", \"quantity\": 1 }],\n  \"payment_proof_url\": \"...\" (URL de la imagen si aplica)\n}\n\nSi falta información, pregunta al usuario amablemente. No generes el JSON de orden hasta tener todo."
                 }
             },
             "name": "AI_Agent_Waiter",
             "type": "n8n-nodes-base.openAi",
             "typeVersion": 1,
             "position": [
-                300,
+                700,
                 300
             ],
             "credentials": {
@@ -36,39 +73,87 @@
         },
         {
             "parameters": {
-                "operation": "executeQuery",
-                "query": "INSERT INTO orders (customer_phone, type, status, total) VALUES ('{{$json.from}}', '{{$json.ai_response.type}}', 'nuevo', 0) RETURNING id"
+                "conditions": {
+                    "boolean": [
+                        {
+                            "value1": "={{ $json.ready_to_order }}",
+                            "value2": true
+                        }
+                    ]
+                }
             },
-            "name": "Create_Order",
-            "type": "n8n-nodes-base.postgres",
+            "name": "Is_Order_Ready",
+            "type": "n8n-nodes-base.if",
             "typeVersion": 1,
             "position": [
-                500,
+                900,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "tableStr": "orders",
+                "columnsJson": "={ \"customer_phone\": \"{{ $('WhatsApp_Webhook').item.json.body.from }}\", \"type\": \"{{ $json.type }}\", \"status\": \"nuevo\", \"total\": 0, \"payment_proof_url\": \"{{ $json.payment_proof_url }}\" }"
+            },
+            "name": "Create_Order",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                1100,
                 300
             ],
             "credentials": {
-                "postgresql": "Postgres_Easypanel"
+                "supabaseApi": "Supabase_Creds"
             }
         },
         {
             "parameters": {
-                "operation": "executeQuery",
-                "query": "INSERT INTO order_items (order_id, product_name, quantity, price) VALUES ({{$json.id}}, '{{$json.ai_response.items[0].product}}', {{$json.ai_response.items[0].quantity}}, 0)"
+                "tableStr": "order_items",
+                "columnsJson": "={ \"order_id\": {{ $json.id }}, \"product_name\": \"{{ $('AI_Agent_Waiter').item.json.items[0].product }}\", \"quantity\": {{ $('AI_Agent_Waiter').item.json.items[0].quantity }}, \"price\": 0 }"
             },
             "name": "Add_Items",
-            "type": "n8n-nodes-base.postgres",
+            "type": "n8n-nodes-base.supabase",
             "typeVersion": 1,
             "position": [
-                700,
+                1300,
                 300
             ],
             "credentials": {
-                "postgresql": "Postgres_Easypanel"
+                "supabaseApi": "Supabase_Creds"
             }
         }
     ],
     "connections": {
         "WhatsApp_Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Check_Message_Type",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check_Message_Type": {
+            "main": [
+                [
+                    {
+                        "node": "Analyze_Payment_Proof",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "AI_Agent_Waiter",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Analyze_Payment_Proof": {
             "main": [
                 [
                     {
@@ -80,6 +165,17 @@
             ]
         },
         "AI_Agent_Waiter": {
+            "main": [
+                [
+                    {
+                        "node": "Is_Order_Ready",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is_Order_Ready": {
             "main": [
                 [
                     {
