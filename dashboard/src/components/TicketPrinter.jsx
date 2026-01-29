@@ -1,7 +1,16 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONES TEST SAS' }) => {
+    const hasPrinted = useRef(false);
+
+    useEffect(() => {
+        if (!hasPrinted.current) {
+            hasPrinted.current = true;
+            window.print();
+        }
+    }, []);
+
     if (!order) return null;
 
     const formatDate = (dateStr) => {
@@ -84,53 +93,120 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                         <div className="flex justify-between"><span>TIPO:</span> <span className="uppercase font-bold">{order.table_id ? `Mesa: ${order.table_id}` : 'Domicilio'}</span></div>
                     </div>
 
-                    {order.type === 'domicilio' && order.delivery && (
-                        <div className="border-t border-dashed border-black mt-1 pt-1 pb-1">
-                            <p className="font-black text-center mb-1">=== DATOS DE ENTREGA ===</p>
-                            <div className="flex flex-col text-[9px]">
-                                {/* Dirección Principal Grande */}
-                                <span className="font-black text-[10px] break-words leading-tight">{order.delivery.address}</span>
+                    {/* Datos de Entrega (Domicilio) */}
+                    {/* Datos de Entrega (Domicilio) - BLOQUE CONSOLIDADO */}
+                    {(order.type === 'domicilio' || order.table_number === 'DOMICILIO') && (
+                        <div className="border-t border-dashed border-black mt-2 pt-2 pb-2">
+                            <p className="font-black text-center mb-1 text-[10px]">=== DATOS DE ENTREGA ===</p>
 
-                                <div className="flex justify-between mt-0.5">
-                                    <span>{order.delivery.neighborhood}</span>
-                                    <span className="uppercase font-bold">{order.delivery.city}</span>
+                            <div className="flex flex-col text-[9px] gap-1">
+                                {/* 1. Contacto del Cliente Principal */}
+                                <div className="border-b border-dotted border-black/30 pb-1 mb-0.5">
+                                    <div className="flex justify-between">
+                                        <span>CLIENTE:</span>
+                                        <span className="font-black uppercase">{order.customer_name || 'SIN NOMBRE'}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span>TELÉFONO:</span>
+                                        <span className="font-black text-[10px]">
+                                            {order.customer_phone || (order.notes?.match(/Tel:\s*(.*)/)?.[1]) || 'N/A'}
+                                        </span>
+                                    </div>
                                 </div>
 
-                                {/* Detalles Adicionales si es Apto */}
-                                {(order.delivery.housingType === 'apto' || order.delivery.complex || order.delivery.unit) && (
-                                    <div className="mt-0.5">
-                                        {order.delivery.complex && <span className="block">{order.delivery.complex}</span>}
-                                        {order.delivery.unit && <span className="block font-bold">{order.delivery.unit}</span>}
-                                    </div>
-                                )}
+                                {/* 2. Detalles de Dirección */}
+                                {order.delivery_info || order.delivery ? (
+                                    <>
+                                        {(() => {
+                                            const details = order.delivery_info || order.delivery;
+                                            return (
+                                                <div className="space-y-0.5">
+                                                    <span className="block font-black text-[11px] leading-tight break-words border-l-2 border-black pl-1 my-1">
+                                                        {details.address}
+                                                    </span>
 
-                                {order.delivery.notes && (
-                                    <span className="italic mt-1 border-t border-dotted border-black pt-0.5">
-                                        Nota: {order.delivery.notes}
-                                    </span>
+                                                    <div className="flex justify-between font-bold">
+                                                        <span>{details.neighborhood || 'SIN BARRIO'}</span>
+                                                        <span className="uppercase">{details.city || 'MONTERÍA'}</span>
+                                                    </div>
+
+                                                    {(details.housingType === 'apto' || details.complex || details.unit) && (
+                                                        <div className="flex gap-2 text-[8px] italic">
+                                                            {details.complex && <span>Urb: {details.complex}</span>}
+                                                            {details.unit && <span className="font-bold not-italic">Int/Apto: {details.unit}</span>}
+                                                        </div>
+                                                    )}
+
+                                                    {details.notes && (
+                                                        <div className="mt-1 bg-black/5 p-1 rounded-sm border border-black/10">
+                                                            <span className="font-black">NOTA:</span> <span className="italic">{details.notes}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+                                    </>
+                                ) : (
+                                    // Fallback para pedidos antiguos sin estructura
+                                    <div className="space-y-0.5">
+                                        <span className="font-black text-[10px] break-words leading-tight">{order.delivery_address || 'Dirección no especificada'}</span>
+                                        {order.notes && !order.notes.startsWith('Tel:') && (
+                                            <div className="mt-1 border-t border-dotted border-black pt-0.5">
+                                                <span className="italic font-bold">Nota: {order.notes}</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         </div>
                     )}
 
-                    {/* Datos del Cliente Tributario */}
+                    {/* Datos del Cliente */}
                     <div className="border-t border-dotted border-black mt-1 pt-1">
-                        <div className="flex justify-between">
-                            <span>CLIENTE:</span>
-                            <span className="font-bold truncate max-w-[150px]">
-                                {order.tax_data?.names || order.customer_name || 'CONSUMIDOR FINAL'}
-                            </span>
+                        <div className="flex flex-col">
+                            <div className="flex justify-between">
+                                <span>CLIENTE:</span>
+                                <span className="font-bold truncate max-w-[150px] uppercase">
+                                    {order.tax_data?.names || order.customer_name || 'CONSUMIDOR FINAL'}
+                                </span>
+                            </div>
+
+                            {/* Dirección del Cliente (Si no es domicilio o para redundancia) */}
+                            {order.customer_address && order.type !== 'domicilio' && (
+                                <div className="flex justify-between">
+                                    <span>DIR:</span>
+                                    <span className="truncate max-w-[150px] uppercase">{order.customer_address}</span>
+                                </div>
+                            )}
+
+                            {/* Teléfono */}
+                            {(order.tax_data?.phone || order.customer_phone || (order.notes && order.notes.includes('Tel:'))) && (
+                                <div className="flex justify-between">
+                                    <span>TEL:</span>
+                                    <span className="font-bold">
+                                        {order.tax_data?.phone || order.customer_phone || (order.notes?.match(/Tel:\s*(.*)/)?.[1] || 'N/A')}
+                                    </span>
+                                </div>
+                            )}
                         </div>
-                        {(order.tax_data?.identification || order.customer_phone) && (
+
+                        {(order.tax_data?.identification) && (
                             <div className="flex justify-between">
                                 <span>{getIDLabel(order.tax_data?.document_type)}:</span>
-                                <span className="font-bold">{order.tax_data?.identification || '222222222222'}</span>
+                                <span className="font-bold">{order.tax_data?.identification}</span>
                             </div>
                         )}
                         {order.tax_data?.email && (
                             <div className="flex justify-between">
                                 <span>EMAIL:</span>
                                 <span className="truncate max-w-[150px]">{order.tax_data.email}</span>
+                            </div>
+                        )}
+
+                        {/* Notas Generales */}
+                        {order.notes && !order.notes.startsWith('Tel:') && (
+                            <div className="mt-1 border-t border-dotted border-black/50 pt-0.5">
+                                <span className="italic font-bold">Nota: {order.notes}</span>
                             </div>
                         )}
                     </div>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { updateOrderStatus } from './api';
 import { useAuth } from './context/AuthContext';
+import { supabase } from './lib/supabase';
 import LoginPage from './pages/LoginPage';
 import Sidebar from './components/Sidebar';
 import NewOrderModal from './components/NewOrderModal';
@@ -14,8 +16,8 @@ import BranchManagement from './components/BranchManagement';
 import ShiftManagement from './components/ShiftManagement';
 import OperationsHub from './components/OperationsHub';
 import TicketPrinter from './components/TicketPrinter';
-import CorporateIntelligence from './components/CorporateIntelligence';
 import MarketingModule from './components/Marketing/MarketingModule';
+import TableQRGenerator from './components/TableQRGenerator';
 import { LayoutGrid, Filter, Plus, Building2, Bell, BellDot, AlertTriangle, ShieldCheck, Wallet, Terminal, User, Printer, Activity, Megaphone } from 'lucide-react';
 
 // Mock data para previsualizar antes de conectar n8n
@@ -58,195 +60,313 @@ function App() {
     localStorage.setItem('restobot_active_tab', activeTab);
   }, [activeTab]);
 
-  const [orders, setOrders] = useState(MOCK_ORDERS);
+  // Estados para control de turnos y edición
+  const [hasActiveShift, setHasActiveShift] = useState(() => {
+    // Check initial state from storage
+    const shifts = JSON.parse(localStorage.getItem('restobot_shifts') || '[]');
+    return shifts.some(s => s.status === 'abierto');
+  });
+
+  // Listen for shift updates
+  useEffect(() => {
+    const checkShiftStatus = () => {
+      const shifts = JSON.parse(localStorage.getItem('restobot_shifts') || '[]');
+      setHasActiveShift(shifts.some(s => s.status === 'abierto'));
+    };
+
+    window.addEventListener('shift-updated', checkShiftStatus);
+    return () => window.removeEventListener('shift-updated', checkShiftStatus);
+  }, []);
+
+  const [showShiftWarning, setShowShiftWarning] = useState(false);
+  const [editingOrder, setEditingOrder] = useState(null);
+  const [autoAdvanceEnabled, setAutoAdvanceEnabled] = useState(true);
+
+  const [orders, setOrders] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [activeRestaurantSubTab, setActiveRestaurantSubTab] = useState(user?.role === 'cajero' ? 'turnos' : 'board');
   const [paymentModal, setPaymentModal] = useState({ isOpen: false, orderId: null, totalPrice: 0 });
   const [showNotifications, setShowNotifications] = useState(false);
   const [printData, setPrintData] = useState({ order: null, type: 'comanda' });
 
-  // Mock de notificaciones de inventario
-  const stockAlerts = [
-    { id: 1, product: 'Hamburguesa Clásica', stock: 3, threshold: 5, branch: 'Sede Norte' },
-    { id: 2, product: 'Coca Cola 350ml', stock: 2, threshold: 12, branch: 'Global' },
-  ];
-
-  // Ajustar pestaña inicial según el rol (solo si no hay una guardada)
-  useEffect(() => {
-    if (user && !localStorage.getItem('restobot_active_tab')) {
-      if (user.role === 'gerente') {
-        setActiveTab('corporate');
-      } else {
-        setActiveTab('restaurante');
-      }
-    }
-  }, [user]);
-  // Automatización: Si no hay pedidos en fabricación y hay nuevos, pasar uno automáticamente tras 2 segundos
-  useEffect(() => {
-    // Solo aplicar si estamos en la vista de pedidos
-    if (activeTab !== 'restaurante') return;
-
-    const inFabricacion = orders.filter(o => o.status === 'fabricacion');
-    const nuevos = orders.filter(o => o.status === 'nuevo');
-
-    if (inFabricacion.length === 0 && nuevos.length > 0) {
-      console.log("Automatización: Cocina libre, preparando auto-pase...");
-      const timer = setTimeout(() => {
-        // Tomar el pedido más antiguo (último del array si se usa unshift) o el primero de la cola filtrada
-        // En nuestro caso, los nuevos pedidos se agregan al inicio, por lo que el más antiguo es el último
-        const oldestOrder = nuevos[nuevos.length - 1];
-        handleStatusChange(oldestOrder.id, 'fabricacion');
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [orders, activeTab]);
-  const [editingOrder, setEditingOrder] = useState(null);
-
-  // Verificar turno activo para bloqueo de ventas
-  const [hasActiveShift, setHasActiveShift] = useState(() => {
-    const saved = localStorage.getItem('restobot_shifts');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return parsed.some(s => s.status === 'abierto');
-    }
-    return false;
-  });
-
-  // Escucha cambios en el turno (Demo simplification)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const saved = localStorage.getItem('restobot_shifts');
-      if (saved) {
-        setHasActiveShift(JSON.parse(saved).some(s => s.status === 'abierto'));
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const [showShiftWarning, setShowShiftWarning] = useState(false);
+  // Estados de turno movidos arriba
+  // const [hasActiveShift... ya definidos ex-inicio
 
   const handleOpenNewOrder = () => {
     if (!hasActiveShift) {
       setShowShiftWarning(true);
+    } else {
+      setIsModalOpen(true);
+    }
+  };
+
+  // Mock de notificaciones de inventario (Pending migration to real alerts)
+  const stockAlerts = [];
+
+  // Ajustar pestaña inicial y UI según el rol
+  useEffect(() => {
+    if (user) {
+      if (user.role === 'cajero') {
+        // Reglas para Cajero: Sidebar colapsado y pestaña Caja por defecto (si no hay una guardada o forzamos inicio)
+        setIsSidebarCollapsed(true);
+        if (!localStorage.getItem('restobot_active_tab') || localStorage.getItem('restobot_active_tab') === 'caja') {
+          setActiveTab('restaurante');
+        }
+      } else if (!localStorage.getItem('restobot_active_tab')) {
+        setActiveTab('restaurante');
+      }
+    }
+  }, [user]);
+
+  // --- SUPABASE INTEGRATION FOR ORDERS ---
+
+  useEffect(() => {
+    fetchOrders();
+
+    // Suscripción Realtime para la tabla 'orders'
+    const ordersChannel = supabase.channel('orders-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
+        console.log('Realtime Order Change:', payload);
+        fetchOrders(); // Recarga simple por ahora para traer items relacionados también
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(ordersChannel);
+    };
+  }, []);
+
+  const fetchOrders = async () => {
+    try {
+      // Necesitamos los items también. Supabase permite hacer joins profundos.
+      // 1. Obtener turno activo actual (si existe) para filtrar pedidos de la sesión
+      const shifts = JSON.parse(localStorage.getItem('restobot_shifts') || '[]');
+      const activeShift = shifts.find(s => s.status === 'abierto');
+
+      let query = supabase
+        .from('orders')
+        .select(`
+          *,
+          items:order_items(*)
+        `)
+        .order('created_at', { ascending: false });
+
+      // LOGICA DE FILTRADO POR ROL
+      // LOGICA DE FILTRADO PARA CAJEROS
+      if (user && user.role !== 'admin' && user.role !== 'gerente') {
+        const todayStr = new Date().toISOString().split('T')[0];
+        // Mostrar pedidos creados HOY o pedidos ACTIVOS (no pagados) de cualquier fecha
+        // Como 'or' es complejo en supabase client js con filtros anidados, simplificamos:
+        // Traemos los de hoy. Los activos antiguos deberían ser pocos o gestionados por admin.
+
+        // Filtro: created_at >= hoy Inicio del día
+        query = query.gte('created_at', `${todayStr}T00:00:00`);
+      }
+
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      setOrders(data || []);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+    }
+  };
+
+  // AUTO-ADVANCE: Mover pedidos de 'nuevo' a 'fabricacion' después de 5 segundos
+  // LIMITADO: Solo si hay menos de 3 pedidos en fabricación por tipo (Mesa vs Domicilio)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+
+      // Contar pedidos actuales en fabricación para verificar límites
+      let fabricacionMesa = orders.filter(o => o.status === 'fabricacion' && o.table_number && o.table_number !== 'DOMICILIO').length;
+      let fabricacionDomicilio = orders.filter(o => o.status === 'fabricacion' && (!o.table_number || o.table_number === 'DOMICILIO')).length;
+
+      orders.forEach(order => {
+        if (order.status === 'nuevo') {
+          const createdAt = new Date(order.created_at);
+          const diffTime = Math.abs(now - createdAt);
+          const diffSeconds = Math.ceil(diffTime / 1000);
+
+          if (diffSeconds >= 5) {
+            const isMesa = order.table_number && order.table_number !== 'DOMICILIO';
+
+            // Verificar capacidad antes de mover
+            if (isMesa) {
+              if (fabricacionMesa < 3) {
+                console.log(`Auto-advancing Mesa order ${order.id}`);
+                handleStatusChange(order.id, 'fabricacion');
+                fabricacionMesa++; // Prevenir mover múltiples en el mismo tick si excede límite
+              }
+            } else {
+              if (fabricacionDomicilio < 3) {
+                console.log(`Auto-advancing Domicilio order ${order.id}`);
+                handleStatusChange(order.id, 'fabricacion');
+                fabricacionDomicilio++;
+              }
+            }
+          }
+        }
+      });
+    }, 1000); // Check every second
+
+    return () => clearInterval(interval);
+  }, [orders]); // Re-run when orders change to avoid stale closures
+
+  const handleStatusChange = async (orderId, newStatus) => {
+    if (newStatus === 'pagado') {
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        setPaymentModal({ isOpen: true, orderId, totalPrice: order.total });
+      }
       return;
     }
-    setIsModalOpen(true);
+
+    try {
+      // Optimistic UI update
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+
+      // Delegar la actualización a n8n para activar triggers (ej. WhatsApp, Factus)
+      await updateOrderStatus(orderId, newStatus);
+
+      // No necesitamos actualizar Supabase manualmente aquí, n8n lo hará.
+      // El Realtime confirmará el cambio en breve.
+
+    } catch (error) {
+      console.error("Error actualizando estado vía n8n:", error);
+      const errorMsg = error.response ? `Status: ${error.response.status}. ${JSON.stringify(error.response.data)}` : error.message;
+
+      // Mostrar toast o alerta más amigable
+      const isNetworkError = errorMsg.includes('Network Error') || errorMsg.includes('Failed to fetch');
+      alert(isNetworkError
+        ? "⚠️ No se pudo conectar con el Asistente WhatsApp (n8n). El estado se guardará localmente, pero el cliente NO recibirá notificación."
+        : `Error de sincronización: ${errorMsg}`
+      );
+
+      // En caso de error de red, mantenemos el cambio optimista (porque Supabase probablemente sí funcionó si está desacoplado, 
+      // o deberíamos revertir si la idea es que n8n hace el update en supabase).
+      // NOTA: Según la arquitectura actual, el dashboard hace el update a n8n y n8n a su vez a Supabase.
+      // Si n8n falla, el update NO se hizo en BD. Revertimos.
+      fetchOrders();
+    }
+  };
+
+  const handleUpdateOrder = async (updatedOrderData) => {
+    // Este handler era para edición full. Por ahora lo dejamos simple o logueamos.
+    // En Supabase implicaría Updates a 'orders' y upserts/deletes a 'order_items'.
+    console.warn("Edición completa de pedido pendiente de refactorizar para Supabase");
+  };
+
+  const handleDeleteOrder = async (orderId) => {
+    if (window.confirm('¿Está seguro de eliminar este pedido permanentemente?')) {
+      try {
+        // 1. Obtener los items del pedido para devolver al inventario
+        const { data: orderItems, error: itemsError } = await supabase
+          .from('order_items')
+          .select('product_id, quantity')
+          .eq('order_id', orderId);
+
+        if (itemsError) throw itemsError;
+
+        // 2. Devolver stock (iterar uno por uno para asegurar consistencia simple)
+        if (orderItems && orderItems.length > 0) {
+          for (const item of orderItems) {
+            // Obtener stock actual para sumar
+            const { data: product } = await supabase
+              .from('products')
+              .select('stock')
+              .eq('id', item.product_id)
+              .single();
+
+            if (product) {
+              await supabase
+                .from('products')
+                .update({ stock: product.stock + item.quantity })
+                .eq('id', item.product_id);
+            }
+          }
+        }
+
+        // 3. Eliminar el pedido (Cascada eliminará los items de la BD, pero ya devolvimos el stock)
+        const { error } = await supabase.from('orders').delete().eq('id', orderId);
+        if (error) throw error;
+
+        // La UI se actualizará via Realtime, pero limpieza optimista:
+        setOrders(prev => prev.filter(o => o.id !== orderId));
+      } catch (error) {
+        console.error("Error eliminando pedido:", error);
+        alert("Error al eliminar pedido: " + error.message);
+      }
+    }
+  };
+
+  const handlePaymentConfirm = async (orderId, method, reference, taxData = null) => {
+    try {
+      // Calcular tiempo de preparación final usando date-fns para consistencia
+      // Importamos dinámicamente o usamos lógica robusta similar
+      const order = orders.find(o => o.id === orderId);
+      let prepTime = 0;
+      if (order && order.created_at) {
+        const created = new Date(order.created_at);
+        const now = new Date();
+        prepTime = Math.max(0, Math.floor((now - created) / 1000));
+      }
+
+      const updates = {
+        status: 'pagado',
+        payment_method: method,
+        preparation_time_seconds: prepTime
+      };
+
+      const { error } = await supabase
+        .from('orders')
+        .update(updates)
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // Actualización optimista de la UI
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o));
+
+      // Cerrar modal localmente y actualizar UI
+      setPaymentModal({ ...paymentModal, isOpen: false });
+
+      // Imprimir recibo
+      if (order) handlePrint({ ...order, ...updates, tax_data: taxData }, 'recibo');
+
+    } catch (error) {
+      console.error("Error procesando pago:", error);
+      alert("Error registrando el pago: " + error.message);
+    }
   };
 
   const handlePrint = (order, type = 'comanda') => {
     setPrintData({ order, type });
-    // Pequeño delay para que React renderice el contenido oculto antes de imprimir
-    setTimeout(() => {
-      window.print();
-    }, 500);
+    // Reset after print dialog would ideally close, but for now just setting it works 
+    // as TicketPrinter usually handles its own lifecycle or we can reset it on effective print.
+    // However, keeping it simple:
+    setTimeout(() => setPrintData({ order: null, type: 'comanda' }), 100);
   };
 
-  // Limpiar estado de impresión al terminar
-  useEffect(() => {
-    const handleAfterPrint = () => {
-      setPrintData({ order: null, type: 'comanda' });
-    };
-    window.addEventListener('afterprint', handleAfterPrint);
-    return () => window.removeEventListener('afterprint', handleAfterPrint);
-  }, []);
-
-  const handleStatusChange = (orderId, newStatus) => {
-    if (newStatus === 'pagado') {
-      const order = orders.find(o => o.id === orderId);
-      if (order) {
-        setPaymentModal({ isOpen: true, orderId, totalPrice: order.total_price });
-      } else {
-        console.error("Error: Pedido no encontrado para pago", orderId);
-      }
-      return;
-    }
-
-    setOrders(prev => prev.map(o => {
-      if (o.id === orderId) {
-        let updates = { status: newStatus };
-        if (newStatus === 'despachado') {
-          updates.dispatched_at = new Date().toISOString();
-        }
-        return { ...o, ...updates };
-      }
-      return o;
-    }));
-  };
-
-  const handleUpdateOrder = (updatedOrder) => {
-    setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-    setEditingOrder(null);
-  };
-
-  const handleDeleteOrder = (orderId) => {
-    if (window.confirm('¿Está seguro de eliminar este pedido permanentemente?')) {
-      // Restaurar inventario al eliminar
-      const orderToDelete = orders.find(o => o.id === orderId);
-      if (orderToDelete) {
-        const savedProducts = localStorage.getItem('restobot_products');
-        if (savedProducts) {
-          let products = JSON.parse(savedProducts);
-          orderToDelete.items.forEach(item => {
-            const productIndex = products.findIndex(p => p.id === item.id);
-            if (productIndex !== -1) {
-              products[productIndex].stock = (products[productIndex].stock || 0) + item.quantity;
-            }
-          });
-          localStorage.setItem('restobot_products', JSON.stringify(products));
-          // Notificar cambio de stock
-          window.dispatchEvent(new Event('storage'));
-        }
-      }
-
-      setOrders(prev => prev.filter(o => o.id !== orderId));
-    }
-  };
-
-  const handlePaymentConfirm = (orderId, method, reference, taxData = null) => {
-    setOrders(prev => prev.map(o => {
-      if (o.id === orderId) {
-        let updates = {
-          status: 'pagado',
-          is_paid: true,
-          payment_method: method,
-          payment_reference: reference,
-          tax_data: taxData,
-          is_electronic_invoiced: !!taxData
-        };
-        if (!o.preparation_time_seconds) {
-          const startTime = new Date(o.created_at);
-          const endTime = new Date();
-          updates.preparation_time_seconds = Math.floor((endTime - startTime) / 1000);
-        }
-        return { ...o, ...updates };
-      }
-      return o;
-    }));
-  };
-
+  // Esta función ahora será llamada por NewOrderModal cuando termine de insertar en Supabase
+  // O simplemente el Realtime lo hará. Para compatibilidad, la mantenemos como "refetch"
   const handleAddOrder = (newOrder) => {
-    // Actualizar stock en localStorage
-    const savedProducts = localStorage.getItem('restobot_products');
-    if (savedProducts) {
-      let products = JSON.parse(savedProducts);
-
-      // Descontar inventario
-      newOrder.items.forEach(item => {
-        const productIndex = products.findIndex(p => p.id === item.id);
-        if (productIndex !== -1) {
-          products[productIndex].stock = Math.max(0, (products[productIndex].stock || 0) - item.quantity);
-        }
-      });
-
-      localStorage.setItem('restobot_products', JSON.stringify(products));
-      // Notificar cambio de stock a otros componentes
-      window.dispatchEvent(new Event('storage'));
-    }
-
-    setOrders([newOrder, ...orders]);
+    // Si NewOrderModal ya insertó en BD, aquí solo esperamos el Realtime.
+    // Pero si NewOrderModal nos pasa el objeto para insertar, lo hacemos aquí.
+    // POR AHORA: Asumiremos que NewOrderModal será refactorizado para insertar DIRECTAMENTE en Supabase.
+    // Así que esta función puede ser un simple fetchOrders() o empty si confiamos en Realtime.
+    fetchOrders();
   };
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="text-secondary font-bold text-xl animate-pulse">Cargando sistema...</div>
+      </div>
+    );
+  }
 
   if (!user) return <LoginPage />;
 
@@ -258,6 +378,8 @@ function App() {
           setActiveTab={setActiveTab}
           isCollapsed={isSidebarCollapsed}
           setIsCollapsed={setIsSidebarCollapsed}
+          activeRestaurantSubTab={activeRestaurantSubTab}
+          setActiveRestaurantSubTab={setActiveRestaurantSubTab}
         />
 
         <main className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} p-3 md:p-8 pt-20 lg:pt-8 w-full overflow-hidden`}>
@@ -271,27 +393,29 @@ function App() {
                   <span className="px-2 py-0.5 bg-primary/10 text-primary text-[8px] font-black uppercase tracking-tighter rounded-sm">Portal Corporativo</span>
                   <h1 className="text-2xl md:text-3xl font-black text-secondary tracking-tighter">
                     {activeTab === 'restaurante' ? 'Gestión Restaurante' :
-                      activeTab === 'corporate' ? 'Centro de Inteligencia' :
-                        activeTab === 'analytics' ? 'Dashboard Global' :
-                          activeTab === 'users' ? 'Gestión de Personal' :
-                            activeTab === 'sedes' ? 'Administración de Sedes' :
-                              activeTab === 'hotels' ? 'Gestión Hotelera' :
-                                activeTab === 'contabilidad' ? 'Contabilidad General' :
-                                  activeTab === 'marketing' ? 'Marketing AI Studio' : 'Seguridad y Auditoría'}
+                      activeTab === 'analytics' ? 'Dashboard Global' :
+                        activeTab === 'users' ? 'Gestión de Personal' :
+                          activeTab === 'sedes' ? 'Administración de Sedes' :
+                            activeTab === 'hotels' ? 'Gestión Hotelera' :
+                              activeTab === 'contabilidad' ? 'Contabilidad General' :
+                                activeTab === 'marketing' ? 'Marketing AI Studio' :
+                                  activeTab === 'qr_tools' ? 'Generador de QR' : 'Seguridad y Auditoría'}
                   </h1>
                 </div>
                 <p className="text-xs font-bold text-accent/70 flex items-center gap-2 uppercase tracking-tight">
                   <Activity size={12} className="text-emerald-500 animate-pulse" />
                   {activeTab === 'restaurante' ? 'Pedidos, carta y control de cajas' :
-                    activeTab === 'corporate' ? 'Monitoreo ejecutivo multidimensional' :
-                      activeTab === 'analytics' ? 'Indicadores clave de rendimiento' :
-                        activeTab === 'sedes' ? 'Control logístico de sucursales' :
-                          activeTab === 'hotels' ? 'Reservas y gestión de habitaciones' :
-                            activeTab === 'contabilidad' ? 'Estados financieros y balances' :
-                              activeTab === 'marketing' ? 'Generación de contenido publicitario con IA' :
+                    activeTab === 'analytics' ? 'Indicadores clave de rendimiento' :
+                      activeTab === 'sedes' ? 'Control logístico de sucursales' :
+                        activeTab === 'hotels' ? 'Reservas y gestión de habitaciones' :
+                          activeTab === 'contabilidad' ? 'Estados financieros y balances' :
+                            activeTab === 'marketing' ? 'Generación de contenido publicitario con IA' :
+                              activeTab === 'qr_tools' ? 'Configuración de mesas y accesos digitales' :
                                 activeTab === 'operaciones' ? 'Registro de actividad y seguridad' : 'Gestión operativa en tiempo real'}
                   <span className="mx-2 opacity-30">|</span>
-                  <span className="text-secondary opacity-80">{user.name}</span>
+                  <span className="text-secondary font-black uppercase tracking-widest bg-secondary/5 px-2 py-0.5 rounded-md text-[10px] md:text-xs">
+                    {user.name || 'USUARIO'}
+                  </span>
                 </p>
               </div>
               {/* Indicador de Estado de Caja */}
@@ -369,15 +493,19 @@ function App() {
               onEdit={(order) => { setEditingOrder(order); setIsModalOpen(true); }}
               onDelete={handleDeleteOrder}
               onPrint={handlePrint}
+              autoAdvance={autoAdvanceEnabled}
+              onToggleAutoAdvance={() => setAutoAdvanceEnabled(!autoAdvanceEnabled)}
+              activeSubTab={activeRestaurantSubTab}
+              setActiveSubTab={setActiveRestaurantSubTab}
             />
           )}
-          {activeTab === 'corporate' && <CorporateIntelligence orders={orders} />}
           {activeTab === 'analytics' && <AnalyticsPro />}
           {activeTab === 'hotels' && <HotelManagement />}
           {activeTab === 'contabilidad' && <AccountingModule orders={orders} />}
           {activeTab === 'users' && <UserManagement />}
           {activeTab === 'sedes' && <BranchManagement />}
           {activeTab === 'marketing' && <MarketingModule />}
+          {activeTab === 'qr_tools' && <TableQRGenerator />}
           {activeTab === 'operaciones' && <OperationsHub />}
         </main>
 

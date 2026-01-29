@@ -1,24 +1,66 @@
 import React, { useState } from 'react';
-import { LayoutPanelLeft, Users, Utensils, Settings, Menu, X, LogOut, ChevronLeft, ChevronRight, Building2, Wallet, ShieldAlert, Zap, Megaphone } from 'lucide-react';
+import { LayoutPanelLeft, Users, Utensils, Settings, Menu, X, LogOut, ChevronLeft, ChevronRight, Building2, Wallet, ShieldAlert, Zap, Megaphone, QrCode } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed }) => {
+const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeRestaurantSubTab, setActiveRestaurantSubTab }) => {
     const [isOpen, setIsOpen] = useState(false);
     const { user, logout } = useAuth();
+    const [expandedMenu, setExpandedMenu] = useState('restaurante'); // Expandir restaurante por defecto
+
+    // Solo definimos subitems para restaurante por ahora
+    const restaurantSubItems = [
+        { id: 'board', label: 'Monitor de Pedidos', roles: ['admin', 'cajero', 'gerente'] },
+        { id: 'menu', label: 'Gestión de Carta', roles: ['admin', 'gerente'] }, // Solo admin/gerente
+        { id: 'turnos', label: 'Cajas y Turnos', roles: ['admin', 'cajero', 'gerente'] },
+    ].filter(item => item.roles.includes(user?.role || 'cajero'));
 
     const menuItems = [
-        { id: 'corporate', label: 'Centro Inteligencia', icon: Zap, roles: ['gerente'] },
-        { id: 'restaurante', label: 'Gestión Restaurante', icon: Utensils, roles: ['admin', 'cajero', 'gerente'] },
+        {
+            id: 'restaurante',
+            label: 'Gestión Restaurante',
+            icon: Utensils,
+            roles: ['admin', 'cajero', 'gerente'],
+            hasSubmenu: true
+        },
         { id: 'hotels', label: 'Gestión Hotel', icon: Building2, roles: ['gerente', 'admin'] },
         { id: 'contabilidad', label: 'Contabilidad', icon: Wallet, roles: ['gerente', 'admin'] },
         { id: 'sedes', label: 'Sucursales', icon: Building2, roles: ['gerente'] },
         { id: 'users', label: 'Personal', icon: Users, roles: ['admin', 'gerente'] },
         { id: 'marketing', label: 'Marketing AI', icon: Megaphone, roles: ['admin', 'gerente'] },
+        { id: 'qr_tools', label: 'Códigos QR', icon: QrCode, roles: ['admin', 'gerente'] },
         { id: 'operaciones', label: 'Seguridad / Logs', icon: ShieldAlert, roles: ['gerente'] },
     ].filter(item => item.roles.includes(user?.role || 'cajero'));
 
+    const toggleSubmenu = (menuId) => {
+        if (expandedMenu === menuId) {
+            setExpandedMenu(null);
+        } else {
+            setExpandedMenu(menuId);
+        }
+    };
+
+    const handleItemClick = (item) => {
+        if (item.hasSubmenu) {
+            // Activar tab
+            setActiveTab(item.id);
+            // Lógica Toggle: Si ya está abierto, cerrarlo. Si no, abrirlo.
+            if (expandedMenu === item.id) {
+                setExpandedMenu(null);
+            } else {
+                setExpandedMenu(item.id);
+            }
+
+            if (isCollapsed) setIsCollapsed(false); // Abrir sidebar si esta colapsado
+        } else {
+            // Comportamiento normal
+            setActiveTab(item.id);
+            setIsOpen(false);
+        }
+    };
+
     const content = (
         <div className="flex flex-col h-full bg-secondary transition-all duration-300">
+            {/* ... Header igual ... */}
             <div className={`p-6 border-b border-white/10 text-white flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'}`}>
                 <LayoutPanelLeft className="text-primary" size={isCollapsed ? 28 : 24} />
                 {!isCollapsed && <span className="text-2xl font-black tracking-tighter">RestoBot</span>}
@@ -40,23 +82,52 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed }) => {
                 )}
             </div>
 
-            <nav className="flex-1 mt-6">
+            <nav className="flex-1 mt-6 overflow-y-auto custom-scrollbar">
                 {menuItems.map((item) => (
-                    <button
-                        key={item.id}
-                        onClick={() => {
-                            setActiveTab(item.id);
-                            setIsOpen(false);
-                        }}
-                        className={`w-full flex items-center transition-all duration-200 border-l-4 ${isCollapsed ? 'justify-center px-0 py-5' : 'gap-4 px-6 py-4'} ${activeTab === item.id
-                            ? 'bg-primary/10 text-primary border-primary'
-                            : 'text-gray-400 border-transparent hover:bg-white/5 hover:text-white'
-                            }`}
-                        title={isCollapsed ? item.label : ''}
-                    >
-                        <item.icon size={isCollapsed ? 24 : 22} strokeWidth={activeTab === item.id ? 2.5 : 2} />
-                        {!isCollapsed && <span className="font-bold text-sm tracking-wide">{item.label}</span>}
-                    </button>
+                    <div key={item.id}>
+                        <button
+                            onClick={() => handleItemClick(item)}
+                            className={`w-full flex items-center transition-all duration-200 border-l-4 ${isCollapsed ? 'justify-center px-0 py-5' : 'gap-4 px-6 py-4'} ${activeTab === item.id
+                                ? 'bg-primary/10 text-primary border-primary'
+                                : 'text-gray-400 border-transparent hover:bg-white/5 hover:text-white'
+                                }`}
+                            title={isCollapsed ? item.label : ''}
+                        >
+                            <item.icon size={isCollapsed ? 24 : 22} strokeWidth={activeTab === item.id ? 2.5 : 2} />
+                            {!isCollapsed && (
+                                <div className="flex-1 flex justify-between items-center">
+                                    <span className="font-bold text-sm tracking-wide">{item.label}</span>
+                                    {item.hasSubmenu && (
+                                        <ChevronRight size={14} className={`transition-transform duration-200 ${expandedMenu === item.id ? 'rotate-90' : ''}`} />
+                                    )}
+                                </div>
+                            )}
+                        </button>
+
+                        {/* Submenu Render */}
+                        {!isCollapsed && item.hasSubmenu && expandedMenu === item.id && (
+                            <div className="bg-black/20 animate-in slide-in-from-top-2 duration-200">
+                                {restaurantSubItems.map(sub => (
+                                    <button
+                                        key={sub.id}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveTab('restaurante');
+                                            setActiveRestaurantSubTab && setActiveRestaurantSubTab(sub.id);
+                                            setIsOpen(false);
+                                        }}
+                                        className={`w-full flex items-center gap-3 pl-16 pr-6 py-3 transition-all text-xs font-bold ${activeTab === 'restaurante' && activeRestaurantSubTab === sub.id
+                                            ? 'text-white bg-white/5'
+                                            : 'text-gray-500 hover:text-gray-300'
+                                            }`}
+                                    >
+                                        <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'restaurante' && activeRestaurantSubTab === sub.id ? 'bg-primary' : 'bg-gray-600'}`} />
+                                        {sub.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 ))}
             </nav>
 

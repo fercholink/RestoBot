@@ -1,0 +1,105 @@
+{
+    "name": "WhatsApp_Incoming_Order_Agent",
+    "nodes": [
+        {
+            "parameters": {
+                "path": "webhook/whatsapp/incoming",
+                "responseMode": "lastNode",
+                "options": {}
+            },
+            "name": "WhatsApp_Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ],
+            "webhookId": "whatsapp-incoming-webhook"
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o",
+                "options": {
+                    "systemMessage": "Eres un mesero virtual del restaurante 'RestoBot'. Tu trabajo es tomar pedidos. \n\n1. Saluda amablemente si es el primer mensaje.\n2. Si el cliente pide algo, identifica los productos del menú (Hamburguesas, Perros, Bebidas).\n3. Extrae la cantidad y el nombre del producto.\n4. Si falta información (ej. dirección para domicilio), pídela.\n5. Cuando el pedido esté claro, genera un JSON con la estructura: \n{ \"type\": \"domicilio|mesa\", \"items\": [{ \"product\": \"Hamburguesa Clásica\", \"quantity\": 2 }] }\n\nNO inventes productos. Usa solo lo que sabes que existe."
+                }
+            },
+            "name": "AI_Agent_Waiter",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                300,
+                300
+            ],
+            "credentials": {
+                "openAiApi": "YOUR_OPENAI_CREDENTIALS"
+            }
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "INSERT INTO orders (customer_phone, type, status, total) VALUES ('{{$json.from}}', '{{$json.ai_response.type}}', 'nuevo', 0) RETURNING id"
+            },
+            "name": "Create_Order",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                500,
+                300
+            ],
+            "credentials": {
+                "postgresql": "Postgres_Easypanel"
+            }
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "INSERT INTO order_items (order_id, product_name, quantity, price) VALUES ({{$json.id}}, '{{$json.ai_response.items[0].product}}', {{$json.ai_response.items[0].quantity}}, 0)"
+            },
+            "name": "Add_Items",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                700,
+                300
+            ],
+            "credentials": {
+                "postgresql": "Postgres_Easypanel"
+            }
+        }
+    ],
+    "connections": {
+        "WhatsApp_Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "AI_Agent_Waiter",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI_Agent_Waiter": {
+            "main": [
+                [
+                    {
+                        "node": "Create_Order",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Create_Order": {
+            "main": [
+                [
+                    {
+                        "node": "Add_Items",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

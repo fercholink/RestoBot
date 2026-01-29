@@ -1,10 +1,11 @@
 import axios from 'axios';
 
 // La URL de n8n vendrá de las variables de entorno o será dinámica
-const N8N_API_URL = import.meta.env.VITE_N8N_URL || 'https://tu-n8n-easypanel.com';
+const N8N_API_URL = import.meta.env.DEV ? '' : (import.meta.env.VITE_N8N_URL || 'https://tu-n8n-easypanel.com');
 
 const api = axios.create({
     baseURL: N8N_API_URL,
+    timeout: 10000, // 10 segundos timeout
     headers: {
         'Content-Type': 'application/json',
     },

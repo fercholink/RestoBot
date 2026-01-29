@@ -1,78 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, Trash2, Tag, Utensils, IndianRupee, Image as ImageIcon, CheckCircle2, XCircle, ChevronRight, MoreVertical, Filter, Save, X, AlertTriangle, Building2, Layers, Coffee, Pizza, Beef, PlusCircle, MinusCircle } from 'lucide-react';
-
-const INITIAL_CATEGORIES = [
-    { id: 1, name: 'Hamburguesas', icon: '🍔' },
-    { id: 2, name: 'Salchipapas', icon: '🍟' },
-    { id: 3, name: 'Bebidas', icon: '🥤' },
-    { id: 4, name: 'Adicionales', icon: '🥓' },
-];
-
-const INITIAL_PRODUCTS = [
-    {
-        id: 1,
-        categoryId: 1,
-        name: 'Hamburguesa Clásica',
-        price: 15000,
-        branch_prices: { 'Sede Norte': 15000, 'Sede Sur': 16000, 'Sede Centro': 15000 },
-        description: 'Carne 150g, queso, lechuga, tomate y salsas.',
-        available: true,
-        stock: 3,
-        stock_threshold: 5,
-        base_ingredients: ['Pan', 'Carne 150g', 'Queso', 'Lechuga', 'Tomate', 'Salsas'],
-        extras: [
-            { name: 'Tocineta', price: 3000 },
-            { name: 'Huevo', price: 2000 },
-            { name: 'Doble Queso', price: 2500 }
-        ],
-        image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500'
-    },
-    {
-        id: 2,
-        categoryId: 1,
-        name: 'Hamburguesa Especial',
-        price: 22000,
-        branch_prices: { 'Sede Norte': 22000, 'Sede Sur': 24000, 'Sede Centro': 22000 },
-        description: 'Carne, pollo, tocineta, huevo, queso y ripio.',
-        available: true,
-        stock: 15,
-        stock_threshold: 5,
-        base_ingredients: ['Pan', 'Carne 150g', 'Pollo', 'Tocineta', 'Huevo', 'Queso', 'Ripio'],
-        extras: [
-            { name: 'Queso costeño', price: 2000 },
-            { name: 'Pepinillos', price: 1500 }
-        ],
-        image: 'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5?w=500'
-    },
-];
-
-// Lista de emojis populares para categorías
-const CATEGORY_EMOJIS = [
-    '🍔', '🍟', '🍕', '🌭', '🌮', '🌯', '🥙', '🥗', '🍝', '🍜',
-    '🍲', '🍱', '🍛', '🍣', '🍤', '🍗', '🍖', '🥓', '🥩', '🍔',
-    '🥤', '🍺', '🍻', '🍷', '🍸', '🍹', '🍾', '🧃', '☕', '🍵',
-    '🧁', '🍰', '🎂', '🍮', '🍪', '🍩', '🍨', '🍧', '🥧', '🍫'
-];
+import { Plus, Search, Edit2, Trash2, Tag, Utensils, IndianRupee, Image as ImageIcon, CheckCircle2, XCircle, ChevronRight, MoreVertical, Filter, Save, X, AlertTriangle, Building2, Layers, Coffee, Pizza, Beef, PlusCircle, MinusCircle, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const MenuManagement = () => {
-    // Inicializar categorías desde localStorage o usar las iniciales
-    const [categories, setCategories] = useState(() => {
-        const saved = localStorage.getItem('restobot_categories');
-        return saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
-    });
+    const [categories, setCategories] = useState([]);
+    const [products, setProducts] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    // Inicializar productos desde localStorage o usar los iniciales
-    const [products, setProducts] = useState(() => {
-        const saved = localStorage.getItem('restobot_products');
-        return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
-    });
-
-    const [activeCategory, setActiveCategory] = useState(() => {
-        const saved = localStorage.getItem('restobot_categories');
-        const cats = saved ? JSON.parse(saved) : INITIAL_CATEGORIES;
-        return cats.length > 0 ? cats[0].id : null;
-    });
-
+    const [activeCategory, setActiveCategory] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [showProductModal, setShowProductModal] = useState(false);
     const [showCategoryModal, setShowCategoryModal] = useState(false);
@@ -80,27 +15,57 @@ const MenuManagement = () => {
     const [editingCategory, setEditingCategory] = useState(null);
     const [selectedBranchForPrice, setSelectedBranchForPrice] = useState('Global');
 
-    // Estados temporales para el modal de edición de productos
     const [tempIngredients, setTempIngredients] = useState([]);
     const [tempExtras, setTempExtras] = useState([]);
 
-    // Guardar categorías en localStorage cada vez que cambien
+    // Cargar datos iniciales
     useEffect(() => {
-        localStorage.setItem('restobot_categories', JSON.stringify(categories));
-    }, [categories]);
+        fetchData();
 
-    // Guardar productos en localStorage cada vez que cambien
-    useEffect(() => {
-        localStorage.setItem('restobot_products', JSON.stringify(products));
-    }, [products]);
+        // Suscripción Realtime
+        const categoryChannel = supabase.channel('cat-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, fetchData)
+            .subscribe();
 
-    const handleEditProduct = (product) => {
-        setEditingProduct(product);
-        setTempIngredients(product?.base_ingredients || []);
-        setTempExtras(product?.extras || []);
-        setShowProductModal(true);
+        const productChannel = supabase.channel('prod-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchData)
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(categoryChannel);
+            supabase.removeChannel(productChannel);
+        };
+    }, []);
+
+    const fetchData = async () => {
+        try {
+            const { data: cats } = await supabase.from('categories').select('*').order('id');
+            const { data: prods } = await supabase.from('products').select('*').order('id');
+
+            if (cats) {
+                setCategories(cats);
+                // Si la categoría activa actual no existe en los nuevos datos (o es null), seleccionar la primera
+                setActiveCategory(prev => {
+                    if (prev && cats.find(c => c.id === prev)) return prev;
+                    return cats.length > 0 ? cats[0].id : null;
+                });
+            }
+            if (prods) setProducts(prods);
+        } catch (error) {
+            console.error("Error loading inventory:", error);
+        } finally {
+            setLoading(false);
+        }
     };
 
+    const CATEGORY_EMOJIS = [
+        '🍔', '🍟', '🍕', '🌭', '🌮', '🌯', '🥙', '🥗', '🍝', '🍜',
+        '🍲', '🍱', '🍛', '🍣', '🍤', '🍗', '🍖', '🥓', '🥩', '🍔',
+        '🥤', '🍺', '🍻', '🍷', '🍸', '🍹', '🍾', '🧃', '☕', '🍵',
+        '🧁', '🍰', '🎂', '🍮', '🍪', '🍩', '🍨', '🍧', '🥧', '🍫'
+    ];
+
+    // --- MANEJO DE ESTADO LOCAL DEL MODAL ---
     const handleAddIngredient = (val) => {
         if (!val) return;
         setTempIngredients([...tempIngredients, val]);
@@ -111,26 +76,47 @@ const MenuManagement = () => {
         setTempExtras([...tempExtras, { name, price: parseInt(price) }]);
     };
 
-    const filteredProducts = products.filter(p =>
-        p.categoryId === activeCategory &&
-        (p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.description.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-
-    const toggleAvailability = (productId) => {
-        setProducts(prev => prev.map(p =>
-            p.id === productId ? { ...p, available: !p.available } : p
-        ));
+    const handleEditProduct = (product) => {
+        setEditingProduct(product);
+        setTempIngredients(product?.base_ingredients || []);
+        setTempExtras(product?.extras || []);
+        setShowProductModal(true);
     };
 
-    const handleDeleteProduct = (productId) => {
+    const handleEditCategory = (category) => {
+        setEditingCategory(category);
+        setShowCategoryModal(true);
+    };
+
+    // --- FILTRADO ---
+    const filteredProducts = products.filter(p =>
+        p.category_id === activeCategory &&
+        (p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (p.description && p.description.toLowerCase().includes(searchTerm.toLowerCase())))
+    );
+
+    // --- DB ACTIONS ---
+
+    const toggleAvailability = async (productId) => {
+        const product = products.find(p => p.id === productId);
+        if (!product) return;
+
+        const { error } = await supabase
+            .from('products')
+            .update({ available: !product.available })
+            .eq('id', productId);
+
+        if (error) alert("Error actualizando: " + error.message);
+    };
+
+    const handleDeleteProduct = async (productId) => {
         if (window.confirm('¿Estás seguro de eliminar este producto?')) {
-            setProducts(prev => prev.filter(p => p.id !== productId));
+            const { error } = await supabase.from('products').delete().eq('id', productId);
+            if (error) alert("Error eliminando: " + error.message);
         }
     };
 
-    // CRUD de Categorías
-    const handleSaveCategory = (e) => {
+    const handleSaveCategory = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
         const name = formData.get('categoryName');
@@ -141,66 +127,50 @@ const MenuManagement = () => {
             return;
         }
 
+        let error;
         if (editingCategory) {
-            // Editar categoría existente
-            setCategories(prev => prev.map(cat =>
-                cat.id === editingCategory.id
-                    ? { ...cat, name, icon }
-                    : cat
-            ));
+            const { error: err } = await supabase
+                .from('categories')
+                .update({ name, icon })
+                .eq('id', editingCategory.id);
+            error = err;
         } else {
-            // Crear nueva categoría
-            const newCategory = {
-                id: Math.max(...categories.map(c => c.id), 0) + 1,
-                name,
-                icon
-            };
-            setCategories(prev => [...prev, newCategory]);
-            setActiveCategory(newCategory.id);
+            const { error: err } = await supabase
+                .from('categories')
+                .insert([{ name, icon }]);
+            error = err;
         }
 
-        setShowCategoryModal(false);
-        setEditingCategory(null);
+        if (error) {
+            alert("Error guardando categoría: " + error.message);
+        } else {
+            setShowCategoryModal(false);
+            setEditingCategory(null);
+        }
     };
 
-    const handleEditCategory = (category) => {
-        setEditingCategory(category);
-        setShowCategoryModal(true);
-    };
-
-    const handleDeleteCategory = (categoryId) => {
-        const productsInCategory = products.filter(p => p.categoryId === categoryId);
+    const handleDeleteCategory = async (categoryId) => {
+        const productsInCategory = products.filter(p => p.category_id === categoryId);
 
         if (productsInCategory.length > 0) {
-            if (!window.confirm(`Esta categoría tiene ${productsInCategory.length} producto(s). ¿Deseas eliminarla de todas formas? Los productos se moverán a la primera categoría disponible.`)) {
+            if (!window.confirm(`Esta categoría tiene ${productsInCategory.length} producto(s). Los productos serán eliminados también (Cascade) o necesitas moverlos manualmente. ¿Continuar?`)) {
                 return;
             }
-            // Mover productos a la primera categoría disponible
-            const remainingCategories = categories.filter(c => c.id !== categoryId);
-            if (remainingCategories.length > 0) {
-                const targetCategoryId = remainingCategories[0].id;
-                setProducts(prev => prev.map(p =>
-                    p.categoryId === categoryId
-                        ? { ...p, categoryId: targetCategoryId }
-                        : p
-                ));
-            } else {
-                // Si no hay más categorías, eliminar los productos
-                setProducts(prev => prev.filter(p => p.categoryId !== categoryId));
-            }
+        } else {
+            if (!window.confirm('¿Eliminar categoría?')) return;
         }
 
-        setCategories(prev => prev.filter(c => c.id !== categoryId));
+        const { error } = await supabase.from('categories').delete().eq('id', categoryId);
 
-        // Si eliminamos la categoría activa, cambiar a otra
-        if (activeCategory === categoryId) {
-            const remaining = categories.filter(c => c.id !== categoryId);
-            setActiveCategory(remaining.length > 0 ? remaining[0].id : null);
+        if (error) {
+            alert("Error eliminando categoría: " + error.message);
+        } else {
+            // Si eliminamos la activa, cambiar a null (el useEffect lo arreglará)
+            if (activeCategory === categoryId) setActiveCategory(null);
         }
     };
 
-    // Guardar producto (crear o editar)
-    const handleSaveProduct = (e) => {
+    const handleSaveProduct = async (e) => {
         e.preventDefault();
         const formData = new FormData(e.target);
 
@@ -224,50 +194,44 @@ const MenuManagement = () => {
             return;
         }
 
+        const productData = {
+            name,
+            price,
+            category_id: categoryId, // Note: DB uses snake_case
+            description,
+            stock,
+            stock_threshold: stockThreshold,
+            branch_prices: branchPrices,
+            base_ingredients: tempIngredients,
+            extras: tempExtras,
+            image: image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500'
+        };
+
+        let error;
         if (editingProduct) {
-            // Editar producto existente
-            setProducts(prev => prev.map(p =>
-                p.id === editingProduct.id
-                    ? {
-                        ...p,
-                        name,
-                        price,
-                        categoryId,
-                        description,
-                        stock,
-                        stock_threshold: stockThreshold,
-                        branch_prices: branchPrices,
-                        base_ingredients: tempIngredients,
-                        extras: tempExtras,
-                        image: image || p.image
-                    }
-                    : p
-            ));
+            const { error: err } = await supabase
+                .from('products')
+                .update(productData)
+                .eq('id', editingProduct.id);
+            error = err;
         } else {
-            // Crear nuevo producto
-            const newProduct = {
-                id: Math.max(...products.map(p => p.id), 0) + 1,
-                categoryId,
-                name,
-                price,
-                description,
-                available: true,
-                stock,
-                stock_threshold: stockThreshold,
-                branch_prices: branchPrices,
-                base_ingredients: tempIngredients,
-                extras: tempExtras,
-                image: image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500'
-            };
-            setProducts(prev => [...prev, newProduct]);
+            const { error: err } = await supabase
+                .from('products')
+                .insert([productData]);
+            error = err;
         }
 
-        // Cerrar modal y limpiar estado
-        setShowProductModal(false);
-        setEditingProduct(null);
-        setTempIngredients([]);
-        setTempExtras([]);
+        if (error) {
+            alert("Error guardando producto: " + error.message);
+        } else {
+            setShowProductModal(false);
+            setEditingProduct(null);
+            setTempIngredients([]);
+            setTempExtras([]);
+        }
     };
+
+    if (loading) return <div className="flex items-center justify-center h-96"><Loader2 className="animate-spin text-primary" size={48} /></div>;
 
     return (
         <div className="space-y-8 pb-20 animate-in fade-in duration-500">
@@ -307,45 +271,55 @@ const MenuManagement = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                {/* Lateral: Categorías */}
-                <aside className="lg:col-span-1 space-y-4">
-                    <div className="flex justify-between items-center px-2">
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Categorías</h3>
-                        <button
-                            onClick={() => { setEditingCategory(null); setShowCategoryModal(true); }}
-                            className="text-primary hover:bg-primary/10 p-1 rounded-md transition-colors"
-                            title="Nueva Categoría"
-                        >
-                            <Plus size={16} />
-                        </button>
-                    </div>
-                    <div className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-visible gap-2 pb-2 lg:pb-0">
-                        {categories.map((cat) => (
-                            <div
-                                key={cat.id}
-                                className={`flex items-center gap-3 px-5 py-4 rounded-2xl font-bold text-sm whitespace-nowrap transition-all group ${activeCategory === cat.id
-                                    ? 'bg-secondary text-white shadow-xl translate-x-1'
-                                    : 'bg-white text-gray-500 border border-gray-100 hover:bg-gray-50'
-                                    }`}
+            {categories.length === 0 ? (
+                <div className="text-center py-20">
+                    <p className="text-gray-400 font-bold mb-4">No hay categorías. Crea una para empezar.</p>
+                    <button
+                        onClick={() => { setEditingCategory(null); setShowCategoryModal(true); }}
+                        className="inline-flex items-center gap-2 bg-secondary text-white px-6 py-3 rounded-2xl font-black text-sm"
+                    >
+                        <Plus size={20} /> Crear Categoría
+                    </button>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    {/* Lateral: Categorías */}
+                    <aside className="lg:col-span-1 space-y-4">
+                        <div className="flex justify-between items-center px-2">
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Categorías</h3>
+                            <button
+                                onClick={() => { setEditingCategory(null); setShowCategoryModal(true); }}
+                                className="text-primary hover:bg-primary/10 p-1 rounded-md transition-colors"
+                                title="Nueva Categoría"
                             >
-                                <button
-                                    onClick={() => setActiveCategory(cat.id)}
-                                    className="flex items-center gap-3 flex-1"
+                                <Plus size={16} />
+                            </button>
+                        </div>
+                        <div className="flex flex-row lg:flex-col overflow-x-auto lg:overflow-visible gap-2 pb-2 lg:pb-0">
+                            {categories.map((cat) => (
+                                <div
+                                    key={cat.id}
+                                    className={`flex items-center gap-3 px-5 py-4 rounded-2xl font-bold text-sm whitespace-nowrap transition-all group ${activeCategory === cat.id
+                                        ? 'bg-secondary text-white shadow-xl translate-x-1'
+                                        : 'bg-white text-gray-500 border border-gray-100 hover:bg-gray-50'
+                                        }`}
                                 >
-                                    <span className="text-xl">{cat.icon}</span>
-                                    <span>{cat.name}</span>
-                                    {activeCategory === cat.id && <ChevronRight className="ml-auto hidden lg:block" size={16} />}
-                                </button>
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button
-                                        onClick={() => handleEditCategory(cat)}
-                                        className={`p-1 rounded-lg hover:bg-white/20 transition-colors ${activeCategory === cat.id ? 'text-white' : 'text-gray-400 hover:text-secondary'}`}
-                                        title="Editar"
+                                        onClick={() => setActiveCategory(cat.id)}
+                                        className="flex items-center gap-3 flex-1"
                                     >
-                                        <Edit2 size={14} />
+                                        <span className="text-xl">{cat.icon}</span>
+                                        <span>{cat.name}</span>
+                                        {activeCategory === cat.id && <ChevronRight className="ml-auto hidden lg:block" size={16} />}
                                     </button>
-                                    {categories.length > 1 && (
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={() => handleEditCategory(cat)}
+                                            className={`p-1 rounded-lg hover:bg-white/20 transition-colors ${activeCategory === cat.id ? 'text-white' : 'text-gray-400 hover:text-secondary'}`}
+                                            title="Editar"
+                                        >
+                                            <Edit2 size={14} />
+                                        </button>
                                         <button
                                             onClick={() => handleDeleteCategory(cat.id)}
                                             className={`p-1 rounded-lg hover:bg-red-500/20 transition-colors ${activeCategory === cat.id ? 'text-white hover:text-red-200' : 'text-gray-400 hover:text-red-500'}`}
@@ -353,108 +327,108 @@ const MenuManagement = () => {
                                         >
                                             <Trash2 size={14} />
                                         </button>
-                                    )}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                </aside>
+                            ))}
+                        </div>
+                    </aside>
 
-                {/* Grid de Productos */}
-                <main className="lg:col-span-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {filteredProducts.map((product) => {
-                            const currentPrice = selectedBranchForPrice === 'Global'
-                                ? product.price
-                                : (product.branch_prices?.[selectedBranchForPrice] || product.price);
+                    {/* Grid de Productos */}
+                    <main className="lg:col-span-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                            {filteredProducts.map((product) => {
+                                const currentPrice = selectedBranchForPrice === 'Global'
+                                    ? product.price
+                                    : (product.branch_prices?.[selectedBranchForPrice] || product.price);
 
-                            const isLowStock = product.stock <= product.stock_threshold;
+                                const isLowStock = product.stock <= product.stock_threshold;
 
-                            return (
-                                <div
-                                    key={product.id}
-                                    className={`bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden group hover:shadow-premium transition-all duration-300 relative ${!product.available ? 'grayscale-[0.5] opacity-80' : ''}`}
-                                >
-                                    {/* Imagen y Badge de Disponibilidad */}
-                                    <div className="relative h-40 overflow-hidden">
-                                        <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                        <div className="absolute top-3 right-3 flex flex-col gap-2">
-                                            <button
-                                                onClick={() => toggleAvailability(product.id)}
-                                                className={`p-2 rounded-xl backdrop-blur-md shadow-lg transition-all ${product.available ? 'bg-success/20 text-success' : 'bg-red-500/20 text-red-500'}`}
-                                                title={product.available ? 'Disponible' : 'Agotado'}
-                                            >
-                                                {product.available ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
-                                            </button>
-                                            {isLowStock && product.available && (
-                                                <div className="p-2 rounded-xl backdrop-blur-md bg-warning/20 text-warning shadow-lg animate-pulse" title="Stock Bajo">
-                                                    <AlertTriangle size={18} />
+                                return (
+                                    <div
+                                        key={product.id}
+                                        className={`bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden group hover:shadow-premium transition-all duration-300 relative ${!product.available ? 'grayscale-[0.5] opacity-80' : ''}`}
+                                    >
+                                        {/* Imagen y Badge de Disponibilidad */}
+                                        <div className="relative h-40 overflow-hidden">
+                                            <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                            <div className="absolute top-3 right-3 flex flex-col gap-2">
+                                                <button
+                                                    onClick={() => toggleAvailability(product.id)}
+                                                    className={`p-2 rounded-xl backdrop-blur-md shadow-lg transition-all ${product.available ? 'bg-success/20 text-success' : 'bg-red-500/20 text-red-500'}`}
+                                                    title={product.available ? 'Disponible' : 'Agotado'}
+                                                >
+                                                    {product.available ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                                                </button>
+                                                {isLowStock && product.available && (
+                                                    <div className="p-2 rounded-xl backdrop-blur-md bg-warning/20 text-warning shadow-lg animate-pulse" title="Stock Bajo">
+                                                        <AlertTriangle size={18} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {!product.available && (
+                                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                                    <span className="bg-white/90 text-secondary px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">Agotado</span>
                                                 </div>
                                             )}
                                         </div>
-                                        {!product.available && (
-                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                                <span className="bg-white/90 text-secondary px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest">Agotado</span>
-                                            </div>
-                                        )}
-                                    </div>
 
-                                    {/* Detalles */}
-                                    <div className="p-5 space-y-3">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <h4 className="font-black text-secondary tracking-tight group-hover:text-primary transition-colors">{product.name}</h4>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${isLowStock ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
-                                                        Stock: {product.stock}
-                                                    </span>
+                                        {/* Detalles */}
+                                        <div className="p-5 space-y-3">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <h4 className="font-black text-secondary tracking-tight group-hover:text-primary transition-colors">{product.name}</h4>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${isLowStock ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500'}`}>
+                                                            Stock: {product.stock}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="font-black text-primary text-sm">${currentPrice.toLocaleString()}</span>
+                                                    <p className="text-[8px] font-black uppercase text-gray-400">{selectedBranchForPrice}</p>
                                                 </div>
                                             </div>
-                                            <div className="text-right">
-                                                <span className="font-black text-primary text-sm">${currentPrice.toLocaleString()}</span>
-                                                <p className="text-[8px] font-black uppercase text-gray-400">{selectedBranchForPrice}</p>
+                                            <div className="flex flex-wrap gap-1">
+                                                {(product.base_ingredients || []).slice(0, 3).map((ing, i) => (
+                                                    <span key={i} className="text-[8px] bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded-md border border-gray-100 font-bold">{ing}</span>
+                                                ))}
+                                                {(product.base_ingredients?.length > 3) && <span className="text-[8px] text-gray-300 font-bold">+{product.base_ingredients.length - 3}</span>}
                                             </div>
-                                        </div>
-                                        <div className="flex flex-wrap gap-1">
-                                            {(product.base_ingredients || []).slice(0, 3).map((ing, i) => (
-                                                <span key={i} className="text-[8px] bg-gray-50 text-gray-400 px-1.5 py-0.5 rounded-md border border-gray-100 font-bold">{ing}</span>
-                                            ))}
-                                            {(product.base_ingredients?.length > 3) && <span className="text-[8px] text-gray-300 font-bold">+{product.base_ingredients.length - 3}</span>}
-                                        </div>
 
-                                        <div className="pt-4 flex items-center justify-between border-t border-gray-50">
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => handleEditProduct(product)}
-                                                    className="p-2 bg-gray-50 text-gray-400 hover:text-secondary hover:bg-gray-100 rounded-xl transition-all"
-                                                >
-                                                    <Edit2 size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteProduct(product.id)}
-                                                    className="p-2 bg-gray-50 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                            <div className="flex items-center gap-1 text-[10px] font-black uppercase text-gray-400">
-                                                <PlusCircle size={12} className="text-success/50" />
-                                                <span>{product.extras?.length || 0} extras</span>
+                                            <div className="pt-4 flex items-center justify-between border-t border-gray-50">
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => handleEditProduct(product)}
+                                                        className="p-2 bg-gray-50 text-gray-400 hover:text-secondary hover:bg-gray-100 rounded-xl transition-all"
+                                                    >
+                                                        <Edit2 size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteProduct(product.id)}
+                                                        className="p-2 bg-gray-50 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center gap-1 text-[10px] font-black uppercase text-gray-400">
+                                                    <PlusCircle size={12} className="text-success/50" />
+                                                    <span>{product.extras?.length || 0} extras</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                    {filteredProducts.length === 0 && (
-                        <div className="flex flex-col items-center justify-center py-20 bg-gray-50/50 rounded-3xl border-2 border-dashed border-gray-200">
-                            <Utensils className="text-gray-200 mb-4" size={48} />
-                            <p className="text-gray-400 font-bold uppercase tracking-widest text-sm">No hay productos en esta categoría</p>
+                                );
+                            })}
                         </div>
-                    )}
-                </main>
-            </div>
+                        {filteredProducts.length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-20 bg-gray-50/50 rounded-3xl border-2 border-dashed border-gray-200">
+                                <Utensils className="text-gray-200 mb-4" size={48} />
+                                <p className="text-gray-400 font-bold uppercase tracking-widest text-sm">No hay productos en esta categoría</p>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            )}
 
             {/* Modal para Crear/Editar Producto */}
             {showProductModal && (

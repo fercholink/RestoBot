@@ -1,0 +1,134 @@
+{
+    "name": "Dashboard_API_Integration",
+    "nodes": [
+        {
+            "parameters": {
+                "path": "webhook/orders",
+                "responseMode": "lastNode",
+                "options": {}
+            },
+            "name": "Webhook_Get_Orders",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ],
+            "webhookId": "get-orders-webhook"
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT o.*, json_agg(oi.*) as items FROM orders o LEFT JOIN order_items oi ON o.id = oi.order_id GROUP BY o.id ORDER BY o.created_at DESC;"
+            },
+            "name": "Get_All_Orders",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                300,
+                300
+            ],
+            "credentials": {
+                "postgresql": "Postgres_Easypanel"
+            }
+        },
+        {
+            "parameters": {
+                "path": "webhook/orders/update",
+                "httpMethod": "POST",
+                "responseMode": "lastNode",
+                "options": {}
+            },
+            "name": "Webhook_Update_Order",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                500
+            ],
+            "webhookId": "update-order-webhook"
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "UPDATE orders SET status = '{{$json.body.status}}' WHERE id = {{$json.body.orderId}} RETURNING *"
+            },
+            "name": "Update_Order_Status",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                300,
+                500
+            ],
+            "credentials": {
+                "postgresql": "Postgres_Easypanel"
+            }
+        },
+        {
+            "parameters": {
+                "path": "webhook/customers",
+                "responseMode": "lastNode",
+                "options": {}
+            },
+            "name": "Webhook_Get_Customers",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                700
+            ],
+            "webhookId": "get-customers-webhook"
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT * FROM customers ORDER BY created_at DESC;"
+            },
+            "name": "Get_All_Customers",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                300,
+                700
+            ],
+            "credentials": {
+                "postgresql": "Postgres_Easypanel"
+            }
+        }
+    ],
+    "connections": {
+        "Webhook_Get_Orders": {
+            "main": [
+                [
+                    {
+                        "node": "Get_All_Orders",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Webhook_Update_Order": {
+            "main": [
+                [
+                    {
+                        "node": "Update_Order_Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Webhook_Get_Customers": {
+            "main": [
+                [
+                    {
+                        "node": "Get_All_Customers",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

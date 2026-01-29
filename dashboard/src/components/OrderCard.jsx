@@ -1,6 +1,6 @@
 import React from 'react';
-import { Package, MapPin, User, Clock, CheckCircle2, Truck, Rocket, CreditCard, Utensils, X, Plus, Edit2, Trash2, Printer } from 'lucide-react';
-import { format } from 'date-fns';
+import { Package, MapPin, User, Clock, CheckCircle2, Truck, Rocket, CreditCard, Utensils, X, Plus, Edit2, Trash2, Printer, MessageCircle } from 'lucide-react';
+import { format, differenceInSeconds, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const statusIcons = {
@@ -10,7 +10,7 @@ const statusIcons = {
     pagado: { icon: CheckCircle2, color: 'text-success', bg: 'bg-green-50' },
 };
 
-const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact = false }) => {
+const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact = false, isMinimal = false }) => {
     const [isExpanded, setIsExpanded] = React.useState(false);
     const [elapsed, setElapsed] = React.useState('');
 
@@ -18,28 +18,67 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
         // El tiempo solo se detiene definitivamente cuando el pedido está pagado
         if (order.status === 'pagado') {
             const diff = order.preparation_time_seconds || 0;
+            if (diff === 0) {
+                setElapsed('N/A');
+                return;
+            }
             const mins = Math.floor(diff / 60);
             const secs = diff % 60;
-            setElapsed(`${mins}:${secs.toString().padStart(2, '0')}`);
+            setElapsed(`${mins}m ${secs.toString().padStart(2, '0')}s`);
             return;
         }
 
         const updateTimer = () => {
-            const start = new Date(order.created_at);
-            const now = new Date();
-            const diff = Math.floor((now - start) / 1000);
+            try {
+                if (!order.created_at) {
+                    setElapsed("--:--");
+                    return;
+                }
 
-            const mins = Math.floor(diff / 60);
-            const secs = diff % 60;
-            setElapsed(`${mins}:${secs.toString().padStart(2, '0')}`);
+                const now = new Date();
+                const created = parseISO(order.created_at);
+
+                let diff = differenceInSeconds(now, created);
+
+                if (diff < 0) diff = 0;
+
+                const mins = Math.floor(diff / 60);
+                const secs = diff % 60;
+                setElapsed(`${mins}m ${secs.toString().padStart(2, '0')}s`);
+            } catch (e) {
+                console.error("Timer error:", e);
+                setElapsed("--:--");
+            }
         };
 
-        const interval = setInterval(updateTimer, 1000);
+        // Actualizar inmediatamente y luego cada segundo
         updateTimer();
+        const interval = setInterval(updateTimer, 1000);
         return () => clearInterval(interval);
     }, [order.created_at, order.status, order.preparation_time_seconds]);
 
     const Icon = statusIcons[order.status]?.icon || Package;
+
+    // Vista Minimalista (Solo ID y número) para ahorrar espacio
+    if (isMinimal && !isExpanded) {
+        return (
+            <div
+                onClick={() => setIsExpanded(true)}
+                className="bg-white rounded-lg p-2 shadow-sm border border-gray-100/50 mb-1 flex items-center justify-between cursor-pointer hover:bg-gray-50 hover:border-primary/20 transition-all select-none"
+                title="Clic para ver detalles"
+            >
+                <div className="flex items-center gap-1.5 ">
+                    <div className="bg-success/10 p-1 rounded-md text-success">
+                        <CheckCircle2 size={12} />
+                    </div>
+                    <span className="text-[10px] font-black text-secondary">#{order.id}</span>
+                </div>
+                <span className="text-[9px] font-bold text-gray-400 truncate max-w-[60px]">
+                    ${(order.total || order.total_price || 0).toLocaleString()}
+                </span>
+            </div>
+        );
+    }
 
     // Vista compacta para pedidos pagados
     if (order.status === 'pagado' && !isExpanded) {
@@ -60,7 +99,11 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black text-primary">${order.total_price}</span>
+                    <div className="px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm border bg-success/10 text-success border-success/10">
+                        <Clock size={10} />
+                        <span className="text-[10px] font-black font-mono">{elapsed}</span>
+                    </div>
+                    <span className="text-[10px] font-black text-primary">${order.total || order.total_price}</span>
                     <div className="bg-gray-50 text-gray-400 p-1 rounded-md">
                         <Plus size={10} />
                     </div>
@@ -145,13 +188,13 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
                     <div>
                         <div className="flex items-center gap-2">
                             <h3 className="font-black text-secondary text-sm">Pedido</h3>
-                            <span className="text-primary font-black text-sm">${order.total_price}</span>
+                            <span className="text-primary font-black text-sm">${order.total || order.total_price}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs font-bold text-accent uppercase tracking-tighter">
                             <span className="flex items-center gap-1"><Package size={12} /> # {order.id}</span>
                             <span className="flex items-center gap-1">
-                                {order.type === 'mesa' ? <Utensils size={12} /> : <MapPin size={12} />}
-                                {order.type === 'mesa' ? `Mesa ${order.table_id}` : 'Domicilio'}
+                                {order.table_number && order.table_number !== 'DOMICILIO' ? <Utensils size={12} /> : <MapPin size={12} />}
+                                {order.table_number && order.table_number !== 'DOMICILIO' ? `Mesa ${order.table_number}` : 'Domicilio'}
                             </span>
                         </div>
                     </div>
@@ -167,7 +210,7 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
                     <div key={idx} className="border-b border-gray-50 pb-1.5 last:border-0">
                         <div className="flex justify-between text-[11px] font-bold">
                             <span className="text-secondary"><span className="text-primary font-black">{item.quantity}x</span> {item.product_name}</span>
-                            <span className="text-secondary/70 font-black">${(item.unit_price * item.quantity).toLocaleString()}</span>
+                            <span className="text-secondary/70 font-black">${((item.price || item.unit_price) * item.quantity).toLocaleString()}</span>
                         </div>
                         {item.customizations && (
                             <div className="pl-4 mt-0.5 space-y-0.5">
@@ -193,8 +236,11 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
                         <User size={12} className="text-accent" />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-[9px] font-black text-secondary truncate">{order.customer_name}</p>
-                        <p className="text-[8px] font-bold text-accent truncate">{order.customer_phone}</p>
+                        <p className="text-[9px] font-black text-secondary truncate">{order.customer_name || 'Cliente'}</p>
+                        <div className="flex items-center gap-1 text-[8px] font-bold text-accent truncate">
+                            {order.customer_phone && <MessageCircle size={8} className="text-green-500" />}
+                            {order.customer_phone}
+                        </div>
                     </div>
                 </div>
             )}
@@ -233,7 +279,7 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
                     <Printer size={14} className="group-hover/print:scale-110 transition-transform" />
                 </button>
             </div>
-            {order.status === 'pagado' && order.preparation_time_seconds && (
+            {order.status === 'pagado' && order.preparation_time_seconds > 0 && (
                 <div className="mt-2 pt-2 border-t border-gray-50 text-center text-[8px] font-black text-success/50 uppercase tracking-widest">
                     {Math.floor(order.preparation_time_seconds / 60)}m {order.preparation_time_seconds % 60}s
                 </div>

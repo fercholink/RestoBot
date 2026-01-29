@@ -1,17 +1,34 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Utensils, Settings, Wallet, LayoutGrid, Filter, Calendar, MapPin, Home, TrendingUp, Clock, DollarSign, Package, ChevronLeft, ChevronRight, X, Eye, EyeOff } from 'lucide-react';
+import { Utensils, Settings, Wallet, LayoutGrid, Filter, Calendar, MapPin, Home, TrendingUp, Clock, DollarSign, Package, ChevronLeft, ChevronRight, X, Eye, EyeOff, Truck } from 'lucide-react';
 import OrderCard from './OrderCard';
 import MenuManagement from './MenuManagement';
 import ShiftManagement from './ShiftManagement';
 
-const RestaurantManagement = ({ orders, onStatusChange, onEdit, onDelete, onPrint }) => {
-    const [activeSubTab, setActiveSubTab] = useState('board');
+import { useAuth } from '../context/AuthContext';
+
+const RestaurantManagement = ({
+    orders,
+    onStatusChange,
+    onEdit,
+    onDelete,
+    onPrint,
+    autoAdvance,
+    onToggleAutoAdvance,
+    activeSubTab: propActiveSubTab,
+    setActiveSubTab: propSetActiveSubTab
+}) => {
+    const { user } = useAuth();
+    // Usar estado local solo si no se proveen props (fallback)
+    const [localActiveSubTab, setLocalActiveSubTab] = useState(user?.role === 'cajero' ? 'turnos' : 'board');
+
+    const activeSubTab = propActiveSubTab || localActiveSubTab;
+    const setActiveSubTab = propSetActiveSubTab || setLocalActiveSubTab;
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [filters, setFilters] = useState({
         status: 'all',
         type: 'all',
-        date: 'today'
+        date: 'all' // Default to all to show orders regardless of timezone issues
     });
     const [showPaidTotal, setShowPaidTotal] = useState(false);
     const [shouldAutoOpenShift, setShouldAutoOpenShift] = useState(false);
@@ -63,7 +80,7 @@ const RestaurantManagement = ({ orders, onStatusChange, onEdit, onDelete, onPrin
         });
         const todayRevenue = todayOrders
             .filter(o => o.status === 'pagado')
-            .reduce((sum, o) => sum + (o.total_price || 0), 0);
+            .reduce((sum, o) => sum + (o.total || o.total_price || 0), 0);
 
         const preparationTimes = orders
             .filter(o => o.preparation_time_seconds)
@@ -82,180 +99,14 @@ const RestaurantManagement = ({ orders, onStatusChange, onEdit, onDelete, onPrin
 
     return (
         <div className="flex-1 flex overflow-hidden bg-gray-50/50">
-            {/* Sidebar Izquierdo */}
-            <motion.aside
-                initial={false}
-                animate={{ width: isSidebarCollapsed ? '80px' : '320px' }}
-                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                className="bg-white border-r border-gray-200 shadow-lg flex flex-col overflow-hidden relative"
-            >
-                {/* Toggle Collapse Button */}
-                <button
-                    onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                    className="absolute -right-3 top-6 z-10 w-6 h-6 bg-secondary text-white rounded-full shadow-lg flex items-center justify-center hover:bg-secondary/90 transition-colors"
-                >
-                    {isSidebarCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
-                </button>
+            {/* Sidebar Izquierdo ELIMINADO - Ahora controlado por Sidebar Principal */}
 
-                {/* Header del Sidebar */}
-                <div className="p-6 border-b border-gray-200">
-                    <motion.div
-                        animate={{ opacity: isSidebarCollapsed ? 0 : 1 }}
-                        className="flex items-center gap-3"
-                    >
-                        <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                            <Utensils size={20} className="text-primary" />
-                        </div>
-                        {!isSidebarCollapsed && (
-                            <div>
-                                <h3 className="text-sm font-black text-secondary">Restaurante</h3>
-                                <p className="text-[10px] text-gray-500">Gestión Operativa</p>
-                            </div>
-                        )}
-                    </motion.div>
+            {/* Filtros Flotantes / Barra Superior (Opcional, si queremos mantener filtros) */}
+            {activeSubTab === 'board' && (
+                <div className="absolute top-4 right-4 z-20 flex gap-2">
+                    {/* Aquí podríamos poner botones de filtro compactos o un dropdown */}
                 </div>
-
-                {/* Navegación Principal */}
-                <nav className="p-4 space-y-2 border-b border-gray-200">
-                    {subMenuItems.map((item) => (
-                        <motion.button
-                            key={item.id}
-                            onClick={() => setActiveSubTab(item.id)}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${activeSubTab === item.id
-                                ? 'bg-secondary text-white shadow-lg'
-                                : 'text-gray-600 hover:bg-gray-100'
-                                }`}
-                        >
-                            <item.icon size={20} className="shrink-0" />
-                            {!isSidebarCollapsed && (
-                                <div className="flex-1 text-left">
-                                    <p className="text-xs font-bold">{item.label}</p>
-                                    <p className={`text-[9px] ${activeSubTab === item.id ? 'text-white/70' : 'text-gray-400'}`}>
-                                        {item.description}
-                                    </p>
-                                </div>
-                            )}
-                        </motion.button>
-                    ))}
-                </nav>
-
-                {/* Filtros - Solo visible en la vista de pedidos */}
-                {activeSubTab === 'board' && !isSidebarCollapsed && (
-                    <div className="p-4 border-b border-gray-200 space-y-4">
-                        <div className="flex items-center gap-2 mb-3">
-                            <Filter size={14} className="text-secondary" />
-                            <h4 className="text-[10px] font-black uppercase tracking-widest text-secondary">Filtros</h4>
-                        </div>
-
-                        {/* Filtro por Estado */}
-                        <div>
-                            <label className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">Estado</label>
-                            <select
-                                value={filters.status}
-                                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                                className="w-full text-xs p-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary/20 bg-gray-50"
-                            >
-                                <option value="all">Todos</option>
-                                <option value="nuevo">Nuevos</option>
-                                <option value="fabricacion">En Fabricación</option>
-                                <option value="despachado">Despachados</option>
-                                <option value="pagado">Pagados</option>
-                            </select>
-                        </div>
-
-                        {/* Filtro por Tipo */}
-                        <div>
-                            <label className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2 block">Tipo</label>
-                            <div className="grid grid-cols-2 gap-2">
-                                <button
-                                    onClick={() => setFilters({ ...filters, type: 'all' })}
-                                    className={`p-2 rounded-lg text-[10px] font-bold transition-all ${filters.type === 'all'
-                                        ? 'bg-secondary text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                        }`}
-                                >
-                                    Todos
-                                </button>
-                                <button
-                                    onClick={() => setFilters({ ...filters, type: 'mesa' })}
-                                    className={`p-2 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${filters.type === 'mesa'
-                                        ? 'bg-secondary text-white'
-                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                        }`}
-                                >
-                                    <Utensils size={12} />
-                                    Mesa
-                                </button>
-                            </div>
-                            <button
-                                onClick={() => setFilters({ ...filters, type: 'domicilio' })}
-                                className={`w-full mt-2 p-2 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1 ${filters.type === 'domicilio'
-                                    ? 'bg-secondary text-white'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
-                            >
-                                <Home size={12} />
-                                Domicilio
-                            </button>
-                        </div>
-
-                        {/* Limpiar Filtros */}
-                        {(filters.status !== 'all' || filters.type !== 'all') && (
-                            <button
-                                onClick={() => setFilters({ status: 'all', type: 'all', date: 'today' })}
-                                className="w-full p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-[10px] font-bold transition-colors flex items-center justify-center gap-1"
-                            >
-                                <X size={12} />
-                                Limpiar Filtros
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {/* Estadísticas en Tiempo Real */}
-                {!isSidebarCollapsed && (
-                    <div className="p-4 flex-1 overflow-y-auto">
-                        <div className="flex items-center gap-2 mb-4">
-                            <TrendingUp size={14} className="text-secondary" />
-                            <h4 className="text-[10px] font-black uppercase tracking-widest text-secondary">Estadísticas</h4>
-                        </div>
-
-                        <div className="space-y-3">
-                            {/* Pedidos Activos */}
-                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <Package size={14} className="text-blue-600" />
-                                    <span className="text-[9px] font-bold text-blue-600 uppercase">Pedidos Activos</span>
-                                </div>
-                                <p className="text-2xl font-black text-blue-700">{stats.activeOrders}</p>
-                            </div>
-
-                            {/* Ventas del Día */}
-                            <div className="bg-green-50 border border-green-100 rounded-xl p-3">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <DollarSign size={14} className="text-green-600" />
-                                    <span className="text-[9px] font-bold text-green-600 uppercase">Ventas Hoy</span>
-                                </div>
-                                <p className="text-2xl font-black text-green-700">
-                                    ${stats.todayRevenue.toLocaleString()}
-                                </p>
-                                <p className="text-[9px] text-green-600 mt-1">{stats.todayOrders} pedidos</p>
-                            </div>
-
-                            {/* Tiempo Promedio */}
-                            <div className="bg-orange-50 border border-orange-100 rounded-xl p-3">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <Clock size={14} className="text-orange-600" />
-                                    <span className="text-[9px] font-bold text-orange-600 uppercase">Tiempo Promedio</span>
-                                </div>
-                                <p className="text-2xl font-black text-orange-700">{stats.avgPrepTime} min</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </motion.aside>
+            )}
 
             {/* Contenido Principal */}
             <div className="flex-1 overflow-hidden relative">
@@ -285,6 +136,60 @@ const RestaurantManagement = ({ orders, onStatusChange, onEdit, onDelete, onPrin
                                                     .filter(o => o.status === status)
                                                     .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
+                                                // Lógica Especial para Fabricación (Dividir Mesa vs Domicilio)
+                                                if (status === 'fabricacion') {
+                                                    const mesaOrders = ordersInStatus.filter(o => o.table_number && o.table_number !== 'DOMICILIO');
+                                                    const domicilioOrders = ordersInStatus.filter(o => !o.table_number || o.table_number === 'DOMICILIO');
+
+                                                    return (
+                                                        <div className="flex h-full gap-2">
+                                                            {/* Columna Izquierda: Mesas */}
+                                                            <div className="flex-1 flex flex-col bg-white/40 rounded-xl p-2 min-w-[200px]">
+                                                                <div className="flex items-center gap-1 mb-2 text-[9px] font-black text-secondary/70 uppercase tracking-wider pb-1 border-b border-secondary/10">
+                                                                    <Utensils size={10} /> Mesas
+                                                                </div>
+                                                                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                                                    {mesaOrders.map(order => (
+                                                                        <OrderCard
+                                                                            key={order.id}
+                                                                            order={order}
+                                                                            onStatusChange={onStatusChange}
+                                                                            onEdit={onEdit}
+                                                                            onDelete={onDelete}
+                                                                            onPrint={onPrint}
+                                                                        />
+                                                                    ))}
+                                                                    {mesaOrders.length === 0 && <div className="text-[9px] text-gray-400 text-center py-4">Sin pedidos</div>}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Divisor Vertical */}
+                                                            <div className="w-px bg-secondary/10 my-2"></div>
+
+                                                            {/* Columna Derecha: Domicilios */}
+                                                            <div className="flex-1 flex flex-col bg-white/40 rounded-xl p-2 min-w-[200px]">
+                                                                <div className="flex items-center gap-1 mb-2 text-[9px] font-black text-secondary/70 uppercase tracking-wider pb-1 border-b border-secondary/10">
+                                                                    <Truck size={10} /> Domicilios
+                                                                </div>
+                                                                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                                                    {domicilioOrders.map(order => (
+                                                                        <OrderCard
+                                                                            key={order.id}
+                                                                            order={order}
+                                                                            onStatusChange={onStatusChange}
+                                                                            onEdit={onEdit}
+                                                                            onDelete={onDelete}
+                                                                            onPrint={onPrint}
+                                                                        />
+                                                                    ))}
+                                                                    {domicilioOrders.length === 0 && <div className="text-[9px] text-gray-400 text-center py-4">Sin domicilios</div>}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                // Vista Normal para otros estados
                                                 const isCompactView = ordersInStatus.length > 2;
 
                                                 return ordersInStatus.map(order => (
@@ -296,6 +201,7 @@ const RestaurantManagement = ({ orders, onStatusChange, onEdit, onDelete, onPrin
                                                         onDelete={onDelete}
                                                         onPrint={onPrint}
                                                         isCompact={isCompactView}
+                                                        isMinimal={status === 'pagado'}
                                                     />
                                                 ));
                                             })()}
@@ -309,7 +215,7 @@ const RestaurantManagement = ({ orders, onStatusChange, onEdit, onDelete, onPrin
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-black text-success text-sm">
                                                         {showPaidTotal
-                                                            ? `$${filteredOrders.filter(o => o.status === 'pagado').reduce((sum, o) => sum + (o.total_price || 0), 0).toLocaleString()}`
+                                                            ? `$${filteredOrders.filter(o => o.status === 'pagado').reduce((sum, o) => sum + (o.total || o.total_price || 0), 0).toLocaleString()}`
                                                             : '••••••'}
                                                     </span>
                                                     {showPaidTotal ? <EyeOff size={14} className="text-gray-400 group-hover:text-secondary" /> : <Eye size={14} className="text-gray-400 group-hover:text-secondary" />}

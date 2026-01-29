@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Activity, ShieldAlert, Monitor, Terminal, User, FileText, Lock, Unlock, AlertTriangle, CheckCircle2, Info, Search, Filter, Clock } from 'lucide-react';
+import { Activity, ShieldAlert, Monitor, Terminal, User, FileText, Lock, Unlock, AlertTriangle, CheckCircle2, Info, Search, Filter, Clock, Trash2, Database } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 
 const MOCK_LOGS = [
     { id: 1, type: 'security', action: 'Cambio de Contraseña', user: 'Admin Principal', target: 'Juan Cajero', timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), severity: 'warning' },
@@ -31,6 +33,55 @@ const OperationsHub = () => {
             case 'warning': return <AlertTriangle size={14} />;
             case 'critical': return <ShieldAlert size={14} />;
             default: return <Activity size={14} />;
+        }
+    };
+
+    const { user } = useAuth();
+    const [isCleaning, setIsCleaning] = useState(false);
+
+    const handleResetDatabase = async () => {
+        if (!user || (user.role !== 'gerente' && user.role !== 'admin')) {
+            alert("No tienes permisos para realizar esta acción.");
+            return;
+        }
+
+        if (!window.confirm("⚠️ ¿Estás COMPLETAMENTE SEGURO?\n\nEsta acción ELIMINARÁ TODOS LOS PEDIDOS E ÍTEMS de la base de datos.\n\nÚsala solo para iniciar un nuevo proyecto desde cero. Esta acción NO se puede deshacer.")) {
+            return;
+        }
+
+        // Doble confirmación
+        if (!window.confirm("CONFIRMACIÓN FINAL: Se borrará todo el historial de pedidos permanentemente. ¿Proceder?")) {
+            return;
+        }
+
+        setIsCleaning(true);
+        try {
+            // 1. Eliminar items primero (aunque cascade debería manejarlo, es más seguro explícito)
+            const { error: itemsError } = await supabase
+                .from('order_items')
+                .delete()
+                .neq('id', 0); // Hack para borrar todo si RLS lo permite
+
+            if (itemsError) throw itemsError;
+
+            // 2. Eliminar pedidos
+            const { error: ordersError } = await supabase
+                .from('orders')
+                .delete()
+                .neq('id', 0);
+
+            if (ordersError) throw ordersError;
+
+            alert("✅ Base de datos de pedidos limpiada correctamente. El sistema está listo para un nuevo proyecto.");
+
+            // Opcional: Recargar o limpiar estado local si fuera necesario
+            window.location.reload();
+
+        } catch (error) {
+            console.error("Error cleaning DB:", error);
+            alert("❌ Error al limpiar base de datos: " + error.message);
+        } finally {
+            setIsCleaning(false);
         }
     };
 
@@ -157,6 +208,31 @@ const OperationsHub = () => {
                         ))}
                     </div>
                 </div>
+
+                {/* Zona de Mantenimiento (Solo Gerentes) */}
+                {(user?.role === 'gerente' || user?.role === 'admin') && (
+                    <div className="bg-red-50 rounded-[2.5rem] border border-red-100 p-8 shadow-sm space-y-6">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-red-400 flex items-center gap-2">
+                            <Database size={14} />
+                            Zona de Mantenimiento
+                        </h4>
+
+                        <div className="space-y-4">
+                            <p className="text-xs text-red-900/60 font-medium leading-relaxed">
+                                Acciones destructivas para reiniciar el sistema. Úsese con extrema precaución.
+                            </p>
+
+                            <button
+                                onClick={handleResetDatabase}
+                                disabled={isCleaning}
+                                className="w-full py-4 bg-red-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-600 active:scale-95 transition-all shadow-lg shadow-red-500/20 flex items-center justify-center gap-2"
+                            >
+                                {isCleaning ? <Activity className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                                {isCleaning ? 'Limpiando...' : 'Resetear Pedidos'}
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

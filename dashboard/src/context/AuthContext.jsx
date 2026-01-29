@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { INITIAL_USERS } from '../constants/initialUsers';
+import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext(null);
 
@@ -7,72 +7,106 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const savedUser = localStorage.getItem('restobot_user');
-        try {
-            console.log("AuthContext: Loading saved user...");
-            if (savedUser) {
-                setUser(JSON.parse(savedUser));
+    const handleUserSession = async (session) => {
+        const supabaseUser = session?.user ?? null;
+        if (supabaseUser) {
+            // AUTO-FIX: Si el usuario no tiene rol (creado manualmente), asignarle 'cajero'
+            let role = supabaseUser.user_metadata?.role;
+            if (!role) {
+                console.log("Auth: Usuario sin rol detectado. Asignando 'cajero' automáticamente...");
+                const { data, error } = await supabase.auth.updateUser({
+                    data: { role: 'cajero', name: 'Cajero', branch: 'Sede Principal' }
+                });
+                if (!error && data.user) {
+                    // Update local var with new metadata
+                    role = 'cajero';
+                    supabaseUser.user_metadata = { ...supabaseUser.user_metadata, role: 'cajero', name: 'Cajero' };
+                }
             }
-        } catch (error) {
-            console.error("AuthContext: Error parsing saved user:", error);
-            localStorage.removeItem('restobot_user');
+
+            // Calcular nombre real para mostrar
+            const metadataName = supabaseUser.user_metadata?.name;
+            const emailName = supabaseUser.email?.split('@')[0];
+            // Si el nombre es genérico o vacío, usar el del email
+            const finalName = (metadataName && metadataName !== 'Usuario Nuevo' && metadataName !== 'Colaborador')
+                ? metadataName
+                : (emailName || 'Cajero');
+
+            // Flatten metadata for compatibility with existing app
+            setUser({
+                ...supabaseUser,
+                ...supabaseUser.user_metadata,
+                name: finalName, // Nombre sanitizado
+                role: role || 'cajero' // Fallback visual
+            });
+        } else {
+            setUser(null);
         }
-        setLoading(false);
+    };
+
+    useEffect(() => {
+        // 1. Initial Session Check
+        const getSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            handleUserSession(session);
+            setLoading(false);
+        };
+        getSession();
+
+        // 2. Listen for Auth Changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            handleUserSession(session);
+            setLoading(false);
+        });
+
+        // Cleanup subscription
+        return () => subscription.unsubscribe();
     }, []);
 
     const login = async (email, password) => {
-        const normalizedEmail = email.trim().toLowerCase();
-        const rawPassword = password.trim();
-
-        console.log("Login Attempt:", normalizedEmail);
-
-        // 1. Obtener usuarios: Primero localStorage, si no hay, usar INITIAL_USERS
-        let allUsers = [];
         try {
-            const storedUsers = localStorage.getItem('restobot_registered_users');
-            if (storedUsers) {
-                allUsers = JSON.parse(storedUsers);
-            } else {
-                // Si no hay nada en storage, usamos los iniciales
-                allUsers = INITIAL_USERS;
-                // Opcional: Persistir los iniciales de una vez para que UserManagement los vea igual
-                // localStorage.setItem('restobot_registered_users', JSON.stringify(INITIAL_USERS));
-            }
-        } catch (err) {
-            console.error("AuthContext: Error reading users", err);
-            allUsers = INITIAL_USERS;
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error("AuthContext: Login error", error);
+            return { success: false, message: error.message };
         }
-
-        // Combinar con INITIAL_USERS si se desea que siempre existan (opcional, pero seguro para demos)
-        // Por ahora, vamos a asegurar que el Admin siempre pueda entrar incluso si borran localStorage
-        const adminUser = INITIAL_USERS.find(u => u.role === 'gerente');
-        const internalMasterList = [...allUsers];
-
-        // Buscar usuario
-        const foundUser = internalMasterList.find(u =>
-            u.email.trim().toLowerCase() === normalizedEmail &&
-            // Comparación simple de password para demo. En prod usar hash.
-            (u.password === rawPassword || (u.id === 1 && rawPassword === 'admin123')) // Backdoor admin original mantenido por compatibilidad
-        );
-
-        if (foundUser) {
-            const authUser = { ...foundUser, token: 'fake-jwt-token-' + Date.now() };
-            setUser(authUser);
-            localStorage.setItem('restobot_user', JSON.stringify(authUser));
-            return { success: true };
-        }
-
-        return { success: false, message: 'Credenciales inválidas o usuario no persistido' };
     };
 
-    const logout = () => {
-        setUser(null);
-        localStorage.removeItem('restobot_user');
+    const signUp = async (email, password, metadata = {}) => {
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: metadata, // Save user name, role, branch, etc.
+                }
+            });
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error("AuthContext: Register error", error);
+            return { success: false, message: error.message };
+        }
+    };
+
+    const logout = async () => {
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
+        } catch (error) {
+            console.error("AuthContext: Logout error", error);
+        }
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, logout, signUp, loading }}>
             {children}
         </AuthContext.Provider>
     );

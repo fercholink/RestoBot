@@ -1,0 +1,186 @@
+{
+    "name": "Dashboard_API_Fixed_V4_Supabase",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "orders/update",
+                "responseMode": "onReceived",
+                "options": {
+                    "responseCode": 200,
+                    "allowedOrigins": "*"
+                }
+            },
+            "name": "Webhook_Update_Order",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                500
+            ],
+            "webhookId": "update-order-webhook"
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "tableStr": "orders",
+                "matchType": "filter",
+                "filterJson": "={ \"id\": {{ $json.body.orderId }} }",
+                "columnsJson": "={ \"status\": \"{{ $json.body.status }}\" }"
+            },
+            "name": "Update_Order_Status",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                300,
+                500
+            ],
+            "credentials": {
+                "supabaseApi": "Supabase_Creds"
+            }
+        },
+        {
+            "parameters": {
+                "dataType": "string",
+                "value1": "={{ $json.status }}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": "despachado"
+                        },
+                        {
+                            "value2": "fabricacion"
+                        }
+                    ]
+                }
+            },
+            "name": "Check_Status",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 1,
+            "position": [
+                500,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "path": "orders",
+                "responseMode": "onReceived",
+                "options": {
+                    "allowedOrigins": "*"
+                }
+            },
+            "name": "Webhook_Get_Orders",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ],
+            "webhookId": "get-orders-webhook"
+        },
+        {
+            "parameters": {
+                "operation": "getAll",
+                "tableStr": "orders",
+                "returnAll": true,
+                "options": {
+                    "order": "created_at.desc"
+                }
+            },
+            "name": "Get_All_Orders",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                300,
+                300
+            ],
+            "credentials": {
+                "supabaseApi": "Supabase_Creds"
+            }
+        },
+        {
+            "parameters": {
+                "path": "customers",
+                "responseMode": "onReceived",
+                "options": {
+                    "allowedOrigins": "*"
+                }
+            },
+            "name": "Webhook_Get_Customers",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                700
+            ],
+            "webhookId": "get-customers-webhook"
+        },
+        {
+            "parameters": {
+                "operation": "getAll",
+                "tableStr": "customers",
+                "returnAll": true,
+                "options": {
+                    "order": "created_at.desc"
+                }
+            },
+            "name": "Get_All_Customers",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                300,
+                700
+            ],
+            "credentials": {
+                "supabaseApi": "Supabase_Creds"
+            }
+        }
+    ],
+    "connections": {
+        "Webhook_Update_Order": {
+            "main": [
+                [
+                    {
+                        "node": "Update_Order_Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Update_Order_Status": {
+            "main": [
+                [
+                    {
+                        "node": "Check_Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Webhook_Get_Orders": {
+            "main": [
+                [
+                    {
+                        "node": "Get_All_Orders",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Webhook_Get_Customers": {
+            "main": [
+                [
+                    {
+                        "node": "Get_All_Customers",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

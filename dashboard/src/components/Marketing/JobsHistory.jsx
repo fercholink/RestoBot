@@ -1,14 +1,50 @@
-import React from 'react';
-import { Eye, ExternalLink, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { Eye, ExternalLink, Clock, CheckCircle2, XCircle, RefreshCw } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useState, useEffect } from 'react';
 
 const JobsHistory = () => {
-    // Mock Data
-    const jobs = [
-        { id: '101', date: '2024-03-20 14:30', product: 'Hamburguesa Perro', platform: 'Instagram', status: 'completed', result: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd' },
-        { id: '102', date: '2024-03-20 10:15', product: 'Salchipapa', platform: 'Facebook', status: 'completed', result: 'https://images.unsplash.com/photo-1594212699903-ec8a3eca50f5' },
-        { id: '103', date: '2024-03-19 18:45', product: 'Coca Cola', platform: 'WhatsApp', status: 'failed', result: null },
-        { id: '104', date: '2024-03-19 09:00', product: 'Pizza Familiar', platform: 'Instagram', status: 'pending', result: null },
-    ];
+    const [jobs, setJobs] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchJobs = async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('marketing_jobs')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setJobs(data || []);
+        } catch (error) {
+            console.error("Error fetching jobs:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchJobs(); // Carga inicial
+
+        // Suscripción a cambios en tiempo real para actualizar la tabla
+        const channel = supabase.channel('table_db_changes')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'marketing_jobs' },
+                (payload) => {
+                    console.log("Cambio en tabla:", payload);
+                    fetchJobs(); // Recargar lista simple
+                }
+            )
+            .subscribe();
+
+        return () => channel.unsubscribe();
+    }, []);
+
+    const formatDate = (dateString) => {
+        if (!dateString) return '';
+        return new Date(dateString).toLocaleString('es-CO');
+    }
 
     const getStatusBadge = (status) => {
         switch (status) {

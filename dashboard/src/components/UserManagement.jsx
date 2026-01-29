@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { UserPlus, Search, Edit2, Trash2, Shield, User, Mail, Building2, Key, Check, Info, X, Save, AlertCircle } from 'lucide-react';
+import { UserPlus, Search, Edit2, Trash2, Shield, User, Mail, Building2, Key, Check, Info, X, Save, AlertCircle, Ban } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 import { INITIAL_USERS } from '../constants/initialUsers';
 
@@ -9,6 +10,24 @@ const MOCK_USERS = INITIAL_USERS;
 const MOCK_BRANCHES = ['Sede Norte', 'Sede Sur', 'Sede Centro', 'Global'];
 
 const UserManagement = () => {
+    const { user } = useAuth();
+
+    // Protección de Ruta: Si no es admin ni gerente, no mostrar nada o redirect.
+    if (user && user.role !== 'admin' && user.role !== 'gerente') {
+        return (
+            <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in zoom-in duration-300">
+                <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center shadow-inner">
+                    <Ban size={48} />
+                </div>
+                <div>
+                    <h2 className="text-2xl font-black text-secondary">Acceso Restringido</h2>
+                    <p className="text-gray-400 font-medium mt-2 max-w-sm mx-auto">
+                        Su perfil de <strong>{user.role}</strong> no tiene permisos para gestionar usuarios.
+                    </p>
+                </div>
+            </div>
+        );
+    }
     // Cargar usuarios de localStorage o usar MOCK inicial
     const [users, setUsers] = useState(() => {
         const saved = localStorage.getItem('restobot_registered_users');

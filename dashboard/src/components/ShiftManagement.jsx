@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { Wallet, Clock, ArrowRightLeft, CheckCircle2, AlertCircle, History, User, Building2, TrendingUp, TrendingDown, Landmark, Banknote, Save, X, Plus, Minus, Download, Send, XCircle } from 'lucide-react';
 
 const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
@@ -27,10 +28,14 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
 
     const activeShift = shifts.find(s => s.status === 'abierto');
 
+    const { user } = useAuth();
+
     // Sincronizar con LocalStorage
     const syncShifts = (newList) => {
         setShifts(newList);
         localStorage.setItem('restobot_shifts', JSON.stringify(newList));
+        // Disparar evento para que App.jsx se entere
+        window.dispatchEvent(new Event('shift-updated'));
     };
 
     // Cálculos en tiempo real basados en pedidos pagados
@@ -72,8 +77,8 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
     const handleOpenShift = () => {
         const newShift = {
             id: Date.now(),
-            cashier: 'Admin Principal', // Simulado
-            branch: 'Sede Global',
+            cashier: user?.name || 'Cajero', // Usar nombre real
+            branch: user?.branch || 'Sede Principal',
             status: 'abierto',
             start_time: new Date().toISOString(),
             initial_cash: Number(initialCash),
@@ -263,68 +268,70 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 font-medium whitespace-nowrap">
-                            {shifts.map((shift) => (
-                                <tr key={shift.id} className="hover:bg-gray-50/50 transition-colors group">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-secondary font-black text-xs group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                                                {shift.cashier.split(' ').map(n => n[0]).join('')}
+                            {shifts
+                                .filter(s => (user?.role === 'admin' || user?.role === 'gerente') ? true : s.cashier === user?.name) // Filtro: Cajeros solo ven sus turnos
+                                .map((shift) => (
+                                    <tr key={shift.id} className="hover:bg-gray-50/50 transition-colors group">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-secondary font-black text-xs group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                                                    {shift.cashier.split(' ').map(n => n[0]).join('')}
+                                                </div>
+                                                <div>
+                                                    <p className="font-black text-secondary text-sm">{shift.cashier}</p>
+                                                    <p className="text-[10px] text-gray-400 font-bold uppercase">{shift.branch}</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <p className="font-black text-secondary text-sm">{shift.cashier}</p>
-                                                <p className="text-[10px] text-gray-400 font-bold uppercase">{shift.branch}</p>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="space-y-0.5">
+                                                <p className="text-xs text-secondary font-bold">{new Date(shift.start_time).toLocaleDateString()}</p>
+                                                <p className="text-[10px] text-gray-400 font-mono">
+                                                    {new Date(shift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    {shift.end_time ? ` - ${new Date(shift.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ' (Abierto)'}
+                                                </p>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="space-y-0.5">
-                                            <p className="text-xs text-secondary font-bold">{new Date(shift.start_time).toLocaleDateString()}</p>
-                                            <p className="text-[10px] text-gray-400 font-mono">
-                                                {new Date(shift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                {shift.end_time ? ` - ${new Date(shift.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ' (Abierto)'}
-                                            </p>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="space-y-0.5">
-                                            <p className="text-sm font-black text-secondary">${(shift.final_cash || (shift.status === 'abierto' ? metrics?.expectedInDrawer : 0))?.toLocaleString()}</p>
-                                            <p className="text-[10px] text-gray-400 font-bold uppercase">Digital: ${shift.digital?.toLocaleString() || metrics?.digitalSales.toLocaleString()}</p>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex justify-center">
-                                            {shift.status === 'abierto' ? (
-                                                <span className="bg-blue-50 text-blue-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">En progreso</span>
-                                            ) : (shift.balance || 0) === 0 ? (
-                                                <span className="bg-success/10 text-success px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 tracking-tighter">
-                                                    <CheckCircle2 size={12} /> Cuadrado
-                                                </span>
-                                            ) : (
-                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 tracking-tighter ${shift.balance > 0 ? 'bg-orange-50 text-orange-500' : 'bg-red-50 text-red-500'}`}>
-                                                    <AlertCircle size={12} /> {shift.balance > 0 ? 'Sobrante' : 'Faltante'} (${Math.abs(shift.balance).toLocaleString()})
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-primary transition-all"><Send size={16} /></button>
-                                            <button
-                                                onClick={() => {
-                                                    const shiftToPrint = { ...shift };
-                                                    if (!shift.metrics && shift.status === 'abierto') {
-                                                        shiftToPrint.metrics = getShiftMetrics(shift);
-                                                    }
-                                                    onPrint && onPrint(shiftToPrint, 'cierre_caja');
-                                                }}
-                                                className="text-[10px] font-black text-secondary hover:text-primary uppercase tracking-widest border border-gray-100 px-3 py-2 rounded-xl"
-                                            >
-                                                Reporte
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="space-y-0.5">
+                                                <p className="text-sm font-black text-secondary">${(shift.final_cash || (shift.status === 'abierto' ? metrics?.expectedInDrawer : 0))?.toLocaleString()}</p>
+                                                <p className="text-[10px] text-gray-400 font-bold uppercase">Digital: ${shift.digital?.toLocaleString() || metrics?.digitalSales.toLocaleString()}</p>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex justify-center">
+                                                {shift.status === 'abierto' ? (
+                                                    <span className="bg-blue-50 text-blue-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">En progreso</span>
+                                                ) : (shift.balance || 0) === 0 ? (
+                                                    <span className="bg-success/10 text-success px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 tracking-tighter">
+                                                        <CheckCircle2 size={12} /> Cuadrado
+                                                    </span>
+                                                ) : (
+                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 tracking-tighter ${shift.balance > 0 ? 'bg-orange-50 text-orange-500' : 'bg-red-50 text-red-500'}`}>
+                                                        <AlertCircle size={12} /> {shift.balance > 0 ? 'Sobrante' : 'Faltante'} (${Math.abs(shift.balance).toLocaleString()})
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-primary transition-all"><Send size={16} /></button>
+                                                <button
+                                                    onClick={() => {
+                                                        const shiftToPrint = { ...shift };
+                                                        if (!shift.metrics && shift.status === 'abierto') {
+                                                            shiftToPrint.metrics = getShiftMetrics(shift);
+                                                        }
+                                                        onPrint && onPrint(shiftToPrint, 'cierre_caja');
+                                                    }}
+                                                    className="text-[10px] font-black text-secondary hover:text-primary uppercase tracking-widest border border-gray-100 px-3 py-2 rounded-xl"
+                                                >
+                                                    Reporte
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
                         </tbody>
                     </table>
                 </div>

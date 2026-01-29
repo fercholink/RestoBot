@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Sparkles, Image as ImageIcon, CheckCircle, Loader2 } from 'lucide-react';
+import { Sparkles, Image as ImageIcon, CheckCircle, Loader2, AlertCircle } from 'lucide-react';
 import AdPreview from './AdPreview';
+import { supabase } from '../../lib/supabase';
 
 const CreateAdForm = () => {
     const [formData, setFormData] = useState({
@@ -70,8 +71,8 @@ const CreateAdForm = () => {
                                         type="button"
                                         onClick={() => setFormData({ ...formData, platform })}
                                         className={`py-2 px-4 rounded-xl border text-sm font-medium capitalize transition-all ${formData.platform === platform
-                                                ? 'bg-purple-50 border-purple-500 text-purple-700'
-                                                : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                                            ? 'bg-purple-50 border-purple-500 text-purple-700'
+                                            : 'border-gray-200 text-gray-600 hover:border-gray-300'
                                             }`}
                                     >
                                         {platform}

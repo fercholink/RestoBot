@@ -1,0 +1,93 @@
+{
+    "name": "WhatsApp_Notification_Flow",
+    "nodes": [
+        {
+            "parameters": {
+                "dataType": "string",
+                "value1": "={{ $json.status }}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": "despachado"
+                        },
+                        {
+                            "value2": "fabricacion"
+                        }
+                    ]
+                }
+            },
+            "name": "Check_Status",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 1,
+            "position": [
+                500,
+                500
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "sendTemplate",
+                "phoneNumberId": "YOUR_PHONE_NUMBER_ID",
+                "recipientPhoneNumber": "={{ $json.customer_phone }}",
+                "templateName": "order_update",
+                "components": [
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {
+                                "type": "text",
+                                "text": "={{ $json.status }}"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "name": "WhatsApp_Notification",
+            "type": "n8n-nodes-base.whatsapp",
+            "typeVersion": 1,
+            "position": [
+                700,
+                400
+            ],
+            "credentials": {
+                "whatsappApi": "YOUR_WHATSAPP_CREDENTIALS_NAME"
+            }
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT * FROM customers WHERE phone_number = '{{$json.customer_phone}}'"
+            },
+            "name": "Get_Customer_Phone",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                500,
+                300
+            ],
+            "credentials": {
+                "postgresql": "Postgres_Easypanel"
+            }
+        }
+    ],
+    "connections": {
+        "Check_Status": {
+            "main": [
+                [
+                    {
+                        "node": "WhatsApp_Notification",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "WhatsApp_Notification",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}
