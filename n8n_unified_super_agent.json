@@ -1,0 +1,457 @@
+{
+    "name": "Super_Agente_RestoBot_Unificado",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "orders/update",
+                "options": {
+                    "allowedOrigins": "*"
+                }
+            },
+            "name": "Webhook_Update_Order",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                100
+            ],
+            "webhookId": "update-order-webhook"
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "tableId": "orders",
+                "filterType": "string",
+                "filterString": "=id=eq.{{ $json.body.orderId }}",
+                "fieldsUi": {
+                    "fieldValues": [
+                        {
+                            "fieldId": "status",
+                            "fieldValue": "={{ $json.body.status }}"
+                        }
+                    ]
+                }
+            },
+            "name": "Update_Order_Status",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                300,
+                100
+            ],
+            "credentials": {
+                "supabaseApi": "Supabase_Creds"
+            }
+        },
+        {
+            "parameters": {
+                "dataType": "string",
+                "value1": "={{ $json.status }}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": "despachado"
+                        },
+                        {
+                            "value2": "fabricacion"
+                        }
+                    ]
+                }
+            },
+            "name": "Check_Status",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 1,
+            "position": [
+                500,
+                100
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.wetooh.com/v1/messages",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer TU_TOKEN_WETOOH"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "number",
+                            "value": "={{ $('Webhook_Update_Order').item.json.body.customer_phone }}"
+                        },
+                        {
+                            "name": "message",
+                            "value": "=Hola 👋, tu pedido ahora está en estado: *{{ $json.status }}*. \n\nGracias por elegirnos. 🍔"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Send_Notification_Wetooh",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                700,
+                100
+            ],
+            "notes": "AJUSTAR URL Y TOKEN DE WETOOH AQUÍ"
+        },
+        {
+            "parameters": {
+                "path": "orders",
+                "options": {
+                    "allowedOrigins": "*"
+                }
+            },
+            "name": "Webhook_Get_Orders",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ],
+            "webhookId": "get-orders-webhook"
+        },
+        {
+            "parameters": {
+                "operation": "getAll",
+                "tableStr": "orders",
+                "returnAll": true,
+                "options": {}
+            },
+            "name": "Get_All_Orders",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                300,
+                300
+            ],
+            "credentials": {
+                "supabaseApi": "Supabase_Creds"
+            }
+        },
+        {
+            "parameters": {
+                "path": "customers",
+                "options": {
+                    "allowedOrigins": "*"
+                }
+            },
+            "name": "Webhook_Get_Customers",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                500
+            ],
+            "webhookId": "get-customers-webhook"
+        },
+        {
+            "parameters": {
+                "operation": "getAll",
+                "tableStr": "customers",
+                "returnAll": true,
+                "options": {}
+            },
+            "name": "Get_All_Customers",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                300,
+                500
+            ],
+            "credentials": {
+                "supabaseApi": "Supabase_Creds"
+            }
+        },
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-ai-agent",
+                "responseMode": "lastNode",
+                "options": {}
+            },
+            "name": "WhatsApp_Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                700
+            ],
+            "webhookId": "whatsapp-master-webhook"
+        },
+        {
+            "parameters": {
+                "dataType": "string",
+                "value1": "={{ $json.body.message.type }}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": "image"
+                        }
+                    ]
+                }
+            },
+            "name": "Check_Input_Type",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 1,
+            "position": [
+                300,
+                700
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "getAll",
+                "tableStr": "menu_view",
+                "returnAll": true,
+                "options": {}
+            },
+            "name": "Get_Menu",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                500,
+                800
+            ],
+            "credentials": {
+                "supabaseApi": "Supabase_Creds"
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const products = items.map(item => item.json);\nconst menuByCategory = {};\nproducts.forEach(p => {\n  if (!menuByCategory[p.category_name]) menuByCategory[p.category_name] = [];\n  menuByCategory[p.category_name].push({\n    name: p.name,\n    price: p.price,\n    description: p.description,\n    image: p.image_url,\n    ingredients: p.base_ingredients,\n    extras: p.extras\n  });\n});\nreturn [{ json: { menu_context: JSON.stringify(menuByCategory, null, 2) } }];"
+            },
+            "name": "Format_Menu_Context",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                700,
+                800
+            ]
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o",
+                "prompt": "Analiza imagen. ¿Comprobante pago?\nJSON: {is_payment_proof, date, status, amount, sender}",
+                "options": {}
+            },
+            "name": "Analyze_Image",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                500,
+                600
+            ],
+            "credentials": {
+                "openAiApi": "OpenAI_Credentials"
+            }
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o",
+                "options": {
+                    "systemMessage": "Eres 'RestoBot'.\n1. Responde dudas del menú.\n2. TOMA PEDIDOS: Pide dirección y FOTO pago (valida fecha HOY).\n3. Si piden humano -> 3001234567."
+                }
+            },
+            "name": "Master_Brain_AI",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                900,
+                700
+            ],
+            "credentials": {
+                "openAiApi": "OpenAI_Credentials"
+            }
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "boolean": [
+                        {
+                            "value1": "={{ $json.ready_to_order }}",
+                            "value2": true
+                        }
+                    ]
+                }
+            },
+            "name": "Is_Order_Confirmed",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                1100,
+                700
+            ]
+        },
+        {
+            "parameters": {
+                "tableStr": "orders",
+                "columnsJson": "={ \"customer_phone\": \"{{ $('WhatsApp_Webhook').item.json.body.from }}\", \"type\": \"{{ $json.type }}\", \"status\": \"nuevo\", \"total\": 0, \"payment_proof_url\": \"{{ $json.payment_proof_url }}\" }"
+            },
+            "name": "Save_Order",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                1300,
+                700
+            ],
+            "credentials": {
+                "supabaseApi": "Supabase_Creds"
+            }
+        }
+    ],
+    "connections": {
+        "Webhook_Update_Order": {
+            "main": [
+                [
+                    {
+                        "node": "Update_Order_Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Update_Order_Status": {
+            "main": [
+                [
+                    {
+                        "node": "Check_Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check_Status": {
+            "main": [
+                [
+                    {
+                        "node": "Send_Notification_Wetooh",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Webhook_Get_Orders": {
+            "main": [
+                [
+                    {
+                        "node": "Get_All_Orders",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Webhook_Get_Customers": {
+            "main": [
+                [
+                    {
+                        "node": "Get_All_Customers",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "WhatsApp_Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Check_Input_Type",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check_Input_Type": {
+            "main": [
+                [
+                    {
+                        "node": "Analyze_Image",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Get_Menu",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get_Menu": {
+            "main": [
+                [
+                    {
+                        "node": "Format_Menu_Context",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format_Menu_Context": {
+            "main": [
+                [
+                    {
+                        "node": "Master_Brain_AI",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Analyze_Image": {
+            "main": [
+                [
+                    {
+                        "node": "Master_Brain_AI",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Master_Brain_AI": {
+            "main": [
+                [
+                    {
+                        "node": "Is_Order_Confirmed",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is_Order_Confirmed": {
+            "main": [
+                [
+                    {
+                        "node": "Save_Order",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}
