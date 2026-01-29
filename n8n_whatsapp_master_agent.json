@@ -1,0 +1,227 @@
+{
+    "name": "WhatsApp_Master_Agent_RestoBot",
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "whatsapp-ai-agent",
+                "responseMode": "lastNode",
+                "options": {}
+            },
+            "name": "WhatsApp_Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ],
+            "webhookId": "whatsapp-master-webhook"
+        },
+        {
+            "parameters": {
+                "dataType": "string",
+                "value1": "={{ $json.body.message.type }}",
+                "rules": {
+                    "rules": [
+                        {
+                            "value2": "image"
+                        }
+                    ]
+                }
+            },
+            "name": "Check_Input_Type",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 1,
+            "position": [
+                300,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "getAll",
+                "tableStr": "menu_view",
+                "returnAll": true,
+                "options": {}
+            },
+            "name": "Get_Menu",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                500,
+                400
+            ],
+            "credentials": {
+                "supabaseApi": "Supabase_Creds"
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "// Formatear Menú para la IA\nconst products = items.map(item => item.json);\nconst menuByCategory = {};\nproducts.forEach(p => {\n  if (!menuByCategory[p.category_name]) menuByCategory[p.category_name] = [];\n  menuByCategory[p.category_name].push({\n    name: p.name,\n    price: p.price,\n    description: p.description,\n    image: p.image_url,\n    ingredients: p.base_ingredients,\n    extras: p.extras\n  });\n});\n\nreturn [{ json: { menu_context: JSON.stringify(menuByCategory, null, 2) } }];"
+            },
+            "name": "Format_Menu_Context",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 1,
+            "position": [
+                700,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o",
+                "prompt": "Analiza esta imagen. ¿Es un comprobante de pago?\nExtrae en JSON:\n{\n  \"is_payment_proof\": boolean,\n  \"date\": string,\n  \"status\": string,\n  \"amount\": number\n}\nHoy es: {{ $today }}",
+                "options": {}
+            },
+            "name": "Analyze_Image",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                500,
+                200
+            ],
+            "credentials": {
+                "openAiApi": "OpenAI_Credentials"
+            }
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o",
+                "options": {
+                    "systemMessage": "📛 IDENTIDAD: Soy 'RestoBot', el Asistente Virtual de IA del restaurante.\n📞 ESCALAMIENTO: Si piden humano, dar número: 3001234567.\n\n🧠 CONTEXTO:\n- MENÚ DIGITAL: {{ $('Format_Menu_Context').item ? $('Format_Menu_Context').item.json.menu_context : 'No solicitado' }}\n- ANÁLISIS IMAGEN: {{ $('Analyze_Image').item ? JSON.stringify($('Analyze_Image').item.json) : 'N/A' }}\n- MENSAJE USUARIO: {{ $('WhatsApp_Webhook').item.json.body.message.body || 'Imagen enviada' }}\n- TIPO: {{ $('Check_Input_Type').item.json.body.message.type }}\n\n📋 REGLAS:\n1. CONSULTAS: Responde dudas del menú usando emojis y precios (COP).\n2. PEDIDOS:\n   - Si es DOMICILIO -> Pide Dirección y FOTO del comprobante.\n   - Si envía FOTO -> Verifica que sea de HOY y EXITOSO.\n   - Si todo OK -> Confirma pedido.\n\n📦 SALIDA JSON (Solo cuando confirmes pedido):\n{ \n  \"ready_to_order\": true,\n  \"type\": \"domicilio|mesa\",\n  \"items\": [{ \"product\": \"...\", \"quantity\": 1 }],\n  \"payment_proof_url\": \"...\"\n}\n\nSi solo están charlando, responde texto normal."
+                }
+            },
+            "name": "Master_Brain_AI",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                900,
+                300
+            ],
+            "credentials": {
+                "openAiApi": "OpenAI_Credentials"
+            }
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "boolean": [
+                        {
+                            "value1": "={{ $json.ready_to_order }}",
+                            "value2": true
+                        }
+                    ]
+                }
+            },
+            "name": "Is_Order_Confirmed",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                1100,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "tableStr": "orders",
+                "columnsJson": "={ \"customer_phone\": \"{{ $('WhatsApp_Webhook').item.json.body.from }}\", \"type\": \"{{ $json.type }}\", \"status\": \"nuevo\", \"total\": 0, \"payment_proof_url\": \"{{ $json.payment_proof_url }}\" }"
+            },
+            "name": "Save_Order",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                1300,
+                300
+            ],
+            "credentials": {
+                "supabaseApi": "Supabase_Creds"
+            }
+        }
+    ],
+    "connections": {
+        "WhatsApp_Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Check_Input_Type",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check_Input_Type": {
+            "main": [
+                [
+                    {
+                        "node": "Analyze_Image",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Get_Menu",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get_Menu": {
+            "main": [
+                [
+                    {
+                        "node": "Format_Menu_Context",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Format_Menu_Context": {
+            "main": [
+                [
+                    {
+                        "node": "Master_Brain_AI",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Analyze_Image": {
+            "main": [
+                [
+                    {
+                        "node": "Master_Brain_AI",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Master_Brain_AI": {
+            "main": [
+                [
+                    {
+                        "node": "Is_Order_Confirmed",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Is_Order_Confirmed": {
+            "main": [
+                [
+                    {
+                        "node": "Save_Order",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}
