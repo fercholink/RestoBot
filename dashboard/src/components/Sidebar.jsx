@@ -14,22 +14,45 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
         { id: 'turnos', label: 'Cajas y Turnos', roles: ['admin', 'cajero', 'gerente'] },
     ].filter(item => item.roles.includes(user?.role || 'cajero'));
 
+    const hasPermission = (moduleName) => {
+        // Si no hay permisos definidos (legacy users), usamos el rol como fallback
+        if (!user?.permissions) {
+            const role = user?.role || 'cajero';
+            // Admin y Gerente ven todo por defecto en legacy. Cajero solo restaurante.
+            if (role === 'admin' || role === 'gerente') return true;
+            if (role === 'cajero' && moduleName === 'restaurante') return true;
+            return false;
+        }
+        // Si hay permisos, devolver el valor de 'read'
+        return user.permissions[moduleName]?.read ?? false;
+    };
+
     const menuItems = [
         {
             id: 'restaurante',
             label: 'Gestión Restaurante',
             icon: Utensils,
             roles: ['admin', 'cajero', 'gerente'],
-            hasSubmenu: true
+            hasSubmenu: true,
+            module: 'restaurante'
         },
-        { id: 'hotels', label: 'Gestión Hotel', icon: Building2, roles: ['gerente', 'admin'] },
-        { id: 'contabilidad', label: 'Contabilidad', icon: Wallet, roles: ['gerente', 'admin'] },
-        { id: 'sedes', label: 'Sucursales', icon: Building2, roles: ['gerente'] },
-        { id: 'users', label: 'Personal', icon: Users, roles: ['admin', 'gerente'] },
+        { id: 'hotels', label: 'Gestión Hotel', icon: Building2, roles: ['gerente', 'admin'] }, // Sin modulo asociado aun en form
+        { id: 'contabilidad', label: 'Contabilidad', icon: Wallet, roles: ['gerente', 'admin'], module: 'financiero' },
+        { id: 'sedes', label: 'Sucursales', icon: Building2, roles: ['gerente'], module: 'sedes' },
+        { id: 'users', label: 'Personal', icon: Users, roles: ['admin', 'gerente'], module: 'usuarios' },
         { id: 'marketing', label: 'Marketing AI', icon: Megaphone, roles: ['admin', 'gerente'] },
         { id: 'qr_tools', label: 'Códigos QR', icon: QrCode, roles: ['admin', 'gerente'] },
         { id: 'operaciones', label: 'Seguridad / Logs', icon: ShieldAlert, roles: ['gerente'] },
-    ].filter(item => item.roles.includes(user?.role || 'cajero'));
+    ].filter(item => {
+        // 1. Filtrar por rol (Legacy check)
+        const hasRole = item.roles.includes(user?.role || 'cajero');
+        // 2. Filtrar por permiso explícito si tiene módulo asociado
+        if (item.module) {
+            return hasPermission(item.module);
+        }
+        // Si no tiene módulo (ej. Marketing), fallback al rol
+        return hasRole;
+    });
 
     const toggleSubmenu = (menuId) => {
         if (expandedMenu === menuId) {

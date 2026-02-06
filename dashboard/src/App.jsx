@@ -190,7 +190,7 @@ function App() {
           const diffTime = Math.abs(now - createdAt);
           const diffSeconds = Math.ceil(diffTime / 1000);
 
-          if (diffSeconds >= 5) {
+          if (diffSeconds >= 20) {
             const isMesa = order.table_number && order.table_number !== 'DOMICILIO';
 
             // Verificar capacidad antes de mover

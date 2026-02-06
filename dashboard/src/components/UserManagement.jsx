@@ -46,19 +46,57 @@ const UserManagement = () => {
     const [showPassModal, setShowPassModal] = useState(false);
     const [selectedUserForPass, setSelectedUserForPass] = useState(null);
 
-    const [formUser, setFormUser] = useState({ name: '', email: '', password: '', role: 'cajero', branch: '' });
+    const INITIAL_PERMISSIONS = {
+        restaurante: { create: true, read: true, update: true, delete: false },
+        usuarios: { create: false, read: false, update: false, delete: false },
+        sedes: { create: false, read: true, update: false, delete: false },
+        financiero: { create: false, read: false, update: false, delete: false },
+    };
+
+    const [formUser, setFormUser] = useState({
+        name: '',
+        email: '',
+        password: '',
+        role: 'cajero',
+        branch: '',
+        permissions: INITIAL_PERMISSIONS
+    });
+
     const [isPassUpdated, setIsPassUpdated] = useState(false);
 
     const handleOpenCreate = () => {
         setEditingUser(null);
-        setFormUser({ name: '', email: '', password: '', role: 'cajero', branch: 'Sede Norte' });
+        setFormUser({
+            name: '',
+            email: '',
+            password: '',
+            role: 'cajero',
+            branch: 'Sede Norte',
+            permissions: JSON.parse(JSON.stringify(INITIAL_PERMISSIONS))
+        });
         setShowModal(true);
     };
 
     const handleOpenEdit = (user) => {
         setEditingUser(user);
-        setFormUser({ ...user });
+        setFormUser({
+            ...user,
+            permissions: user.permissions || JSON.parse(JSON.stringify(INITIAL_PERMISSIONS))
+        });
         setShowModal(true);
+    };
+
+    const handlePermissionChange = (module, action) => {
+        setFormUser(prev => ({
+            ...prev,
+            permissions: {
+                ...prev.permissions,
+                [module]: {
+                    ...prev.permissions[module],
+                    [action]: !prev.permissions[module][action]
+                }
+            }
+        }));
     };
 
     const handleSaveUser = (e) => {
@@ -278,6 +316,43 @@ const UserManagement = () => {
                                     </select>
                                 </div>
                             </div>
+
+                            {/* Matriz de Permisos */}
+                            <div className="space-y-3 pt-2">
+                                <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest border-b border-gray-100 pb-2">Matriz de Permisos</h4>
+                                <div className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="bg-gray-100/50">
+                                                <th className="px-4 py-2 text-[8px] font-black uppercase text-gray-400">Módulo</th>
+                                                <th className="px-2 py-2 text-[8px] font-black uppercase text-center text-gray-400" title="Leer/Ver">Ver</th>
+                                                <th className="px-2 py-2 text-[8px] font-black uppercase text-center text-gray-400" title="Crear">Crear</th>
+                                                <th className="px-2 py-2 text-[8px] font-black uppercase text-center text-gray-400" title="Editar">Edit</th>
+                                                <th className="px-2 py-2 text-[8px] font-black uppercase text-center text-gray-400" title="Eliminar">Del</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {Object.entries(formUser.permissions || {}).map(([moduleName, perms]) => (
+                                                <tr key={moduleName}>
+                                                    <td className="px-4 py-3 text-[10px] font-bold capitalize text-secondary">
+                                                        {moduleName}
+                                                    </td>
+                                                    {['read', 'create', 'update', 'delete'].map(action => (
+                                                        <td key={action} className="px-2 py-2 text-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={perms[action]}
+                                                                onChange={() => handlePermissionChange(moduleName, action)}
+                                                                className="w-4 h-4 rounded-md border-gray-300 text-primary focus:ring-primary/20 cursor-pointer"
+                                                            />
+                                                        </td>
+                                                    ))}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                             <button
                                 type="submit"
                                 className="w-full bg-primary text-white py-4 rounded-2xl font-black shadow-xl hover:brightness-110 active:scale-95 transition-all mt-4 flex items-center justify-center gap-2 text-xs uppercase tracking-widest"
@@ -286,65 +361,67 @@ const UserManagement = () => {
                                 {editingUser ? 'Actualizar Datos' : 'Registrar Colaborador'}
                             </button>
                         </form>
-                    </div>
-                </div>
+                    </div >
+                </div >
             )}
 
             {/* Modal de Cambio de Contraseña (Seguridad) */}
-            {showPassModal && (
-                <div className="fixed inset-0 bg-secondary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in fade-in duration-200">
-                        {isPassUpdated ? (
-                            <div className="p-12 text-center space-y-6 animate-in zoom-in duration-300">
-                                <div className="w-20 h-20 bg-success/10 text-success rounded-full flex items-center justify-center mx-auto shadow-inner">
-                                    <Check size={40} strokeWidth={3} className="animate-in slide-in-from-bottom-2" />
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-black text-secondary">¡Cambio Exitoso!</h3>
-                                    <p className="text-sm font-medium text-gray-400 mt-2">La contraseña ha sido actualizada correctamente.</p>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="p-8 text-center space-y-4">
-                                <div className="w-16 h-16 bg-warning/10 text-warning rounded-full flex items-center justify-center mx-auto mb-2">
-                                    <Key size={32} />
-                                </div>
-                                <h3 className="text-xl font-black text-secondary">Control de Segurança</h3>
-                                <p className="text-xs text-gray-400 font-medium">Establecer nueva contraseña para <br /><span className="text-secondary font-black">{selectedUserForPass?.name}</span></p>
-
-                                <div className="space-y-3 pt-4 text-left">
-                                    <input
-                                        type="password"
-                                        id="new-password-input"
-                                        autoFocus
-                                        className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 outline-none font-bold"
-                                        placeholder="Nueva contraseña"
-                                    />
-                                    <div className="bg-blue-50 p-3 rounded-xl flex gap-3">
-                                        <AlertCircle size={18} className="text-blue-500 shrink-0" />
-                                        <p className="text-[10px] text-blue-600 font-medium leading-normal">
-                                            Se generará un log de seguridad indicando que usted restableció esta cuenta.
-                                        </p>
+            {
+                showPassModal && (
+                    <div className="fixed inset-0 bg-secondary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in fade-in duration-200">
+                            {isPassUpdated ? (
+                                <div className="p-12 text-center space-y-6 animate-in zoom-in duration-300">
+                                    <div className="w-20 h-20 bg-success/10 text-success rounded-full flex items-center justify-center mx-auto shadow-inner">
+                                        <Check size={40} strokeWidth={3} className="animate-in slide-in-from-bottom-2" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-secondary">¡Cambio Exitoso!</h3>
+                                        <p className="text-sm font-medium text-gray-400 mt-2">La contraseña ha sido actualizada correctamente.</p>
                                     </div>
                                 </div>
+                            ) : (
+                                <div className="p-8 text-center space-y-4">
+                                    <div className="w-16 h-16 bg-warning/10 text-warning rounded-full flex items-center justify-center mx-auto mb-2">
+                                        <Key size={32} />
+                                    </div>
+                                    <h3 className="text-xl font-black text-secondary">Control de Segurança</h3>
+                                    <p className="text-xs text-gray-400 font-medium">Establecer nueva contraseña para <br /><span className="text-secondary font-black">{selectedUserForPass?.name}</span></p>
 
-                                <div className="flex gap-3 pt-6">
-                                    <button
-                                        onClick={handleUpdatePassword}
-                                        className="flex-1 bg-secondary text-white py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all"
-                                    >
-                                        Actualizar
-                                    </button>
-                                    <button onClick={() => setShowPassModal(false)} className="px-6 py-3.5 bg-gray-100 text-gray-400 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 transition-all">
-                                        Volver
-                                    </button>
+                                    <div className="space-y-3 pt-4 text-left">
+                                        <input
+                                            type="password"
+                                            id="new-password-input"
+                                            autoFocus
+                                            className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 outline-none font-bold"
+                                            placeholder="Nueva contraseña"
+                                        />
+                                        <div className="bg-blue-50 p-3 rounded-xl flex gap-3">
+                                            <AlertCircle size={18} className="text-blue-500 shrink-0" />
+                                            <p className="text-[10px] text-blue-600 font-medium leading-normal">
+                                                Se generará un log de seguridad indicando que usted restableció esta cuenta.
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3 pt-6">
+                                        <button
+                                            onClick={handleUpdatePassword}
+                                            className="flex-1 bg-secondary text-white py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all"
+                                        >
+                                            Actualizar
+                                        </button>
+                                        <button onClick={() => setShowPassModal(false)} className="px-6 py-3.5 bg-gray-100 text-gray-400 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 transition-all">
+                                            Volver
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

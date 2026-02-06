@@ -101,18 +101,38 @@ const MenuManagement = () => {
         const product = products.find(p => p.id === productId);
         if (!product) return;
 
-        const { error } = await supabase
-            .from('products')
-            .update({ available: !product.available })
-            .eq('id', productId);
+        // Actualización Optimista
+        const newStatus = !product.available;
+        setProducts(prev => prev.map(p => p.id === productId ? { ...p, available: newStatus } : p));
 
-        if (error) alert("Error actualizando: " + error.message);
+        try {
+            const { error } = await supabase
+                .from('products')
+                .update({ available: newStatus })
+                .eq('id', productId);
+
+            if (error) throw error;
+        } catch (error) {
+            // Revertir si falla
+            setProducts(prev => prev.map(p => p.id === productId ? { ...p, available: !newStatus } : p));
+            alert("Error actualizando: " + error.message);
+        }
     };
 
     const handleDeleteProduct = async (productId) => {
         if (window.confirm('¿Estás seguro de eliminar este producto?')) {
-            const { error } = await supabase.from('products').delete().eq('id', productId);
-            if (error) alert("Error eliminando: " + error.message);
+            // Actualización Optimista: Eliminar de la lista visualmente ya
+            const previousProducts = [...products];
+            setProducts(prev => prev.filter(p => p.id !== productId));
+
+            try {
+                const { error } = await supabase.from('products').delete().eq('id', productId);
+                if (error) throw error;
+            } catch (error) {
+                // Revertir
+                setProducts(previousProducts);
+                alert("Error eliminando: " + error.message);
+            }
         }
     };
 
@@ -127,25 +147,40 @@ const MenuManagement = () => {
             return;
         }
 
-        let error;
+        // Optimistic UI
+        const previousCategories = [...categories];
+        const tempId = editingCategory ? editingCategory.id : `temp-${Date.now()}`;
+
         if (editingCategory) {
-            const { error: err } = await supabase
-                .from('categories')
-                .update({ name, icon })
-                .eq('id', editingCategory.id);
-            error = err;
+            setCategories(prev => prev.map(c => c.id === tempId ? { ...c, name, icon } : c));
         } else {
-            const { error: err } = await supabase
-                .from('categories')
-                .insert([{ name, icon }]);
-            error = err;
+            setCategories(prev => [...prev, { id: tempId, name, icon }]);
         }
 
-        if (error) {
-            alert("Error guardando categoría: " + error.message);
-        } else {
-            setShowCategoryModal(false);
-            setEditingCategory(null);
+        // Cerrar modal inmediatamente para sensación de rapidez
+        setShowCategoryModal(false);
+        setEditingCategory(null);
+
+        let error;
+        try {
+            if (editingCategory) {
+                const { error: err } = await supabase
+                    .from('categories')
+                    .update({ name, icon })
+                    .eq('id', editingCategory.id);
+                error = err;
+            } else {
+                const { error: err } = await supabase
+                    .from('categories')
+                    .insert([{ name, icon }]);
+                error = err;
+            }
+
+            if (error) throw error;
+            // No necesitamos hacer nada si éxito, el Realtime traerá la data final confirmada
+        } catch (err) {
+            setCategories(previousCategories); // Revertir
+            alert("Error guardando categoría: " + err.message);
         }
     };
 
@@ -160,13 +195,17 @@ const MenuManagement = () => {
             if (!window.confirm('¿Eliminar categoría?')) return;
         }
 
-        const { error } = await supabase.from('categories').delete().eq('id', categoryId);
+        // Optimistic UI
+        const previousCategories = [...categories];
+        setCategories(prev => prev.filter(c => c.id !== categoryId));
+        if (activeCategory === categoryId) setActiveCategory(null);
 
-        if (error) {
+        try {
+            const { error } = await supabase.from('categories').delete().eq('id', categoryId);
+            if (error) throw error;
+        } catch (error) {
+            setCategories(previousCategories);
             alert("Error eliminando categoría: " + error.message);
-        } else {
-            // Si eliminamos la activa, cambiar a null (el useEffect lo arreglará)
-            if (activeCategory === categoryId) setActiveCategory(null);
         }
     };
 
@@ -204,30 +243,48 @@ const MenuManagement = () => {
             branch_prices: branchPrices,
             base_ingredients: tempIngredients,
             extras: tempExtras,
-            image: image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500'
+            image: image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500',
+            available: editingProduct ? editingProduct.available : true
         };
 
-        let error;
+        // Optimistic UI Update
+        const previousProducts = [...products];
+        const tempProduct = {
+            id: editingProduct ? editingProduct.id : `temp-${Date.now()}`,
+            ...productData
+        };
+
         if (editingProduct) {
-            const { error: err } = await supabase
-                .from('products')
-                .update(productData)
-                .eq('id', editingProduct.id);
-            error = err;
+            setProducts(prev => prev.map(p => p.id === editingProduct.id ? tempProduct : p));
         } else {
-            const { error: err } = await supabase
-                .from('products')
-                .insert([productData]);
-            error = err;
+            setProducts(prev => [...prev, tempProduct]);
         }
 
-        if (error) {
-            alert("Error guardando producto: " + error.message);
-        } else {
-            setShowProductModal(false);
-            setEditingProduct(null);
-            setTempIngredients([]);
-            setTempExtras([]);
+        // Close modal immediately
+        setShowProductModal(false);
+        setEditingProduct(null);
+        setTempIngredients([]);
+        setTempExtras([]);
+
+        let error;
+        try {
+            if (editingProduct) {
+                const { error: err } = await supabase
+                    .from('products')
+                    .update(productData)
+                    .eq('id', editingProduct.id);
+                error = err;
+            } else {
+                const { error: err } = await supabase
+                    .from('products')
+                    .insert([productData]);
+                error = err;
+            }
+
+            if (error) throw error;
+        } catch (err) {
+            setProducts(previousProducts); // Revert
+            alert("Error guardando producto: " + err.message);
         }
     };
 

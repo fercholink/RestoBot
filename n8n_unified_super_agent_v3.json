@@ -1,6 +1,52 @@
 {
-    "name": "Super_Agente_RestoBot_Unificado_v2",
+    "name": "Super_Agente_RestoBot_Unificado_v3_WhatsApp_API",
     "nodes": [
+        {
+            "parameters": {
+                "updates": [
+                    "messages"
+                ],
+                "options": {}
+            },
+            "type": "n8n-nodes-base.whatsAppTrigger",
+            "typeVersion": 1,
+            "position": [
+                100,
+                700
+            ],
+            "id": "whatsapp-trigger-node",
+            "name": "WhatsApp Trigger",
+            "webhookId": "whatsapp-trigger-webhook",
+            "credentials": {
+                "whatsAppTriggerApi": {
+                    "id": "CNgrIn9wZQmpkduo",
+                    "name": "WhatsApp OAuth account Recibe mensajes"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "operation": "send",
+                "phoneNumberId": "985672601291427",
+                "recipientPhoneNumber": "={{ $('WhatsApp Trigger').item.json.contacts[0].wa_id }}",
+                "textBody": "={{ $json.reply_to_user }}",
+                "additionalFields": {}
+            },
+            "type": "n8n-nodes-base.whatsApp",
+            "typeVersion": 1.1,
+            "position": [
+                1100,
+                700
+            ],
+            "id": "send-ai-reply-node",
+            "name": "Send_AI_Reply",
+            "credentials": {
+                "whatsAppApi": {
+                    "id": "PgrWSe6fLKZejP6f",
+                    "name": "WhatsApp account responder mensajes"
+                }
+            }
+        },
         {
             "parameters": {
                 "httpMethod": "POST",
@@ -69,44 +115,26 @@
         },
         {
             "parameters": {
-                "method": "POST",
-                "url": "https://api.wetooh.com/v1/messages",
-                "sendHeaders": true,
-                "headerParameters": {
-                    "parameters": [
-                        {
-                            "name": "Authorization",
-                            "value": "Bearer TU_TOKEN_WETOOH"
-                        },
-                        {
-                            "name": "Content-Type",
-                            "value": "application/json"
-                        }
-                    ]
-                },
-                "sendBody": true,
-                "bodyParameters": {
-                    "parameters": [
-                        {
-                            "name": "number",
-                            "value": "={{ $('Webhook_Update_Order').item.json.body.customer_phone }}"
-                        },
-                        {
-                            "name": "message",
-                            "value": "=Hola 👋, tu pedido ahora está en estado: *{{ $json.status }}*. \n\nGracias por elegirnos. 🍔"
-                        }
-                    ]
-                },
-                "options": {}
+                "operation": "send",
+                "phoneNumberId": "985672601291427",
+                "recipientPhoneNumber": "={{ $('Webhook_Update_Order').item.json.body.customer_phone }}",
+                "textBody": "=Hola 👋, tu pedido ahora está en estado: *{{ $json.status }}*. \n\nGracias por elegirnos. 🍔",
+                "additionalFields": {}
             },
-            "name": "Send_Notification_Wetooh",
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 3,
+            "type": "n8n-nodes-base.whatsApp",
+            "typeVersion": 1.1,
             "position": [
                 700,
                 100
             ],
-            "notes": "AJUSTAR URL Y TOKEN DE WETOOH AQUÍ"
+            "id": "send-notification-node",
+            "name": "Send_Notification",
+            "credentials": {
+                "whatsAppApi": {
+                    "id": "PgrWSe6fLKZejP6f",
+                    "name": "WhatsApp account responder mensajes"
+                }
+            }
         },
         {
             "parameters": {
@@ -178,24 +206,8 @@
         },
         {
             "parameters": {
-                "httpMethod": "POST",
-                "path": "whatsapp-ai-agent",
-                "responseMode": "lastNode",
-                "options": {}
-            },
-            "name": "WhatsApp_Webhook",
-            "type": "n8n-nodes-base.webhook",
-            "typeVersion": 1,
-            "position": [
-                100,
-                700
-            ],
-            "webhookId": "whatsapp-master-webhook"
-        },
-        {
-            "parameters": {
                 "dataType": "string",
-                "value1": "={{ $json.body.message.type }}",
+                "value1": "={{ $json.messages[0].type }}",
                 "rules": {
                     "rules": [
                         {
@@ -263,7 +275,7 @@
             "parameters": {
                 "model": "gpt-4o",
                 "options": {
-                    "systemMessage": "🆔 Eres 'RestoBot'.\n\n🧠 CONTEXTO:\n- MENÚ: {{ $('Format_Menu_Context').item ? $('Format_Menu_Context').item.json.menu_context : 'N/A' }}\n- ANÁLISIS FOTO: {{ $('Analyze_Image').item ? JSON.stringify($('Analyze_Image').item.json) : 'N/A' }}\n\n👮 REGLAS:\n1. Si es DOMICILIO, pide Dirección y FOTO Comprobante (validar fecha HOY).\n2. Si piden humano -> 3001234567.\n\n📦 FORMATO RESPUESTA (SIEMPRE JSON):\nDebes responder SIEMPRE en este formato JSON:\n{\n  \"reply_to_user\": \"(Tu mensaje de texto para el usuario aquí con emojis)\",\n  \"order_data\": null  // O el objeto del pedido si está listo\n}\n\nSi el pedido está listo (tiene productos, dirección y pago válido), llena 'order_data' con: { \"customer_name\": \"...\", \"items\": [...], \"type\": \"domicilio\", \"payment_proof_url\": \"...\" }."
+                    "systemMessage": "🆔 Eres 'RestoBot', el Mesero Virtual del restaurante. TU OBJETIVO: Guiar al cliente paso a paso hasta cerrar la venta.\n\n🧠 CONTEXTO:\n- 📅 HOY: {{ $today }}\n- 🍔 MENÚ: {{ $('Format_Menu_Context').item ? $('Format_Menu_Context').item.json.menu_context : 'Error' }}\n- 📸 FOTO: {{ $('Analyze_Image').item ? JSON.stringify($('Analyze_Image').item.json) : 'N/A' }}\n\n🚦 FLUJO DE CONVERSACIÓN (Sigue este orden):\n1. **SALUDO**: Si saluda, muestra SOLO las **CATEGORÍAS** (Hamburguesas 🍔, Perros 🌭, etc.). No listes productos aún.\n2. **CATEGORÍA**: Si elige categoría, muestra los **PRODUCTOS** de esa categoría con precio.\n3. **PRODUCTO**: Si elige producto, ofrece **ADICIONALES/VARIACIONES** (¿Sin cebolla? ¿Bebida extra?).\n4. **CIERRE**: Confirma el pedido total.\n5. **DATOS**: Si es Domicilio, pide **Dirección** y **FOTO PAGO**.\n\n📦 FORMATO DE RESPUESTA (SIEMPRE JSON):\n{\n  \"reply_to_user\": \"(Texto amable para el usuario)\",\n  \"order_data\": null\n}\n\nSi el pedido está COMPLETO (Items + Dirección + Pago Ok), llena 'order_data'."
                 }
             },
             "name": "Master_Brain_AI",
@@ -276,47 +288,6 @@
             "credentials": {
                 "openAiApi": "OpenAI_Credentials"
             }
-        },
-        {
-            "parameters": {
-                "method": "POST",
-                "url": "https://api.wetooh.com/v1/messages",
-                "sendHeaders": true,
-                "headerParameters": {
-                    "parameters": [
-                        {
-                            "name": "Authorization",
-                            "value": "Bearer TU_TOKEN_WETOOH"
-                        },
-                        {
-                            "name": "Content-Type",
-                            "value": "application/json"
-                        }
-                    ]
-                },
-                "sendBody": true,
-                "bodyParameters": {
-                    "parameters": [
-                        {
-                            "name": "number",
-                            "value": "={{ $('WhatsApp_Webhook').item.json.body.from }}"
-                        },
-                        {
-                            "name": "message",
-                            "value": "={{ $json.reply_to_user }}"
-                        }
-                    ]
-                },
-                "options": {}
-            },
-            "name": "Send_AI_Reply_Wetooh",
-            "type": "n8n-nodes-base.httpRequest",
-            "typeVersion": 3,
-            "position": [
-                1100,
-                700
-            ],
-            "notes": "ENVÍA RESPUESTA AL USUARIO"
         },
         {
             "parameters": {
@@ -340,7 +311,7 @@
         {
             "parameters": {
                 "tableStr": "orders",
-                "columnsJson": "={ \"customer_phone\": \"{{ $('WhatsApp_Webhook').item.json.body.from }}\", \"type\": \"{{ $json.order_data.type }}\", \"status\": \"nuevo\", \"total\": 0, \"payment_proof_url\": \"{{ $json.order_data.payment_proof_url }}\" }"
+                "columnsJson": "={ \"customer_phone\": \"{{ $('WhatsApp Trigger').item.json.contacts[0].wa_id }}\", \"type\": \"{{ $json.order_data.type }}\", \"status\": \"nuevo\", \"total\": 0, \"payment_proof_url\": \"{{ $json.order_data.payment_proof_url }}\" }"
             },
             "name": "Save_Order",
             "type": "n8n-nodes-base.supabase",
@@ -355,62 +326,7 @@
         }
     ],
     "connections": {
-        "Webhook_Update_Order": {
-            "main": [
-                [
-                    {
-                        "node": "Update_Order_Status",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Update_Order_Status": {
-            "main": [
-                [
-                    {
-                        "node": "Check_Status",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Check_Status": {
-            "main": [
-                [
-                    {
-                        "node": "Send_Notification_Wetooh",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Webhook_Get_Orders": {
-            "main": [
-                [
-                    {
-                        "node": "Get_All_Orders",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "Webhook_Get_Customers": {
-            "main": [
-                [
-                    {
-                        "node": "Get_All_Customers",
-                        "type": "main",
-                        "index": 0
-                    }
-                ]
-            ]
-        },
-        "WhatsApp_Webhook": {
+        "WhatsApp Trigger": {
             "main": [
                 [
                     {
@@ -476,14 +392,14 @@
             "main": [
                 [
                     {
-                        "node": "Send_AI_Reply_Wetooh",
+                        "node": "Send_AI_Reply",
                         "type": "main",
                         "index": 0
                     }
                 ]
             ]
         },
-        "Send_AI_Reply_Wetooh": {
+        "Send_AI_Reply": {
             "main": [
                 [
                     {
@@ -499,6 +415,61 @@
                 [
                     {
                         "node": "Save_Order",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Webhook_Update_Order": {
+            "main": [
+                [
+                    {
+                        "node": "Update_Order_Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Update_Order_Status": {
+            "main": [
+                [
+                    {
+                        "node": "Check_Status",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check_Status": {
+            "main": [
+                [
+                    {
+                        "node": "Send_Notification",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Webhook_Get_Orders": {
+            "main": [
+                [
+                    {
+                        "node": "Get_All_Orders",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Webhook_Get_Customers": {
+            "main": [
+                [
+                    {
+                        "node": "Get_All_Customers",
                         "type": "main",
                         "index": 0
                     }
