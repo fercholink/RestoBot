@@ -1,5 +1,5 @@
 {
-    "name": "Super_Agente_RestoBot_Unificado",
+    "name": "Super_Agente_RestoBot_Unificado_v2",
     "nodes": [
         {
             "parameters": {
@@ -263,7 +263,7 @@
             "parameters": {
                 "model": "gpt-4o",
                 "options": {
-                    "systemMessage": "🆔 Eres 'RestoBot', el Mesero Virtual IA del restaurante.\n\n🧠 CONTEXTO (Datos del sistema):\n- 📅 FECHA DE HOY: {{ $today }}\n- 🍔 MENÚ (Productos/Precios): {{ $('Format_Menu_Context').item ? $('Format_Menu_Context').item.json.menu_context : 'Error al cargar menú' }}\n- 📸 ANÁLISIS DE IMAGEN (Si envió foto): {{ $('Analyze_Image').item ? JSON.stringify($('Analyze_Image').item.json) : 'Ninguna imagen' }}\n- 📩 TIPO MENSAJE: {{ $('WhatsApp_Webhook').item.json.body.message.type }}\n\n👮 REGLAS DE NEGOCIO (Estrictas):\n1. **Identidad**: Eres una IA amable. Si piden humano, da el WhatsApp: 3001234567.\n2. **Consultas**: Responde dudas del menú. Usa emojis 🍔🥤. Precios en COP ($20.000). NO inventes productos.\n3. **Pedidos**: \n   - Identifica si es 'mesa' o 'domicilio'.\n   - Si es **DOMICILIO**:\n     - 🛑 REQUISITO 1: Pide la **Dirección Exacta**.\n     - 🛑 REQUISITO 2: Pide **FOTO del Comprobante de Pago**.\n     - 🕵️ VERIFICACIÓN PAGO: Mira el 'ANÁLISIS DE IMAGEN'. \n       - ¿Es comprobante? ¿La fecha es de HOY ({{ $today }})? ¿Monto coincide? \n       - SI TODO OK: Procede.\n       - SI NO: Rechaza amablemente y pide un comprobante válido de hoy.\n\n📦 FORMATO DE SALIDA (JSON):\nSOLO cuando tengas todos los datos (Productos + Cantidad + (Dirección y Pago Válido si es Domicilio)), responde ÚNICAMENTE con este JSON:\n\n{\n  \"ready_to_order\": true,\n  \"type\": \"domicilio|mesa\",\n  \"customer_name\": \"(Nombre del perfil)\",\n  \"customer_address\": \"(Dirección detectada)\",\n  \"items\": [\n    { \"product\": \"Nombre Exacto del Menú\", \"quantity\": 1, \"notes\": \"Sin cebolla\" }\n  ],\n  \"payment_proof_url\": \"(URL de la imagen recibida)\",\n  \"total\": 0\n}\n\nSi te falta información, NO envíes JSON. Solo chatea amablemente pidiendo lo que falta."
+                    "systemMessage": "🆔 Eres 'RestoBot'.\n\n🧠 CONTEXTO:\n- MENÚ: {{ $('Format_Menu_Context').item ? $('Format_Menu_Context').item.json.menu_context : 'N/A' }}\n- ANÁLISIS FOTO: {{ $('Analyze_Image').item ? JSON.stringify($('Analyze_Image').item.json) : 'N/A' }}\n\n👮 REGLAS:\n1. Si es DOMICILIO, pide Dirección y FOTO Comprobante (validar fecha HOY).\n2. Si piden humano -> 3001234567.\n\n📦 FORMATO RESPUESTA (SIEMPRE JSON):\nDebes responder SIEMPRE en este formato JSON:\n{\n  \"reply_to_user\": \"(Tu mensaje de texto para el usuario aquí con emojis)\",\n  \"order_data\": null  // O el objeto del pedido si está listo\n}\n\nSi el pedido está listo (tiene productos, dirección y pago válido), llena 'order_data' con: { \"customer_name\": \"...\", \"items\": [...], \"type\": \"domicilio\", \"payment_proof_url\": \"...\" }."
                 }
             },
             "name": "Master_Brain_AI",
@@ -279,10 +279,51 @@
         },
         {
             "parameters": {
+                "method": "POST",
+                "url": "https://api.wetooh.com/v1/messages",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer TU_TOKEN_WETOOH"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "number",
+                            "value": "={{ $('WhatsApp_Webhook').item.json.body.from }}"
+                        },
+                        {
+                            "name": "message",
+                            "value": "={{ $json.reply_to_user }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "name": "Send_AI_Reply_Wetooh",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 3,
+            "position": [
+                1100,
+                700
+            ],
+            "notes": "ENVÍA RESPUESTA AL USUARIO"
+        },
+        {
+            "parameters": {
                 "conditions": {
                     "boolean": [
                         {
-                            "value1": "={{ $json.ready_to_order }}",
+                            "value1": "={{ $json.order_data != null }}",
                             "value2": true
                         }
                     ]
@@ -292,20 +333,20 @@
             "type": "n8n-nodes-base.if",
             "typeVersion": 1,
             "position": [
-                1100,
+                1300,
                 700
             ]
         },
         {
             "parameters": {
                 "tableStr": "orders",
-                "columnsJson": "={ \"customer_phone\": \"{{ $('WhatsApp_Webhook').item.json.body.from }}\", \"type\": \"{{ $json.type }}\", \"status\": \"nuevo\", \"total\": 0, \"payment_proof_url\": \"{{ $json.payment_proof_url }}\" }"
+                "columnsJson": "={ \"customer_phone\": \"{{ $('WhatsApp_Webhook').item.json.body.from }}\", \"type\": \"{{ $json.order_data.type }}\", \"status\": \"nuevo\", \"total\": 0, \"payment_proof_url\": \"{{ $json.order_data.payment_proof_url }}\" }"
             },
             "name": "Save_Order",
             "type": "n8n-nodes-base.supabase",
             "typeVersion": 1,
             "position": [
-                1300,
+                1500,
                 700
             ],
             "credentials": {
@@ -432,6 +473,17 @@
             ]
         },
         "Master_Brain_AI": {
+            "main": [
+                [
+                    {
+                        "node": "Send_AI_Reply_Wetooh",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Send_AI_Reply_Wetooh": {
             "main": [
                 [
                     {
