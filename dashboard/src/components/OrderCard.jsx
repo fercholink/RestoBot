@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, MapPin, User, Clock, CheckCircle2, Truck, Rocket, CreditCard, Utensils, X, Plus, Edit2, Trash2, Printer, MessageCircle } from 'lucide-react';
+import { Package, MapPin, User, Clock, CheckCircle2, Truck, Rocket, CreditCard, Utensils, X, Plus, Edit2, Trash2, Printer, MessageCircle, Hotel } from 'lucide-react';
 import { format, differenceInSeconds, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -205,6 +205,14 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
                 </div>
             </div>
 
+            {/* Visual Indicator for Pre-Paid Orders */}
+            {order.is_paid && order.status !== 'pagado' && (
+                <div className="mb-2 px-2 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-[10px] font-black uppercase tracking-widest text-center border border-emerald-200">
+                    Pedido Pagado 💰
+                </div>
+            )}
+
+
             <div className="space-y-2 mb-3">
                 {order.items?.map((item, idx) => (
                     <div key={idx} className="border-b border-gray-50 pb-1.5 last:border-0">
@@ -263,13 +271,26 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
                     </button>
                 )}
                 {(order.status === 'despachado' || order.status === 'fabricacion') && (
-                    <button
-                        onClick={() => onStatusChange(order.id, 'pagado')}
-                        className="flex-1 bg-white hover:bg-success hover:text-white text-success border-2 border-success/30 font-black py-1.5 rounded-lg text-[9px] uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1"
-                    >
-                        <CreditCard size={10} />
-                        Pagado
-                    </button>
+                    <>
+                        {(order.table_number && (order.table_number.toString().startsWith('HAB') || order.type === 'habitacion')) ? (
+                            <button
+                                onClick={() => onStatusChange(order.id, 'pagado', { method: 'cargo_habitacion', reference: order.table_number })}
+                                className="flex-1 bg-white hover:bg-orange-500 hover:text-white text-orange-600 border-2 border-orange-500/30 font-black py-1.5 rounded-lg text-[9px] uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1"
+                                title="Cargar a cuenta de habitación"
+                            >
+                                <Hotel size={12} />
+                                Cargar Hab
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => onStatusChange(order.id, 'pagado')}
+                                className="flex-1 bg-white hover:bg-success hover:text-white text-success border-2 border-success/30 font-black py-1.5 rounded-lg text-[9px] uppercase tracking-wider transition-all shadow-sm flex items-center justify-center gap-1"
+                            >
+                                <CreditCard size={10} />
+                                {order.is_paid ? 'Cerrar' : 'Pagado'}
+                            </button>
+                        )}
+                    </>
                 )}
                 <button
                     onClick={() => onPrint(order)}

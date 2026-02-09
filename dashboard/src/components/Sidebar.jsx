@@ -36,7 +36,7 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
             hasSubmenu: true,
             module: 'restaurante'
         },
-        { id: 'hotels', label: 'Gestión Hotel', icon: Building2, roles: ['gerente', 'admin'] }, // Sin modulo asociado aun en form
+        { id: 'hotels', label: 'Gestión Hotel', icon: Building2, roles: ['gerente', 'admin'] },
         { id: 'contabilidad', label: 'Contabilidad', icon: Wallet, roles: ['gerente', 'admin'], module: 'financiero' },
         { id: 'sedes', label: 'Sucursales', icon: Building2, roles: ['gerente'], module: 'sedes' },
         { id: 'users', label: 'Personal', icon: Users, roles: ['admin', 'gerente'], module: 'usuarios' },

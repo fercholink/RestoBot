@@ -60,29 +60,14 @@ function App() {
     localStorage.setItem('restobot_active_tab', activeTab);
   }, [activeTab]);
 
-  // Estados para control de turnos y edición
-  const [hasActiveShift, setHasActiveShift] = useState(() => {
-    // Check initial state from storage
-    const shifts = JSON.parse(localStorage.getItem('restobot_shifts') || '[]');
-    return shifts.some(s => s.status === 'abierto');
-  });
 
-  // Listen for shift updates
-  useEffect(() => {
-    const checkShiftStatus = () => {
-      const shifts = JSON.parse(localStorage.getItem('restobot_shifts') || '[]');
-      setHasActiveShift(shifts.some(s => s.status === 'abierto'));
-    };
-
-    window.addEventListener('shift-updated', checkShiftStatus);
-    return () => window.removeEventListener('shift-updated', checkShiftStatus);
-  }, []);
 
   const [showShiftWarning, setShowShiftWarning] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
   const [autoAdvanceEnabled, setAutoAdvanceEnabled] = useState(true);
 
   const [orders, setOrders] = useState([]);
+  const [activeShift, setActiveShift] = useState(null); // Estado para el turno activo
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeRestaurantSubTab, setActiveRestaurantSubTab] = useState(user?.role === 'cajero' ? 'turnos' : 'board');
@@ -92,6 +77,7 @@ function App() {
 
   // Estados de turno movidos arriba
   // const [hasActiveShift... ya definidos ex-inicio
+  const hasActiveShift = !!activeShift;
 
   const handleOpenNewOrder = () => {
     if (!hasActiveShift) {
@@ -137,12 +123,36 @@ function App() {
     };
   }, []);
 
+  // Escuchar eventos de actualización de turno (emitidos por ShiftManagement)
+  useEffect(() => {
+    const handleShiftUpdate = () => {
+      fetchOrders(); // Recargar turno activo y pedidos
+    };
+    window.addEventListener('shift-updated', handleShiftUpdate);
+    return () => window.removeEventListener('shift-updated', handleShiftUpdate);
+  }, []);
+
+  // Force clear orders when shift closes (Redundant safety)
+  useEffect(() => {
+    if (!activeShift && user && user.role !== 'admin' && user.role !== 'gerente') {
+      console.log('Force clearing orders because activeShift is null');
+      setOrders([]);
+    }
+  }, [activeShift, user]);
+
   const fetchOrders = async () => {
     try {
       // Necesitamos los items también. Supabase permite hacer joins profundos.
-      // 1. Obtener turno activo actual (si existe) para filtrar pedidos de la sesión
-      const shifts = JSON.parse(localStorage.getItem('restobot_shifts') || '[]');
-      const activeShift = shifts.find(s => s.status === 'abierto');
+      // 1. Obtener turno activo actual desde Supabase (para filtrar pedidos de la sesión)
+      // Ya no usamos localStorage
+      const { data: shiftData } = await supabase
+        .from('shifts')
+        .select('*')
+        .eq('status', 'abierto')
+        .maybeSingle();
+
+      const currentShift = shiftData;
+      setActiveShift(currentShift);
 
       let query = supabase
         .from('orders')
@@ -155,20 +165,37 @@ function App() {
       // LOGICA DE FILTRADO POR ROL
       // LOGICA DE FILTRADO PARA CAJEROS
       if (user && user.role !== 'admin' && user.role !== 'gerente') {
-        const todayStr = new Date().toISOString().split('T')[0];
-        // Mostrar pedidos creados HOY o pedidos ACTIVOS (no pagados) de cualquier fecha
-        // Como 'or' es complejo en supabase client js con filtros anidados, simplificamos:
-        // Traemos los de hoy. Los activos antiguos deberían ser pocos o gestionados por admin.
-
-        // Filtro: created_at >= hoy Inicio del día
-        query = query.gte('created_at', `${todayStr}T00:00:00`);
+        if (currentShift) {
+          // Si hay turno abierto, mostrar solo pedidos de ESTE turno
+          query = query.eq('shift_id', currentShift.id);
+        } else {
+          // Si NO hay turno abierto, no mostrar nada (o mostrar vacío) para obligar apertura
+          // Opcional: Mostrar los del día por si acaso, pero la regla es "Caja cerrada = No pedidos"
+          // Para ser estrictos con la solicitud: "los pedidos del dia se desaparezcan"
+          // Retornamos array vacío si no hay turno.
+          setOrders([]);
+          return;
+        }
+      } else {
+        // Admin/Gerente: Mostrar últimos 30 días
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        query = query.gte('created_at', thirtyDaysAgo.toISOString());
       }
 
 
       const { data, error } = await query;
 
       if (error) throw error;
-      setOrders(data || []);
+
+      // FAILSAFE: Si es cajero y no hay turno, vaciar SIEMPRE
+      // Esto asegura que si la query trajo algo por error, lo ignoremos
+      if (user && user.role !== 'admin' && user.role !== 'gerente' && !currentShift) {
+        console.log('FAILSAFE: Clearing orders because no active shift.');
+        setOrders([]);
+      } else {
+        setOrders(data || []);
+      }
     } catch (error) {
       console.error("Error fetching orders:", error);
     }
@@ -215,41 +242,114 @@ function App() {
     return () => clearInterval(interval);
   }, [orders]); // Re-run when orders change to avoid stale closures
 
-  const handleStatusChange = async (orderId, newStatus) => {
+  const handleStatusChange = async (orderId, newStatus, paymentDetails = null) => {
+    const order = orders.find(o => o.id === orderId);
+
+    // Lógica para Pagos
     if (newStatus === 'pagado') {
-      const order = orders.find(o => o.id === orderId);
       if (order) {
-        setPaymentModal({ isOpen: true, orderId, totalPrice: order.total });
+        // Opción 1: Cargo Automático a Habitación (Bypass Modal)
+        if (paymentDetails && paymentDetails.method === 'cargo_habitacion') {
+          // Continúa abajo para procesar el cargo
+        }
+        // Opción 2: Ya pagado o total cero
+        else if (order.is_paid || order.total === 0) {
+          // Continúa
+        }
+        // Opción 3: Abrir Modal de Pago
+        else {
+          setPaymentModal({ isOpen: true, orderId, totalPrice: order.total });
+          return;
+        }
       }
-      return;
     }
 
     try {
+      // LOGICA ESPECIAL: CARGO A HABITACIÓN (Desde botón rápido)
+      if (newStatus === 'pagado' && paymentDetails?.method === 'cargo_habitacion') {
+        let bookingId = paymentDetails.reference; // Puede llegar como "HAB-101" o UUID
+
+        // Si no es UUID, buscar la reserva activa por número de habitación
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(bookingId);
+
+        if (!isUUID) {
+          const roomNum = bookingId.replace(/^HAB-/i, '').trim();
+
+          const { data: roomData, error: roomError } = await supabase
+            .from('rooms')
+            .select('id')
+            .eq('number', roomNum)
+            .single();
+
+          if (roomError || !roomData) throw new Error(`Habitación ${roomNum} no encontrada.`);
+
+          const { data: booking, error: bookingError } = await supabase
+            .from('bookings')
+            .select('id')
+            .eq('room_id', roomData.id)
+            .eq('status', 'ocupada')
+            .single();
+
+          if (bookingError || !booking) throw new Error(`No hay reserva activa en la habitación ${roomNum}.`);
+
+          bookingId = booking.id;
+        }
+
+        // Insertar Cargo
+        const { error: chargeError } = await supabase
+          .from('room_charges')
+          .insert([{
+            booking_id: bookingId,
+            description: `Consumo Restaurante - Pedido #${orderId}`,
+            amount: order.total || order.total_price,
+            order_id: orderId
+          }]);
+
+        if (chargeError) throw chargeError;
+
+        // Si todo sale bien, actualizamos el pedido localmente con los datos de pago
+        // para asegurarnos que n8n o el update posterior tengan la info completa
+        await supabase
+          .from('orders')
+          .update({
+            payment_method: 'cargo_habitacion',
+            status: 'pagado'
+          })
+          .eq('id', orderId);
+
+        alert("✅ Cargo a habitación realizado correctamente.");
+      }
+
       // Optimistic UI update
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
 
       // Delegar la actualización a n8n para activar triggers (ej. WhatsApp, Factus)
+      // Nota: Si ya actualizamos arriba, n8n podría redudnar, pero sirve para notificaciones.
       await updateOrderStatus(orderId, newStatus);
-
-      // No necesitamos actualizar Supabase manualmente aquí, n8n lo hará.
-      // El Realtime confirmará el cambio en breve.
 
     } catch (error) {
       console.error("Error actualizando estado vía n8n:", error);
-      const errorMsg = error.response ? `Status: ${error.response.status}. ${JSON.stringify(error.response.data)}` : error.message;
 
-      // Mostrar toast o alerta más amigable
-      const isNetworkError = errorMsg.includes('Network Error') || errorMsg.includes('Failed to fetch');
-      alert(isNetworkError
-        ? "⚠️ No se pudo conectar con el Asistente WhatsApp (n8n). El estado se guardará localmente, pero el cliente NO recibirá notificación."
-        : `Error de sincronización: ${errorMsg}`
-      );
+      // Fallback: Actualizar directamente en Supabase si n8n falla
+      try {
+        const { error: sbError } = await supabase
+          .from('orders')
+          .update({ status: newStatus })
+          .eq('id', orderId);
 
-      // En caso de error de red, mantenemos el cambio optimista (porque Supabase probablemente sí funcionó si está desacoplado, 
-      // o deberíamos revertir si la idea es que n8n hace el update en supabase).
-      // NOTA: Según la arquitectura actual, el dashboard hace el update a n8n y n8n a su vez a Supabase.
-      // Si n8n falla, el update NO se hizo en BD. Revertimos.
-      fetchOrders();
+        if (sbError) throw sbError;
+
+        // Si funcionó el fallback, no revertimos, pero avisamos (opcional, para no spammear quitamos el alert intrusivo)
+        console.warn("N8N no disponible. Estado actualizado directamente en Supabase.");
+
+        // Podríamos mostrar un toast aquí si tuviéramos un sistema de notificaciones, 
+        // pero por ahora el console.warn es suficiente para no bloquear el flujo.
+
+      } catch (fallbackError) {
+        console.error("Error fatal: Falló n8n y también Supabase", fallbackError);
+        alert("Error crítico: No se pudo actualizar el estado del pedido.");
+        fetchOrders(); // Revertir UI
+      }
     }
   };
 
@@ -319,6 +419,23 @@ function App() {
         payment_method: method,
         preparation_time_seconds: prepTime
       };
+
+      // LOGICA DE CARGO A HABITACIÓN
+      if (method === 'cargo_habitacion') {
+        const bookingId = reference; // PaymentModal sends bookingId in reference field
+        if (bookingId) {
+          const { error: chargeError } = await supabase
+            .from('room_charges')
+            .insert([{
+              booking_id: bookingId,
+              description: `Consumo Restaurante - Pedido #${orderId}`,
+              amount: order.total_price,
+              order_id: orderId
+            }]);
+
+          if (chargeError) throw chargeError;
+        }
+      }
 
       const { error } = await supabase
         .from('orders')
@@ -500,7 +617,7 @@ function App() {
             />
           )}
           {activeTab === 'analytics' && <AnalyticsPro />}
-          {activeTab === 'hotels' && <HotelManagement />}
+          {activeTab === 'hotels' && (user.role === 'admin' || user.role === 'gerente') && <HotelManagement />}
           {activeTab === 'contabilidad' && <AccountingModule orders={orders} />}
           {activeTab === 'users' && <UserManagement />}
           {activeTab === 'sedes' && <BranchManagement />}
@@ -519,6 +636,7 @@ function App() {
           onAddOrder={handleAddOrder}
           onUpdateOrder={handleUpdateOrder}
           editingOrder={editingOrder}
+          shiftId={activeShift?.id} // Pasamos el ID del turno activo
         />
 
         <PaymentModal

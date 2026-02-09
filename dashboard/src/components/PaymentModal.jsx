@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
-import { X, Banknote, Landmark, CheckCircle2, FileText, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Banknote, Landmark, CheckCircle2, FileText, ChevronDown, Hotel } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
     const [method, setMethod] = useState('efectivo');
     const [reference, setReference] = useState('');
     const [isElectronic, setIsElectronic] = useState(false);
+
+    // Hotel Charge State
+    const [activeBookings, setActiveBookings] = useState([]);
+    const [selectedBooking, setSelectedBooking] = useState('');
+    const [loadingBookings, setLoadingBookings] = useState(false);
 
     // Datos Tributarios (Factus / DIAN)
     const [taxData, setTaxData] = useState({
@@ -15,15 +21,60 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
         type_person: '1' // Persona Natural por defecto
     });
 
+    useEffect(() => {
+        if (isOpen) {
+            fetchActiveBookings();
+            setMethod('efectivo');
+            setReference('');
+            setSelectedBooking('');
+            setTaxData({
+                document_type: '13',
+                identification: '',
+                names: '',
+                email: '',
+                type_person: '1'
+            });
+        }
+    }, [isOpen]);
+
+    const fetchActiveBookings = async () => {
+        setLoadingBookings(true);
+        try {
+            // Fetch bookings that are currently 'ocupada'
+            const { data, error } = await supabase
+                .from('bookings')
+                .select(`
+                    id,
+                    room:rooms(number, type),
+                    guest:guests(full_name)
+                `)
+                .eq('status', 'ocupada');
+
+            if (error) throw error;
+            setActiveBookings(data || []);
+        } catch (error) {
+            console.error("Error fetching hotel bookings:", error);
+        } finally {
+            setLoadingBookings(false);
+        }
+    };
+
     if (!isOpen) return null;
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onConfirm(orderId, method, reference, isElectronic ? taxData : null);
+
+        // Validation for Hotel Charge
+        if (method === 'cargo_habitacion' && !selectedBooking) {
+            alert("Por favor seleccione una habitación");
+            return;
+        }
+
+        // If Hotel Charge, we pass bookingId as reference
+        const finalRef = method === 'cargo_habitacion' ? selectedBooking : reference;
+
+        onConfirm(orderId, method, finalRef, isElectronic ? taxData : null);
         onClose();
-        setReference('');
-        setMethod('efectivo');
-        setIsElectronic(false);
     };
 
     return (
@@ -85,16 +136,18 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
                                 </div>
                                 <span className="text-xs font-black uppercase">Datáfono</span>
                             </button>
+
+                            {/* HOTEL CHARGE OPTION */}
                             <button
                                 type="button"
-                                onClick={() => setMethod('transferencia')}
-                                className={`flex flex-col items-center gap-3 p-4 rounded-2xl border-2 transition-all ${method === 'transferencia'
+                                onClick={() => setMethod('cargo_habitacion')}
+                                className={`flex flex-col items-center gap-3 p-4 rounded-2xl border-2 transition-all ${method === 'cargo_habitacion'
                                     ? 'border-primary bg-primary/5 text-primary'
                                     : 'border-gray-100 bg-white text-accent hover:border-gray-200'
                                     }`}
                             >
-                                <Landmark size={24} />
-                                <span className="text-xs font-black uppercase">Bancos</span>
+                                <Hotel size={24} />
+                                <span className="text-xs font-black uppercase text-center">Cargo a Habitación</span>
                             </button>
                         </div>
                     </div>
@@ -104,12 +157,40 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
                             <label className="text-[10px] font-black text-secondary/60 uppercase tracking-widest px-1">Número de Comprobante</label>
                             <input
                                 type="text"
-                                required
+                                required={method === 'transferencia'}
                                 value={reference}
                                 onChange={(e) => setReference(e.target.value)}
                                 className="w-full bg-gray-100 border-2 border-transparent rounded-xl p-3 text-sm font-bold focus:border-primary focus:bg-white transition-all outline-none"
                                 placeholder="Ej: 982374123"
                             />
+                        </div>
+                    )}
+
+                    {/* HOTEL ROOM SELECTION */}
+                    {method === 'cargo_habitacion' && (
+                        <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
+                            <label className="text-[10px] font-black text-secondary/60 uppercase tracking-widest px-1">Seleccionar Habitación</label>
+                            {loadingBookings ? (
+                                <div className="p-3 text-xs text-center text-gray-400 bg-gray-50 rounded-xl">Cargando habitaciones...</div>
+                            ) : activeBookings.length === 0 ? (
+                                <div className="p-3 text-xs text-center text-orange-500 bg-orange-50 rounded-xl border border-orange-100 font-bold">
+                                    No hay habitaciones ocupadas actualmente.
+                                </div>
+                            ) : (
+                                <select
+                                    required={method === 'cargo_habitacion'}
+                                    value={selectedBooking}
+                                    onChange={(e) => setSelectedBooking(e.target.value)}
+                                    className="w-full bg-gray-100 border-2 border-transparent rounded-xl p-3 text-sm font-bold focus:border-primary focus:bg-white transition-all outline-none"
+                                >
+                                    <option value="">-- Seleccionar Habitación --</option>
+                                    {activeBookings.map(booking => (
+                                        <option key={booking.id} value={booking.id}>
+                                            Hab {booking.room?.number} - {booking.guest?.full_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
                         </div>
                     )}
 

@@ -25,6 +25,10 @@ const RestaurantManagement = ({
     const activeSubTab = propActiveSubTab || localActiveSubTab;
     const setActiveSubTab = propSetActiveSubTab || setLocalActiveSubTab;
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+    // DEBUG: Confirmar qué llega realmente
+    console.log('RestMan received orders:', orders.length);
+
     const [filters, setFilters] = useState({
         status: 'all',
         type: 'all',
@@ -79,7 +83,7 @@ const RestaurantManagement = ({
             return today === orderDate;
         });
         const todayRevenue = todayOrders
-            .filter(o => o.status === 'pagado')
+            .filter(o => o.status === 'pagado' || o.is_paid)
             .reduce((sum, o) => sum + (o.total || o.total_price || 0), 0);
 
         const preparationTimes = orders

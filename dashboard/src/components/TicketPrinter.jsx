@@ -69,7 +69,7 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                     <p className="text-[8px]">Dirección: Calle Falsa 123 - Montería, Córdoba</p>
                     <p className="text-[8px]">TEL: +57 321 000 0000</p>
 
-                    {type === 'recibo' && (
+                    {(type === 'recibo' || type === 'factura_hotel') && (
                         <div className="mt-2 pt-1 border-t border-dotted border-black px-2">
                             <p className="text-[7px] leading-tight">
                                 RESOLUCIÓN DIAN No. 187640000001 <br />
@@ -83,7 +83,7 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                 {/* Información del Pedido */}
                 <div className="space-y-1 mb-2">
                     <p className="font-black uppercase text-[10px] text-center mb-2">
-                        {type === 'comanda' ? '*** COMANDA DE COCINA ***' : 'FACTURA ELECTRÓNICA DE VENTA'}
+                        {type === 'comanda' ? '*** COMANDA DE COCINA ***' : (type === 'factura_hotel' ? 'FACTURA ELECTRÓNICA DE VENTA' : 'RECIBO DE CAJA')}
                     </p>
 
                     <div className="grid grid-cols-2 gap-x-4">
@@ -213,14 +213,14 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                 </div>
 
                 {/* Detalle de Productos */}
-                {/* Detalle de Productos (Solo para Comandas y Recibos) */}
+                {/* Detalle de Productos (Solo para Comandas, Recibos y Facturas Hotel) */}
                 {order.items && (
                     <table className="w-full border-t border-b border-black mb-2 py-1">
                         <thead>
                             <tr className="border-b border-black">
                                 <th className="text-left py-1 text-[8px]">CANT</th>
                                 <th className="text-left py-1 text-[8px]">DESCRIPCIÓN</th>
-                                {type === 'recibo' && <th className="text-right py-1 text-[8px]">TOTAL</th>}
+                                {(type === 'recibo' || type === 'factura_hotel') && <th className="text-right py-1 text-[8px]">TOTAL</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-black/5">
@@ -242,7 +242,7 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                                                 </div>
                                             )}
                                         </td>
-                                        {type === 'recibo' && (
+                                        {(type === 'recibo' || type === 'factura_hotel') && (
                                             <td className="py-1 text-right text-[9px]">
                                                 ${(item.unit_price * item.quantity).toLocaleString()}
                                             </td>
@@ -255,7 +255,7 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                 )}
 
                 {/* Totales y Desglose de Impuestos */}
-                {type === 'recibo' && (
+                {(type === 'recibo' || type === 'factura_hotel') && (
                     <div className="space-y-1 text-[10px] mb-4">
                         <div className="flex justify-between pt-1">
                             <span>SUBTOTAL:</span>
@@ -283,8 +283,8 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                     </div>
                 )}
 
-                {/* Footer Legal DIAN */}
-                {type === 'recibo' && (
+                {/* Template: Factura Hotel / Recibo */}
+                {(type === 'recibo' || type === 'factura_hotel') && (
                     <div className="text-center space-y-3 mt-4">
                         {/* Placeholder de QR Code */}
                         <div className="flex justify-center">
@@ -303,8 +303,7 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                         </div>
 
                         <div className="text-[7px] space-y-1">
-                            <p className="font-black">¡GRACIAS POR SU COMPRA!</p>
-                            <p>Visítenos pronto</p>
+                            <p className="font-black">¡GRACIAS POR SU VISITA!</p>
                             <p className="font-bold opacity-30">Software: RestoBot v2.0 - BS COMUNICACIONES</p>
                             <p className="opacity-30 italic"> Montería - Colombia </p>
                         </div>

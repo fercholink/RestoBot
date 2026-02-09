@@ -1,24 +1,84 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import { Wallet, Clock, ArrowRightLeft, CheckCircle2, AlertCircle, History, User, Building2, TrendingUp, TrendingDown, Landmark, Banknote, Save, X, Plus, Minus, Download, Send, XCircle } from 'lucide-react';
 
 const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
-    // Persistencia en LocalStorage
-    const [shifts, setShifts] = useState(() => {
-        const saved = localStorage.getItem('restobot_shifts');
-        if (saved) return JSON.parse(saved);
-        return [
-            { id: 1, cashier: 'Juan Cajero', branch: 'Sede Norte', status: 'cerrado', start_time: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), end_time: new Date(Date.now() - 1000 * 60 * 60 * 16).toISOString(), initial_cash: 50000, final_cash: 210000, expected_cash: 210000, digital: 150000, balance: 0, expenses: [] }
-        ];
-    });
+    // Estado local para la UI
+    const [shifts, setShifts] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    const activeShift = shifts.find(s => s.status === 'abierto');
+    const { user } = useAuth();
+
+    // Cargar turnos desde Supabase
+    useEffect(() => {
+        fetchShifts();
+    }, []);
+
+    const fetchShifts = async () => {
+        try {
+            // 1. Fetch active shift (guaranteed)
+            // 1. Fetch active shift (handle multiple if they exist by taking latest)
+            const { data: activeDataArray, error: activeError } = await supabase
+                .from('shifts')
+                .select('*')
+                .eq('status', 'abierto')
+                .order('start_time', { ascending: false });
+
+            // Take the most recent open shift if multiple exist
+            const activeData = activeDataArray?.[0] || null;
+
+            if (activeError) throw activeError;
+
+            // 2. Fetch history (closed shifts)
+            const { data: historyData, error: historyError } = await supabase
+                .from('shifts')
+                .select('*')
+                .neq('status', 'abierto') // Exclude open if we want, or just mix them.
+                // Let's just fetch all recent and merge, but simpler:
+                .order('start_time', { ascending: false })
+                .limit(20);
+
+            if (historyError) throw historyError;
+
+            // Merge: If active shift exists, place it first or ensure it's in the list
+            let allShifts = historyData || [];
+            if (activeData) {
+                // Remove if it was present in history fetch (unlikely if we used neq, but safe check)
+                allShifts = allShifts.filter(s => s.id !== activeData.id);
+                allShifts.unshift(activeData);
+            }
+
+            setShifts(allShifts);
+        } catch (error) {
+            console.error('Error fetching shifts:', error);
+            alert('Error cargando turnos: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const [showOpenModal, setShowOpenModal] = useState(false);
 
     useEffect(() => {
-        if (autoOpen) {
+        if (autoOpen && !activeShift) {
             setShowOpenModal(true);
         }
-    }, [autoOpen]);
+    }, [autoOpen, activeShift]);
+
+    // Safety: If active shift appears, close open modal
+    useEffect(() => {
+        if (activeShift) {
+            setShowOpenModal(false);
+        }
+    }, [activeShift]);
+
+    const syncShifts = async () => {
+        await fetchShifts();
+        window.dispatchEvent(new Event('shift-updated'));
+    };
+
     const [showCloseModal, setShowCloseModal] = useState(false);
     const [showExpenseModal, setShowExpenseModal] = useState(false);
     const [initialCash, setInitialCash] = useState(50000);
@@ -26,37 +86,34 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
     const [expenseAmount, setExpenseAmount] = useState(0);
     const [expenseReason, setExpenseReason] = useState('');
 
-    const activeShift = shifts.find(s => s.status === 'abierto');
 
-    const { user } = useAuth();
 
-    // Sincronizar con LocalStorage
-    const syncShifts = (newList) => {
-        setShifts(newList);
-        localStorage.setItem('restobot_shifts', JSON.stringify(newList));
-        // Disparar evento para que App.jsx se entere
-        window.dispatchEvent(new Event('shift-updated'));
-    };
+
 
     // Cálculos en tiempo real basados en pedidos pagados
     const getShiftMetrics = (shift) => {
         if (!shift) return null;
-        const shiftOrders = orders.filter(o =>
+        const shiftStart = shift.start_time ? new Date(shift.start_time) : new Date();
+
+        const shiftOrders = Array.isArray(orders) ? orders.filter(o =>
             o.status === 'pagado' &&
-            new Date(o.created_at) >= new Date(shift.start_time)
-        );
+            new Date(o.created_at) >= shiftStart
+        ) : [];
+
+        // Helper para obtener precio total (compatible con total o total_price)
+        const getPrice = (o) => Number(o.total || o.total_price || 0);
 
         const cashSales = shiftOrders
             .filter(o => o.payment_method === 'efectivo')
-            .reduce((sum, o) => sum + o.total_price, 0);
+            .reduce((sum, o) => sum + getPrice(o), 0);
 
         const digitalSales = shiftOrders
             .filter(o => o.payment_method !== 'efectivo')
-            .reduce((sum, o) => sum + o.total_price, 0);
+            .reduce((sum, o) => sum + getPrice(o), 0);
 
-        const totalExpenses = (shift.expenses || []).reduce((sum, e) => sum + e.amount, 0);
+        const totalExpenses = (shift.expenses || []).reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
-        const expectedInDrawer = shift.initial_cash + cashSales - totalExpenses;
+        const expectedInDrawer = Number(shift.initial_cash || 0) + cashSales - totalExpenses;
 
         return {
             cashSales,
@@ -65,30 +122,82 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
             expectedInDrawer,
             orderCount: shiftOrders.length,
             digitalBreakdown: {
-                nequi: shiftOrders.filter(o => o.payment_method === 'nequi').reduce((sum, o) => sum + o.total_price, 0),
-                tarjeta: shiftOrders.filter(o => o.payment_method === 'tarjeta').reduce((sum, o) => sum + o.total_price, 0),
-                transferencia: shiftOrders.filter(o => o.payment_method === 'transferencia').reduce((sum, o) => sum + o.total_price, 0),
+                nequi: shiftOrders.filter(o => o.payment_method === 'nequi').reduce((sum, o) => sum + getPrice(o), 0),
+                tarjeta: shiftOrders.filter(o => o.payment_method === 'tarjeta').reduce((sum, o) => sum + getPrice(o), 0),
+                transferencia: shiftOrders.filter(o => o.payment_method === 'transferencia').reduce((sum, o) => sum + getPrice(o), 0),
             }
         };
     };
 
     const metrics = getShiftMetrics(activeShift);
 
-    const handleOpenShift = () => {
-        const newShift = {
-            id: Date.now(),
-            cashier: user?.name || 'Cajero', // Usar nombre real
-            branch: user?.branch || 'Sede Principal',
-            status: 'abierto',
-            start_time: new Date().toISOString(),
-            initial_cash: Number(initialCash),
-            expenses: []
-        };
-        syncShifts([newShift, ...shifts]);
-        setShowOpenModal(false);
+    const safeDate = (dateStr) => {
+        try {
+            if (!dateStr) return new Date();
+            const d = new Date(dateStr);
+            return isNaN(d.getTime()) ? new Date() : d;
+        } catch (e) {
+            return new Date();
+        }
     };
 
-    const handleAddExpense = () => {
+    const handleOpenShift = async () => {
+        try {
+            // Guard: Check if shift is already open locally or in DB
+            if (activeShift) {
+                alert("Ya existe un turno abierto.");
+                setShowOpenModal(false);
+                return;
+            }
+
+            // Double check server-side to prevent race conditions
+            const { data: existingOpen } = await supabase
+                .from('shifts')
+                .select('id')
+                .eq('status', 'abierto')
+                .maybeSingle();
+
+            if (existingOpen) {
+                alert("Detectamos un turno abierto en segundo plano. Sincronizando...");
+                await fetchShifts();
+                setShowOpenModal(false);
+                return;
+            }
+
+            const { error } = await supabase.from('shifts').insert([{
+                cashier_name: user?.name || 'Cajero',
+                branch_name: user?.branch || 'Sede Principal',
+                status: 'abierto',
+                start_time: new Date().toISOString(),
+                initial_cash: Number(initialCash),
+                expenses: []
+            }]);
+
+            if (error) throw error;
+
+            // Force immediate UI update locally to prevent lag
+            const newShiftStub = {
+                id: 'temp_' + Date.now(),
+                cashier_name: user?.name,
+                branch_name: user?.branch,
+                status: 'abierto',
+                start_time: new Date().toISOString(),
+                initial_cash: Number(initialCash),
+                expenses: []
+            };
+            setShifts(prev => [newShiftStub, ...prev]);
+
+            await syncShifts();
+            setShowOpenModal(false);
+        } catch (error) {
+            console.error('Error opening shift:', error);
+            alert('Error al abrir turno: ' + (error.message || 'Error desconocido'));
+            // If error, try to fetch to see if it was created anyway
+            fetchShifts();
+        }
+    };
+
+    const handleAddExpense = async () => {
         if (!activeShift) return;
         const expense = {
             id: Date.now(),
@@ -96,39 +205,53 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
             reason: expenseReason,
             time: new Date().toISOString()
         };
-        const updatedShifts = shifts.map(s =>
-            s.id === activeShift.id
-                ? { ...s, expenses: [...(s.expenses || []), expense] }
-                : s
-        );
-        syncShifts(updatedShifts);
-        setShowExpenseModal(false);
-        setExpenseAmount(0);
-        setExpenseReason('');
+
+        try {
+            // Postgres JSON append
+            const updatedExpenses = [...(activeShift.expenses || []), expense];
+            const { error } = await supabase
+                .from('shifts')
+                .update({ expenses: updatedExpenses })
+                .eq('id', activeShift.id);
+
+            if (error) throw error;
+            syncShifts();
+            setShowExpenseModal(false);
+            setExpenseAmount(0);
+            setExpenseReason('');
+        } catch (error) {
+            console.error('Error adding expense:', error);
+            alert('Error al registrar gasto');
+        }
     };
 
-    const handleCloseShift = () => {
+    const handleCloseShift = async () => {
         if (!activeShift || !metrics) return;
 
         const finalBalance = Number(countedCash) - metrics.expectedInDrawer;
 
-        const updatedShifts = shifts.map(s =>
-            s.id === activeShift.id
-                ? {
-                    ...s,
+        try {
+            const { error } = await supabase
+                .from('shifts')
+                .update({
                     status: 'cerrado',
                     end_time: new Date().toISOString(),
                     final_cash: Number(countedCash),
                     expected_cash: metrics.expectedInDrawer,
-                    digital: metrics.digitalSales,
-                    balance: finalBalance,
-                    metrics: metrics // Guardar snapshot de métricas
-                }
-                : s
-        );
-        syncShifts(updatedShifts);
-        setShowCloseModal(false);
-        setCountedCash(0);
+                    digital_sales: metrics.digitalSales,
+                    difference: finalBalance,
+                    metrics_snapshot: metrics
+                })
+                .eq('id', activeShift.id);
+
+            if (error) throw error;
+            syncShifts();
+            setShowCloseModal(false);
+            setCountedCash(0);
+        } catch (error) {
+            console.error('Error closing shift:', error);
+            alert('Error al cerrar turno');
+        }
     };
 
     return (
@@ -162,10 +285,10 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
                                     <div className="flex items-center gap-3">
                                         <span className="bg-success text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.2em] animate-pulse">Turno Activo</span>
                                         <span className="text-white/40 text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
-                                            <Clock size={12} /> Iniciado {new Date(activeShift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            <Clock size={12} /> Iniciado {safeDate(activeShift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
-                                    <h2 className="text-4xl font-black mt-4">{activeShift.cashier}</h2>
+                                    <h2 className="text-4xl font-black mt-4">{activeShift.cashier_name}</h2>
                                     <p className="text-white/40 text-sm font-medium flex items-center gap-2">
                                         <Building2 size={14} /> Global • {metrics.orderCount} pedidos realizados
                                     </p>
@@ -269,17 +392,17 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
                         </thead>
                         <tbody className="divide-y divide-gray-50 font-medium whitespace-nowrap">
                             {shifts
-                                .filter(s => (user?.role === 'admin' || user?.role === 'gerente') ? true : s.cashier === user?.name) // Filtro: Cajeros solo ven sus turnos
+                                .filter(s => (user?.role === 'admin' || user?.role === 'gerente') ? true : s.cashier_name === user?.name) // Filtro: Cajeros solo ven sus turnos
                                 .map((shift) => (
                                     <tr key={shift.id} className="hover:bg-gray-50/50 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-secondary font-black text-xs group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                                                    {shift.cashier.split(' ').map(n => n[0]).join('')}
+                                                    {(shift.cashier_name || 'C').split(' ').map(n => n[0]).join('')}
                                                 </div>
                                                 <div>
-                                                    <p className="font-black text-secondary text-sm">{shift.cashier}</p>
-                                                    <p className="text-[10px] text-gray-400 font-bold uppercase">{shift.branch}</p>
+                                                    <p className="font-black text-secondary text-sm">{shift.cashier_name}</p>
+                                                    <p className="text-[10px] text-gray-400 font-bold uppercase">{shift.branch_name}</p>
                                                 </div>
                                             </div>
                                         </td>
@@ -295,20 +418,20 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
                                         <td className="px-6 py-4">
                                             <div className="space-y-0.5">
                                                 <p className="text-sm font-black text-secondary">${(shift.final_cash || (shift.status === 'abierto' ? metrics?.expectedInDrawer : 0))?.toLocaleString()}</p>
-                                                <p className="text-[10px] text-gray-400 font-bold uppercase">Digital: ${shift.digital?.toLocaleString() || metrics?.digitalSales.toLocaleString()}</p>
+                                                <p className="text-[10px] text-gray-400 font-bold uppercase">Digital: ${(shift.digital_sales || 0).toLocaleString()}</p>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex justify-center">
                                                 {shift.status === 'abierto' ? (
                                                     <span className="bg-blue-50 text-blue-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">En progreso</span>
-                                                ) : (shift.balance || 0) === 0 ? (
+                                                ) : (shift.difference || 0) === 0 ? (
                                                     <span className="bg-success/10 text-success px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 tracking-tighter">
                                                         <CheckCircle2 size={12} /> Cuadrado
                                                     </span>
                                                 ) : (
-                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 tracking-tighter ${shift.balance > 0 ? 'bg-orange-50 text-orange-500' : 'bg-red-50 text-red-500'}`}>
-                                                        <AlertCircle size={12} /> {shift.balance > 0 ? 'Sobrante' : 'Faltante'} (${Math.abs(shift.balance).toLocaleString()})
+                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 tracking-tighter ${shift.difference > 0 ? 'bg-orange-50 text-orange-500' : 'bg-red-50 text-red-500'}`}>
+                                                        <AlertCircle size={12} /> {shift.difference > 0 ? 'Sobrante' : 'Faltante'} (${Math.abs(shift.difference).toLocaleString()})
                                                     </span>
                                                 )}
                                             </div>

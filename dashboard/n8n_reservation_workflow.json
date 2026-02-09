@@ -1,0 +1,162 @@
+{
+    "name": "Gmail to RestoBot Hotel Booking",
+    "nodes": [
+        {
+            "parameters": {
+                "pollTimes": {
+                    "item": [
+                        {
+                            "mode": "everyMinute"
+                        }
+                    ]
+                },
+                "filters": {
+                    "sender": "booking@example.com",
+                    "subject": "Nueva Reserva"
+                }
+            },
+            "name": "Gmail Trigger",
+            "type": "n8n-nodes-base.gmailTrigger",
+            "typeVersion": 1,
+            "position": [
+                250,
+                300
+            ],
+            "credentials": {
+                "gmailOAuth2": {
+                    "id": "YOUR_GMAIL_CREDENTIAL_ID",
+                    "name": "Gmail Account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o-mini",
+                "messages": {
+                    "values": [
+                        {
+                            "content": "Extract the following reservation details from the email text below and return ONLY a valid JSON object. \nFields: guest_name, guest_doc_id, room_number, check_in (YYYY-MM-DD), check_out (YYYY-MM-DD), guest_email.\n\nEmail Text:\n{{$json[\"snippet\"]}}"
+                        }
+                    ]
+                },
+                "jsonOutput": true
+            },
+            "name": "AI Parser (OpenAI)",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                450,
+                300
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "YOUR_OPENAI_CREDENTIAL_ID",
+                    "name": "OpenAI Account"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "SELECT id, base_price FROM rooms WHERE number = '{{$json[\"room_number\"]}}' LIMIT 1;"
+            },
+            "name": "Find Room",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                650,
+                300
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "YOUR_SUPABASE_PG_CREDENTIAL_ID",
+                    "name": "Supabase Postgres"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "INSERT INTO guests (full_name, document_id, email) VALUES ('{{$node[\"AI Parser (OpenAI)\"].json[\"guest_name\"]}}', '{{$node[\"AI Parser (OpenAI)\"].json[\"guest_doc_id\"]}}', '{{$node[\"AI Parser (OpenAI)\"].json[\"guest_email\"]}}') ON CONFLICT (document_id) DO UPDATE SET full_name = EXCLUDED.full_name RETURNING id;"
+            },
+            "name": "Upsert Guest",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                850,
+                300
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "YOUR_SUPABASE_PG_CREDENTIAL_ID",
+                    "name": "Supabase Postgres"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "INSERT INTO bookings (room_id, guest_id, check_in, check_out, total_price, status) VALUES ('{{$node[\"Find Room\"].json[\"id\"]}}', '{{$json[\"id\"]}}', '{{$node[\"AI Parser (OpenAI)\"].json[\"check_in\"]}}', '{{$node[\"AI Parser (OpenAI)\"].json[\"check_out\"]}}', {{$node[\"Find Room\"].json[\"base_price\"]}}, 'reservada') RETURNING id;"
+            },
+            "name": "Create Booking",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 1,
+            "position": [
+                1050,
+                300
+            ],
+            "credentials": {
+                "postgres": {
+                    "id": "YOUR_SUPABASE_PG_CREDENTIAL_ID",
+                    "name": "Supabase Postgres"
+                }
+            }
+        }
+    ],
+    "connections": {
+        "Gmail Trigger": {
+            "main": [
+                [
+                    {
+                        "node": "AI Parser (OpenAI)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI Parser (OpenAI)": {
+            "main": [
+                [
+                    {
+                        "node": "Find Room",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Find Room": {
+            "main": [
+                [
+                    {
+                        "node": "Upsert Guest",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Upsert Guest": {
+            "main": [
+                [
+                    {
+                        "node": "Create Booking",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Minus, ShoppingCart, Check, Trash2, PlusCircle, MinusCircle, AlertCircle, ChevronRight, MapPin, Loader2 } from 'lucide-react';
+import { X, Plus, Minus, ShoppingCart, Check, Trash2, PlusCircle, MinusCircle, AlertCircle, ChevronRight, MapPin, Loader2, Search } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
-const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [] }) => {
+const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [], shiftId }) => {
     const { user } = useAuth();
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
@@ -18,6 +18,11 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [] }) => {
         unit: '',
         notes: ''
     });
+    // Nuevo estado para pago inicial
+    const [initialPayment, setInitialPayment] = useState({
+        isPaid: false,
+        method: 'efectivo'
+    });
     const [cart, setCart] = useState([]);
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
@@ -31,14 +36,35 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [] }) => {
 
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
+    const [activeBookings, setActiveBookings] = useState([]);
+    const [selectedBookingRooms, setSelectedBookingRooms] = useState('');
     const [selectedCategory, setSelectedCategory] = useState(null);
 
-    // Cargar productos y categorías desde Supabase
+    // Cargar productos, categorías y habitaciones ocupadas desde Supabase
     useEffect(() => {
         if (isOpen) {
             fetchData();
+            fetchActiveBookings();
         }
     }, [isOpen]);
+
+    const fetchActiveBookings = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('bookings')
+                .select(`
+                    id,
+                    room:rooms(number, type),
+                    guest:guests(full_name, phone, document_id)
+                `)
+                .eq('status', 'ocupada');
+
+            if (error) throw error;
+            setActiveBookings(data || []);
+        } catch (error) {
+            console.error("Error fetching hotel bookings:", error);
+        }
+    };
 
     const fetchData = async () => {
         setLoading(true);
@@ -59,6 +85,7 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [] }) => {
         setCustomerPhone('');
         setOrderType('mesa');
         setTableId('');
+        setSelectedBookingRooms('');
         setCart([]);
         setDeliveryDetails({
             housingType: 'casa',
@@ -68,6 +95,10 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [] }) => {
             complex: '',
             unit: '',
             notes: ''
+        });
+        setInitialPayment({
+            isPaid: false,
+            method: 'efectivo'
         });
     };
 
@@ -197,44 +228,70 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [] }) => {
             }
         }
 
+        if (orderType === 'habitacion' && !selectedBookingRooms) {
+            return alert('Por favor seleccione la habitación');
+        }
+
         setSubmitting(true);
 
         try {
-            // 1. Crear el Pedido
-            const deliveryAddressStr = orderType === 'domicilio'
-                ? `${deliveryDetails.address}, ${deliveryDetails.neighborhood} (${deliveryDetails.city}) - ${deliveryDetails.housingType} ${deliveryDetails.complex || ''} ${deliveryDetails.unit || ''}. Notas: ${deliveryDetails.notes}`
-                : null;
+            let deliveryAddressStr = null;
+            let finalCustomerName = customerName;
+            let finalTableNumber = 'DOMICILIO';
+            let finalPhone = customerPhone;
 
-            // Formatear teléfono: Asegurar prefijo +57 si el usuario escribió un número
+            if (orderType === 'domicilio') {
+                deliveryAddressStr = `${deliveryDetails.address}, ${deliveryDetails.neighborhood} (${deliveryDetails.city}) - ${deliveryDetails.housingType} ${deliveryDetails.complex || ''} ${deliveryDetails.unit || ''}. Notas: ${deliveryDetails.notes}`;
+            } else if (orderType === 'mesa') {
+                finalTableNumber = tableId;
+            } else if (orderType === 'habitacion') {
+                const booking = activeBookings.find(b => b.id === selectedBookingRooms);
+                if (booking) {
+                    finalTableNumber = `HAB-${booking.room?.number}`;
+                    finalCustomerName = booking.guest?.full_name || customerName; // Use guest name if available
+                    deliveryAddressStr = `Servicio a la Habitación ${booking.room?.number}`;
+                }
+            }
+
+            // Formatear teléfono
             let formattedPhone = '';
-            if (customerPhone && customerPhone.trim().length > 0) {
-                const cleanPhone = customerPhone.replace(/\D/g, ''); // Quitar no-dígitos
-                // Si empieza con 57 y es largo, asumimos que ya lo tiene. Si no, lo pegamos.
-                // Lógica simple: si tiene 10 dígitos (celular Co), pegar +57.
+            if (finalPhone && finalPhone.trim().length > 0) {
+                const cleanPhone = finalPhone.replace(/\D/g, '');
                 formattedPhone = cleanPhone.startsWith('57') && cleanPhone.length > 10
                     ? `+${cleanPhone}`
                     : `+57${cleanPhone}`;
             }
 
+            // Determinar estado de pago
+            let isPaid = initialPayment.isPaid;
+            let paymentMethod = initialPayment.isPaid ? initialPayment.method : 'pendiente';
+            let paymentRef = initialPayment.isPaid ? initialPayment.reference : null;
+
+            // Si es cargo a habitación, se marca como pagado (por el hotel) automáticamente si el usuario lo elige así
+            // O podríamos forzarlo siempre. Asumiremos que si selecciona "Cargo a Habitación" en el pago anticipado, es eso.
+            // Pero simplifiquemos: Si es tipo Habitación, sugerimos Cargo a Habitación.
+
             const { data: orderData, error: orderError } = await supabase
                 .from('orders')
                 .insert([{
-                    customer_name: customerName,
-                    table_number: orderType === 'mesa' ? tableId : 'DOMICILIO',
+                    customer_name: finalCustomerName,
+                    table_number: finalTableNumber,
                     status: 'nuevo',
                     total: total,
-                    payment_method: 'pendiente',
+                    payment_method: paymentMethod,
+                    is_paid: isPaid,
+                    payment_reference: paymentRef,
                     delivery_address: deliveryAddressStr,
-                    notes: orderType === 'domicilio' ? `Dir: ${deliveryAddressStr}` : '', // Dejamos las notas limpias de tel
-                    customer_phone: formattedPhone, // Nueva columna
-                    customer_phone: formattedPhone, // Nueva columna
-                    // Usamos delivery_info como metadata flexible ya que user_id no existe
+                    notes: orderType === 'domicilio' ? `Dir: ${deliveryAddressStr}` : (orderType === 'habitacion' ? 'Room Service' : ''),
+                    customer_phone: formattedPhone,
                     delivery_info: {
                         ...(orderType === 'domicilio' ? deliveryDetails : {}),
+                        booking_id: orderType === 'habitacion' ? selectedBookingRooms : null,
                         created_by_id: user?.id,
                         created_by_name: user?.name,
                         created_by_role: user?.role
                     },
+                    shift_id: shiftId,
                     created_at: new Date().toISOString()
                 }])
                 .select()
@@ -242,7 +299,7 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [] }) => {
 
             if (orderError) throw orderError;
 
-            // 2. Crear Items del Pedido
+            // 2. Crear Items
             const orderItems = cart.map(item => ({
                 order_id: orderData.id,
                 product_id: item.id,
@@ -252,13 +309,10 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [] }) => {
                 customization: item.customizations
             }));
 
-            const { error: itemsError } = await supabase
-                .from('order_items')
-                .insert(orderItems);
-
+            const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
             if (itemsError) throw itemsError;
 
-            // 3. Actualizar Inventario (Simple decremento)
+            // 3. Actualizar Stock
             for (const item of cart) {
                 const current = products.find(p => p.id === item.id);
                 if (current) {
@@ -269,8 +323,20 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [] }) => {
                 }
             }
 
-            // Éxito
-            onAddOrder(); // Notificar a App.jsx (opcional si usamos realtime)
+            // 4. Si es Cargo a Habitación, insertar en room_charges
+            if (orderType === 'habitacion' && paymentMethod === 'cargo_habitacion' && isPaid) {
+                const { error: chargeError } = await supabase
+                    .from('room_charges')
+                    .insert([{
+                        booking_id: selectedBookingRooms,
+                        description: `Room Service - Pedido #${orderData.id}`,
+                        amount: total,
+                        order_id: orderData.id
+                    }]);
+                if (chargeError) console.error("Error creating room charge:", chargeError);
+            }
+
+            onAddOrder();
             resetForm();
             onClose();
 
@@ -365,11 +431,20 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [] }) => {
                                 <div className="flex gap-2">
                                     <select
                                         value={orderType}
-                                        onChange={(e) => setOrderType(e.target.value)}
+                                        onChange={(e) => {
+                                            setOrderType(e.target.value);
+                                            // Auto-configure payment if room selected
+                                            if (e.target.value === 'habitacion') {
+                                                setInitialPayment({ isPaid: true, method: 'cargo_habitacion' });
+                                            } else {
+                                                setInitialPayment({ isPaid: false, method: 'efectivo' });
+                                            }
+                                        }}
                                         className="bg-white border-0 ring-1 ring-gray-200 rounded-xl px-3 py-2 text-xs font-black shadow-sm focus:ring-primary w-1/3"
                                     >
                                         <option value="mesa">🍽️ Mesa</option>
                                         <option value="domicilio">🛵 Domicilio</option>
+                                        <option value="habitacion">🏨 Habitación</option>
                                     </select>
 
                                     {orderType === 'mesa' && (
@@ -392,7 +467,70 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [] }) => {
                                             )}
                                         </div>
                                     )}
+
+                                    {orderType === 'habitacion' && (
+                                        <div className="flex-1">
+                                            <select
+                                                required
+                                                value={selectedBookingRooms}
+                                                onChange={(e) => {
+                                                    setSelectedBookingRooms(e.target.value);
+                                                    const booking = activeBookings.find(b => b.id === e.target.value);
+                                                    if (booking && booking.guest) {
+                                                        setCustomerName(booking.guest.full_name || '');
+                                                        setCustomerPhone(booking.guest.phone || '');
+                                                    } else {
+                                                        setCustomerName('');
+                                                        setCustomerPhone('');
+                                                    }
+                                                }}
+                                                className="w-full bg-white ring-1 ring-gray-200 rounded-xl px-3 py-2 text-xs font-bold outline-none shadow-sm focus:ring-primary"
+                                            >
+                                                <option value="">-- Seleccionar Habitación --</option>
+                                                {activeBookings.length > 0 ? activeBookings.map(b => (
+                                                    <option key={b.id} value={b.id}>
+                                                        Hab {b.room?.number} - {b.guest?.full_name}
+                                                    </option>
+                                                )) : <option disabled>No hay habitaciones ocupadas</option>}
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
+
+                                {orderType === 'habitacion' && (
+                                    <div className="flex gap-2 animate-in slide-in-from-top-2 mt-2 p-3 bg-blue-50/50 rounded-xl border border-blue-100">
+                                        <div className="flex-1">
+                                            <label className="text-[10px] font-black text-blue-400 uppercase tracking-widest block mb-1">Buscar por Cédula</label>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Ingrese Cédula del Huésped"
+                                                    className="w-full bg-white ring-1 ring-blue-200 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-blue-500 shadow-sm text-blue-900"
+                                                    onChange={(e) => {
+                                                        const docId = e.target.value;
+                                                        // Auto-search logic
+                                                        const match = activeBookings.find(b => b.guest?.document_id === docId);
+                                                        if (match) {
+                                                            setSelectedBookingRooms(match.id);
+                                                            if (match.guest) {
+                                                                setCustomerName(match.guest.full_name || '');
+                                                                setCustomerPhone(match.guest.phone || '');
+                                                            }
+                                                        } else if (docId === '') {
+                                                            // Optional: clear selection if input is cleared? Maybe activeBookings length is small enough to not matter.
+                                                        }
+                                                    }}
+                                                />
+                                                <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100 text-blue-500">
+                                                    <Search size={14} />
+                                                </div>
+                                            </div>
+                                            <p className="text-[9px] text-gray-400 mt-1 pl-1">
+                                                Si la cédula coincide, la habitación se seleccionará automáticamente.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="grid grid-cols-2 gap-2">
                                     <input
@@ -411,6 +549,53 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [] }) => {
                                         className="bg-white ring-1 ring-gray-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-primary shadow-sm"
                                         required={orderType === 'domicilio'}
                                     />
+                                </div>
+
+                                {/* Sección de Pago Anticipado */}
+                                <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100/50 animate-in fade-in">
+                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                        <div className="relative flex items-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={initialPayment.isPaid}
+                                                onChange={(e) => setInitialPayment({ ...initialPayment, isPaid: e.target.checked })}
+                                                className="peer sr-only"
+                                            />
+                                            <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                                        </div>
+                                        <span className="text-xs font-black text-secondary group-hover:text-emerald-700 transition-colors">
+                                            {initialPayment.isPaid ? '¡Pedido Pagado!' : 'Marcar como Pagado'}
+                                        </span>
+                                    </label>
+
+                                    {initialPayment.isPaid && (
+                                        <div className="mt-2 animate-in slide-in-from-top-1">
+                                            <select
+                                                value={initialPayment.method}
+                                                onChange={(e) => setInitialPayment({ ...initialPayment, method: e.target.value })}
+                                                className="w-full bg-white ring-1 ring-emerald-200 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-emerald-500 shadow-sm text-emerald-800"
+                                            >
+                                                <option value="efectivo">💵 Efectivo</option>
+                                                <option value="nequi">📱 Nequi</option>
+                                                <option value="daviplata">📱 Daviplata</option>
+                                                <option value="bancolombia">🏦 Bancolombia</option>
+                                                <option value="tarjeta">💳 Tarjeta</option>
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {/* Campo de Referencia (Diferido o Inmediato si no es efectivo) */}
+                                    {initialPayment.isPaid && initialPayment.method !== 'efectivo' && (
+                                        <div className="mt-2 animate-in slide-in-from-top-2">
+                                            <input
+                                                type="text"
+                                                placeholder="Número de Comprobante / Referencia"
+                                                value={initialPayment.reference || ''}
+                                                onChange={(e) => setInitialPayment({ ...initialPayment, reference: e.target.value })}
+                                                className="w-full bg-white ring-1 ring-emerald-200 rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-emerald-500 shadow-sm text-emerald-800 placeholder-emerald-800/50"
+                                            />
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Campos Extra para Domicilio */}
