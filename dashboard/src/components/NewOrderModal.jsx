@@ -292,6 +292,7 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [], shiftId }) =>
                         created_by_role: user?.role
                     },
                     shift_id: shiftId,
+                    branch_id: user?.branch_id,
                     created_at: new Date().toISOString()
                 }])
                 .select()

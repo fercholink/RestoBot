@@ -1,44 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, Edit2, Trash2, Shield, User, Mail, Building2, Key, Check, Info, X, Save, AlertCircle, Ban } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 
-import { INITIAL_USERS } from '../constants/initialUsers';
-
-// Removing local MOCK_USERS in favor of shared constant
-const MOCK_USERS = INITIAL_USERS;
-
-const MOCK_BRANCHES = ['Sede Norte', 'Sede Sur', 'Sede Centro', 'Global'];
+// Helper to generate UUID if needed (though DB should handle it)
+const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+};
 
 const UserManagement = () => {
     const { user } = useAuth();
-
-    // Protección de Ruta: Si no es admin ni gerente, no mostrar nada o redirect.
-    if (user && user.role !== 'admin' && user.role !== 'gerente') {
-        return (
-            <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in zoom-in duration-300">
-                <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center shadow-inner">
-                    <Ban size={48} />
-                </div>
-                <div>
-                    <h2 className="text-2xl font-black text-secondary">Acceso Restringido</h2>
-                    <p className="text-gray-400 font-medium mt-2 max-w-sm mx-auto">
-                        Su perfil de <strong>{user.role}</strong> no tiene permisos para gestionar usuarios.
-                    </p>
-                </div>
-            </div>
-        );
-    }
-    // Cargar usuarios de localStorage o usar MOCK inicial
-    const [users, setUsers] = useState(() => {
-        const saved = localStorage.getItem('restobot_registered_users');
-        return saved ? JSON.parse(saved) : MOCK_USERS;
-    });
-
-    // Sincronizar con localStorage cada vez que cambie la lista
-    const syncUsers = (newList) => {
-        setUsers(newList);
-        localStorage.setItem('restobot_registered_users', JSON.stringify(newList));
-    };
+    const [users, setUsers] = useState([]);
+    const [branches, setBranches] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [showModal, setShowModal] = useState(false);
@@ -54,24 +31,62 @@ const UserManagement = () => {
     };
 
     const [formUser, setFormUser] = useState({
-        name: '',
+        full_name: '',
         email: '',
-        password: '',
+        password: '', // Nota: No se guardará en profiles, solo para creación Auth futura
         role: 'cajero',
-        branch: '',
+        branch_id: '',
         permissions: INITIAL_PERMISSIONS
     });
 
     const [isPassUpdated, setIsPassUpdated] = useState(false);
 
+    useEffect(() => {
+        fetchData();
+    }, []);
+
+    const fetchData = async () => {
+        setLoading(true);
+        try {
+            const [profilesRes, branchesRes] = await Promise.all([
+                supabase.from('profiles').select('*, branch:branches(name)'),
+                supabase.from('branches').select('id, name')
+            ]);
+
+            setUsers(profilesRes.data || []);
+            setBranches(branchesRes.data || []);
+        } catch (error) {
+            console.error("Error cargando datos:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Protección de Ruta
+    if (user && user.role !== 'admin' && user.role !== 'gerente') {
+        return (
+            <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in zoom-in duration-300">
+                <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center shadow-inner">
+                    <Ban size={48} />
+                </div>
+                <div>
+                    <h2 className="text-2xl font-black text-secondary">Acceso Restringido</h2>
+                    <p className="text-gray-400 font-medium mt-2 max-w-sm mx-auto">
+                        Su perfil de <strong>{user.role}</strong> no tiene permisos para gestionar usuarios.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     const handleOpenCreate = () => {
         setEditingUser(null);
         setFormUser({
-            name: '',
+            full_name: '',
             email: '',
             password: '',
             role: 'cajero',
-            branch: 'Sede Norte',
+            branch_id: branches[0]?.id || '',
             permissions: JSON.parse(JSON.stringify(INITIAL_PERMISSIONS))
         });
         setShowModal(true);
@@ -80,7 +95,11 @@ const UserManagement = () => {
     const handleOpenEdit = (user) => {
         setEditingUser(user);
         setFormUser({
-            ...user,
+            full_name: user.full_name || user.name, // Support both fields just in case
+            email: user.email || '', // Profiles might not have email if not synced
+            password: '',
+            role: user.role,
+            branch_id: user.branch_id || branches[0]?.id,
             permissions: user.permissions || JSON.parse(JSON.stringify(INITIAL_PERMISSIONS))
         });
         setShowModal(true);
@@ -99,42 +118,76 @@ const UserManagement = () => {
         }));
     };
 
-    const handleSaveUser = (e) => {
+    const handleSaveUser = async (e) => {
         e.preventDefault();
-        if (editingUser) {
-            syncUsers(users.map(u => u.id === editingUser.id ? { ...formUser, id: u.id } : u));
-        } else {
-            syncUsers([...users, { ...formUser, id: Date.now(), active: true }]);
+        try {
+            const profileData = {
+                full_name: formUser.full_name,
+                role: formUser.role,
+                branch_id: formUser.branch_id,
+                permissions: formUser.permissions,
+                active: true,
+                // Si tuviéramos email en perfil, lo guardamos
+                // email: formUser.email 
+            };
+
+            if (editingUser) {
+                // Update Profile
+                const { error } = await supabase
+                    .from('profiles')
+                    .update(profileData)
+                    .eq('id', editingUser.id);
+
+                if (error) throw error;
+            } else {
+                // Create New User Logic
+                // IMPORTANTE: Aquí deberíamos llamar a una Edge Function para crear el usuario en Auth
+                // O usar supabase.auth.signUp() si es auto-registro. 
+                // Como workaround, insertamos en perfiles con un ID generado para tener el registro "Staff".
+                // En un sistema real, el trigger de Auth crearía este perfil.
+
+                // Opción A: Intentar Crear Auth User (Solo funciona si 'Enable Email Signup' está on y no requiere confirmación para login inmediato)
+                // const { data: authData, error: authError } = await supabase.auth.signUp({
+                //    email: formUser.email,
+                //    password: formUser.password,
+                //    options: { data: { full_name: formUser.full_name } }
+                // });
+                // if (authError) console.warn("No se pudo crear Auth:", authError);
+
+                // Opción B: Insertar solo perfil (Staff sin login o login manejado externamente)
+                const mockId = generateUUID(); // En producción usar authData.user.id
+
+                const { error } = await supabase
+                    .from('profiles')
+                    .insert([{ ...profileData, id: mockId, email: formUser.email }]);
+
+                if (error) throw error;
+            }
+            setShowModal(false);
+            fetchData();
+        } catch (error) {
+            alert("Error guardando usuario: " + error.message);
         }
-        setShowModal(false);
     };
 
-    const handleDeleteUser = (id) => {
-        if (window.confirm('¿Está seguro de eliminar este usuario? Recibirá una alerta de seguridad.')) {
-            syncUsers(users.filter(u => u.id !== id));
+    const handleDeleteUser = async (id) => {
+        if (window.confirm('¿Está seguro de eliminar este usuario?')) {
+            const { error } = await supabase.from('profiles').delete().eq('id', id);
+            if (error) alert("Error: " + error.message);
+            else fetchData();
         }
     };
 
     const handleUpdatePassword = () => {
-        const newPassword = document.getElementById('new-password-input')?.value;
-        if (!newPassword) return;
-
-        // Actualizar el password en la lista persistente
-        syncUsers(users.map(u =>
-            u.id === selectedUserForPass.id ? { ...u, password: newPassword } : u
-        ));
-
-        setIsPassUpdated(true);
-        setTimeout(() => {
-            setIsPassUpdated(false);
-            setShowPassModal(false);
-            setSelectedUserForPass(null);
-        }, 2000);
+        // Placeholder: Client-side password update for OTHER users is restricted. 
+        // We need an Admin function or "Send Password Reset Email".
+        alert("Función disponible solo vía 'Recuperar Contraseña' o acceso Admin API.");
+        setShowPassModal(false);
     };
 
     const filteredUsers = users.filter(u =>
-        u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email.toLowerCase().includes(searchTerm.toLowerCase())
+        (u.full_name || u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
@@ -169,7 +222,7 @@ const UserManagement = () => {
                                 <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Perfil de Usuario</th>
                                 <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Nivel de Acceso</th>
                                 <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Sede Asignada</th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Auditoría / Acciones</th>
+                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -178,11 +231,11 @@ const UserManagement = () => {
                                     <td className="px-8 py-5">
                                         <div className="flex items-center gap-4">
                                             <div className="w-12 h-12 rounded-2xl bg-secondary text-white flex items-center justify-center font-black text-lg shadow-sm">
-                                                {user.name.charAt(0)}
+                                                {(user.full_name || user.name || '?').charAt(0)}
                                             </div>
                                             <div>
-                                                <p className="font-black text-secondary text-sm tracking-tight">{user.name}</p>
-                                                <p className="text-[11px] text-gray-400 font-medium">{user.email}</p>
+                                                <p className="font-black text-secondary text-sm tracking-tight">{user.full_name || user.name}</p>
+                                                <p className="text-[11px] text-gray-400 font-medium">{user.email || 'Sin email'}</p>
                                             </div>
                                         </div>
                                     </td>
@@ -198,7 +251,7 @@ const UserManagement = () => {
                                     <td className="px-8 py-5 text-gray-500 font-bold text-sm">
                                         <div className="flex items-center gap-2">
                                             <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                                            {user.branch}
+                                            {user.branch?.name || 'Globál / Sin Asignar'}
                                         </div>
                                     </td>
                                     <td className="px-8 py-5 text-right">
@@ -234,7 +287,7 @@ const UserManagement = () => {
             {/* Modal de Creación / Edición */}
             {showModal && (
                 <div className="fixed inset-0 bg-secondary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
                         <div className="p-8 bg-secondary text-white flex justify-between items-center relative overflow-hidden">
                             <div className="relative z-10">
                                 <h3 className="text-2xl font-black tracking-tight">{editingUser ? 'Editar Perfil' : 'Alta de Personal'}</h3>
@@ -255,8 +308,8 @@ const UserManagement = () => {
                                         type="text"
                                         className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-bold text-sm"
                                         placeholder="Ej. Carlos Ruiz"
-                                        value={formUser.name}
-                                        onChange={(e) => setFormUser({ ...formUser, name: e.target.value })}
+                                        value={formUser.full_name}
+                                        onChange={(e) => setFormUser({ ...formUser, full_name: e.target.value })}
                                     />
                                 </div>
                             </div>
@@ -288,6 +341,7 @@ const UserManagement = () => {
                                             onChange={(e) => setFormUser({ ...formUser, password: e.target.value })}
                                         />
                                     </div>
+                                    <p className="text-[9px] text-gray-400 pl-2 opacity-70">Nota: Solo se creará el perfil. La cuenta Auth debe crearse por Admin.</p>
                                 </div>
                             )}
                             <div className="grid grid-cols-2 gap-4">
@@ -299,6 +353,7 @@ const UserManagement = () => {
                                         onChange={(e) => setFormUser({ ...formUser, role: e.target.value })}
                                     >
                                         <option value="cajero">Cajero</option>
+                                        <option value="mesero">Mesero</option>
                                         <option value="admin">Administrador</option>
                                         <option value="gerente">Gerente General</option>
                                     </select>
@@ -307,11 +362,11 @@ const UserManagement = () => {
                                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Sede de Trabajo</label>
                                     <select
                                         className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-xs font-black appearance-none"
-                                        value={formUser.branch}
-                                        onChange={(e) => setFormUser({ ...formUser, branch: e.target.value })}
+                                        value={formUser.branch_id}
+                                        onChange={(e) => setFormUser({ ...formUser, branch_id: e.target.value })}
                                     >
-                                        {MOCK_BRANCHES.map(b => (
-                                            <option key={b} value={b}>{b}</option>
+                                        {branches.map(b => (
+                                            <option key={b.id} value={b.id}>{b.name}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -341,7 +396,7 @@ const UserManagement = () => {
                                                         <td key={action} className="px-2 py-2 text-center">
                                                             <input
                                                                 type="checkbox"
-                                                                checked={perms[action]}
+                                                                checked={perms[action] || false}
                                                                 onChange={() => handlePermissionChange(moduleName, action)}
                                                                 className="w-4 h-4 rounded-md border-gray-300 text-primary focus:ring-primary/20 cursor-pointer"
                                                             />
@@ -385,34 +440,20 @@ const UserManagement = () => {
                                     <div className="w-16 h-16 bg-warning/10 text-warning rounded-full flex items-center justify-center mx-auto mb-2">
                                         <Key size={32} />
                                     </div>
-                                    <h3 className="text-xl font-black text-secondary">Control de Segurança</h3>
-                                    <p className="text-xs text-gray-400 font-medium">Establecer nueva contraseña para <br /><span className="text-secondary font-black">{selectedUserForPass?.name}</span></p>
+                                    <h3 className="text-xl font-black text-secondary">Control de Seguridad</h3>
+                                    <p className="text-xs text-gray-400 font-medium">Establecer nueva contraseña para <br /><span className="text-secondary font-black">{selectedUserForPass?.name || selectedUserForPass?.full_name}</span></p>
 
-                                    <div className="space-y-3 pt-4 text-left">
-                                        <input
-                                            type="password"
-                                            id="new-password-input"
-                                            autoFocus
-                                            className="w-full px-5 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 outline-none font-bold"
-                                            placeholder="Nueva contraseña"
-                                        />
-                                        <div className="bg-blue-50 p-3 rounded-xl flex gap-3">
-                                            <AlertCircle size={18} className="text-blue-500 shrink-0" />
-                                            <p className="text-[10px] text-blue-600 font-medium leading-normal">
-                                                Se generará un log de seguridad indicando que usted restableció esta cuenta.
-                                            </p>
-                                        </div>
+                                    <div className="bg-blue-50 p-3 rounded-xl flex gap-3 text-left">
+                                        <AlertCircle size={18} className="text-blue-500 shrink-0" />
+                                        <p className="text-[10px] text-blue-600 font-medium leading-normal">
+                                            Por seguridad, el cambio de contraseña para otros usuarios debe realizarse desde el Panel de Administración de Supabase o mediante el flujo de recuperación de contraseña por email.
+                                        </p>
                                     </div>
 
                                     <div className="flex gap-3 pt-6">
-                                        <button
-                                            onClick={handleUpdatePassword}
-                                            className="flex-1 bg-secondary text-white py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all"
-                                        >
-                                            Actualizar
-                                        </button>
-                                        <button onClick={() => setShowPassModal(false)} className="px-6 py-3.5 bg-gray-100 text-gray-400 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 transition-all">
-                                            Volver
+
+                                        <button onClick={() => setShowPassModal(false)} className="px-6 py-3.5 bg-gray-100 text-gray-400 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 transition-all w-full">
+                                            Entendido
                                         </button>
                                     </div>
                                 </div>

@@ -1,14 +1,24 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
-const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONES TEST SAS' }) => {
+const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONES TEST SAS', onAfterPrint }) => {
     const hasPrinted = useRef(false);
 
     useEffect(() => {
+        const handleAfterPrint = () => {
+            if (onAfterPrint) onAfterPrint();
+        };
+
+        window.addEventListener('afterprint', handleAfterPrint);
+
         if (!hasPrinted.current) {
             hasPrinted.current = true;
             window.print();
         }
+
+        return () => {
+            window.removeEventListener('afterprint', handleAfterPrint);
+        };
     }, []);
 
     if (!order) return null;
@@ -30,11 +40,61 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
         return labels[type] || 'ID';
     };
 
-    // Cálculos Tributarios DIAN (8% ICO es común en restaurantes de Colombia)
-    const total = order.total_price || 0;
-    const ico_rate = 0.08;
-    const subtotal = Math.round(total / (1 + ico_rate));
-    const ico_val = total - subtotal;
+    // Cálculos Tributarios Avanzados (Discriminar IVA vs ICO)
+    const calculateTotals = () => {
+        let stats = { subtotal: 0, ico_8: 0, iva_19: 0, exempt: 0, total: 0 };
+
+        // Si no hay ítems, usar lógica por defecto según el tipo de orden
+        if (!order.items || order.items.length === 0) {
+            const t = order.total_price || 0;
+            // Si es hotel/hospedaje, asumir IVA 19% por defecto en legacy; si es restaurante, ICO 8%
+            if (type === 'factura_hotel' || order.type === 'habitacion' || (order.prefix === 'HTL')) {
+                const base = t / 1.19;
+                return { subtotal: base, iva_19: t - base, ico_8: 0, exempt: 0, total: t };
+            } else {
+                const base = t / 1.08;
+                return { subtotal: base, iva_19: 0, ico_8: t - base, exempt: 0, total: t };
+            }
+        }
+
+        order.items.forEach(item => {
+            // Asegurar que usamos el valor total de la línea
+            const lineTotal = item.total || (item.unit_price * item.quantity) || 0;
+            stats.total += lineTotal;
+
+            // Determinar Tipo de Impuesto
+            // 1. Buscar explícitamente tax_type o tax_rate
+            // 2. Inferir por nombre
+            let taxType = item.tax_type;
+            if (!taxType) {
+                const name = (item.product_name || '').toLowerCase();
+                if (name.includes('alojamiento') || name.includes('hospedaje') || name.includes('habitación') || name.includes('noche')) {
+                    taxType = 'IVA_19';
+                } else if (name.includes('(exento)')) {
+                    taxType = 'EXENTO';
+                } else {
+                    taxType = 'ICO_8'; // Default para Restaurante
+                }
+            }
+
+            if (taxType === 'IVA_19' || taxType === 'IVA') {
+                const base = lineTotal / 1.19;
+                stats.subtotal += base;
+                stats.iva_19 += (lineTotal - base);
+            } else if (taxType === 'ICO_8' || taxType === 'ICO') {
+                const base = lineTotal / 1.08;
+                stats.subtotal += base;
+                stats.ico_8 += (lineTotal - base);
+            } else {
+                stats.subtotal += lineTotal;
+                stats.exempt += 0;
+            }
+        });
+
+        return stats;
+    };
+
+    const totals = calculateTotals();
 
     return createPortal(
         <>
@@ -64,17 +124,17 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
 
                 {/* Cabezote Legal */}
                 <div className="text-center border-b border-dashed border-black pb-2 mb-2">
-                    <h2 className="text-sm font-black uppercase">{branchName}</h2>
-                    <p className="text-[8px] font-bold">NIT: 900.876.543-1 - RESPONSABLE DE IVA</p>
-                    <p className="text-[8px]">Dirección: Calle Falsa 123 - Montería, Córdoba</p>
-                    <p className="text-[8px]">TEL: +57 321 000 0000</p>
+                    <h2 className="text-sm font-black uppercase">{order.branch?.name || branchName}</h2>
+                    <p className="text-[8px] font-bold">NIT: {order.branch?.nit || '900.876.543-1'} - RESPONSABLE DE IVA</p>
+                    <p className="text-[8px]">Dirección: {order.branch?.address || 'Calle Falsa 123 - Montería'}</p>
+                    <p className="text-[8px]">TEL: {order.branch?.phone || '+57 321 000 0000'}</p>
 
                     {(type === 'recibo' || type === 'factura_hotel') && (
                         <div className="mt-2 pt-1 border-t border-dotted border-black px-2">
                             <p className="text-[7px] leading-tight">
-                                RESOLUCIÓN DIAN No. 187640000001 <br />
-                                FECHA: 2024/01/01 DESDE: 1 HASTA: 5000 <br />
-                                PREFIJO: RB - DOCUMENTO EQUIVALENTE POS
+                                RESOLUCIÓN DIAN No. {order.branch?.resolution || '187640000001'} <br />
+                                FECHA: {order.branch?.resolution_date || '2024/01/01'} RANGO: {order.branch?.resolution_range || '1 - 5000'} <br />
+                                PREFIJO: {order.prefix || 'HTL'} - DOCUMENTO EQUIVALENTE
                             </p>
                         </div>
                     )}
@@ -90,7 +150,10 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                         <div className="flex justify-between"><span>No:</span> <span className="font-bold">{order.prefix || 'RB'}-{order.id}</span></div>
                         <div className="flex justify-between"><span>FECHA:</span> <span>{new Date(order.created_at).toLocaleDateString()}</span></div>
                         <div className="flex justify-between"><span>HORA:</span> <span>{new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
-                        <div className="flex justify-between"><span>TIPO:</span> <span className="uppercase font-bold">{order.table_id ? `Mesa: ${order.table_id}` : 'Domicilio'}</span></div>
+                        <div className="flex justify-between"><span>TIPO:</span> <span className="uppercase font-bold">{
+                            (type === 'factura_hotel' || type === 'recibo_copia' || order.prefix === 'HTL') ? 'HOSPEDAJE' :
+                                (order.table_id ? `Mesa: ${order.table_id}` : 'Domicilio')
+                        }</span></div>
                     </div>
 
                     {/* Datos de Entrega (Domicilio) */}
@@ -244,7 +307,7 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                                         </td>
                                         {(type === 'recibo' || type === 'factura_hotel') && (
                                             <td className="py-1 text-right text-[9px]">
-                                                ${(item.unit_price * item.quantity).toLocaleString()}
+                                                ${(item.total || (item.unit_price * item.quantity)).toLocaleString()}
                                             </td>
                                         )}
                                     </tr>
@@ -259,19 +322,29 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                     <div className="space-y-1 text-[10px] mb-4">
                         <div className="flex justify-between pt-1">
                             <span>SUBTOTAL:</span>
-                            <span>${subtotal.toLocaleString()}</span>
+                            <span>${(totals.subtotal).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                         </div>
-                        <div className="flex justify-between">
-                            <span>IMPOCONSUMO (8%):</span>
-                            <span>${ico_val.toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>IVA (0%):</span>
-                            <span>$0</span>
-                        </div>
+                        {totals.ico_8 > 0 && (
+                            <div className="flex justify-between">
+                                <span>IMPOCONSUMO (8%):</span>
+                                <span>${(totals.ico_8).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                            </div>
+                        )}
+                        {totals.iva_19 > 0 && (
+                            <div className="flex justify-between">
+                                <span>IVA (19%):</span>
+                                <span>${(totals.iva_19).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                            </div>
+                        )}
+                        {totals.exempt > 0 && (
+                            <div className="flex justify-between">
+                                <span>EXENTO/NO GRAVADO:</span>
+                                <span>${(totals.exempt).toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between font-black text-[12px] border-t border-black pt-1 mt-1">
                             <span>TOTAL A PAGAR:</span>
-                            <span>${total.toLocaleString()}</span>
+                            <span>${(totals.total).toLocaleString()}</span>
                         </div>
 
                         {order.payment_method && (

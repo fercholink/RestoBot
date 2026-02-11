@@ -118,6 +118,28 @@ const RoomModal = ({ isOpen, onClose, onRoomSaved, roomToEdit = null, branchId, 
         }
     };
 
+    const handleDelete = async () => {
+        if (!roomToEdit) return;
+        if (!confirm(`¿Estás seguro de eliminar la habitación ${roomToEdit.number}? Esta acción no se puede deshacer.`)) return;
+
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('rooms')
+                .delete()
+                .eq('id', roomToEdit.id);
+
+            if (error) throw error;
+            onRoomSaved(); // Refresh parent
+            onClose();
+        } catch (error) {
+            console.error("Error deleting room:", error);
+            alert("No se puede eliminar: " + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
             <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -244,21 +266,33 @@ const RoomModal = ({ isOpen, onClose, onRoomSaved, roomToEdit = null, branchId, 
                         </div>
                     </div>
 
-                    <div className="mt-8 flex justify-end gap-4 pt-6 border-t border-gray-100">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-gray-400 hover:text-secondary hover:bg-gray-50 transition-all"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="bg-primary text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-premium hover:shadow-lg hover:scale-[1.02] transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {loading ? 'Guardando...' : <><Save size={16} /> Guardar</>}
-                        </button>
+                    <div className="mt-8 flex justify-between items-center pt-6 border-t border-gray-100">
+                        {roomToEdit ? (
+                            <button
+                                type="button"
+                                onClick={handleDelete}
+                                className="text-red-400 hover:text-red-600 p-2 rounded-xl hover:bg-red-50 transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest"
+                            >
+                                <Trash2 size={16} /> Eliminar
+                            </button>
+                        ) : <div></div>}
+
+                        <div className="flex gap-4">
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-gray-400 hover:text-secondary hover:bg-gray-50 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="bg-primary text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-premium hover:shadow-lg hover:scale-[1.02] transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? 'Guardando...' : <><Save size={16} /> Guardar</>}
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>

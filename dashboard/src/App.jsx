@@ -71,6 +71,7 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeRestaurantSubTab, setActiveRestaurantSubTab] = useState(user?.role === 'cajero' ? 'turnos' : 'board');
+  const [activeHotelSubTab, setActiveHotelSubTab] = useState('habitaciones');
   const [paymentModal, setPaymentModal] = useState({ isOpen: false, orderId: null, totalPrice: 0 });
   const [showNotifications, setShowNotifications] = useState(false);
   const [printData, setPrintData] = useState({ order: null, type: 'comanda' });
@@ -158,7 +159,8 @@ function App() {
         .from('orders')
         .select(`
           *,
-          items:order_items(*)
+          items:order_items(*),
+          branch:branches(*)
         `)
         .order('created_at', { ascending: false });
 
@@ -497,6 +499,8 @@ function App() {
           setIsCollapsed={setIsSidebarCollapsed}
           activeRestaurantSubTab={activeRestaurantSubTab}
           setActiveRestaurantSubTab={setActiveRestaurantSubTab}
+          activeHotelSubTab={activeHotelSubTab}
+          setActiveHotelSubTab={setActiveHotelSubTab}
         />
 
         <main className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} p-3 md:p-8 pt-20 lg:pt-8 w-full overflow-hidden`}>
@@ -617,7 +621,7 @@ function App() {
             />
           )}
           {activeTab === 'analytics' && <AnalyticsPro />}
-          {activeTab === 'hotels' && (user.role === 'admin' || user.role === 'gerente') && <HotelManagement />}
+          {activeTab === 'hotels' && (user.role === 'admin' || user.role === 'gerente') && <HotelManagement activeSubTab={activeHotelSubTab} />}
           {activeTab === 'contabilidad' && <AccountingModule orders={orders} />}
           {activeTab === 'users' && <UserManagement />}
           {activeTab === 'sedes' && <BranchManagement />}

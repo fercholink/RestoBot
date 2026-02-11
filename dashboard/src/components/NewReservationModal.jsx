@@ -323,6 +323,23 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
                         <div className="space-y-4">
                             <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Estancia</h4>
 
+                            <div className="bg-gray-100 p-1 rounded-xl flex mb-4">
+                                <button
+                                    type="button"
+                                    className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${formData.status === 'reservada' ? 'bg-white text-secondary shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                    onClick={() => setFormData({ ...formData, status: 'reservada' })}
+                                >
+                                    Reserva
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${formData.status === 'ocupada' ? 'bg-primary text-white shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                    onClick={() => setFormData({ ...formData, status: 'ocupada' })}
+                                >
+                                    Check-In
+                                </button>
+                            </div>
+
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 mb-1">Habitación</label>
                                 <select

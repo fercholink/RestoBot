@@ -7,59 +7,64 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    const handleUserSession = async (session) => {
-        const supabaseUser = session?.user ?? null;
-        if (supabaseUser) {
-            // AUTO-FIX: Si el usuario no tiene rol (creado manualmente), asignarle 'cajero'
-            let role = supabaseUser.user_metadata?.role;
-            if (!role) {
-                console.log("Auth: Usuario sin rol detectado. Asignando 'cajero' automáticamente...");
-                const { data, error } = await supabase.auth.updateUser({
-                    data: { role: 'cajero', name: 'Cajero', branch: 'Sede Principal' }
-                });
-                if (!error && data.user) {
-                    // Update local var with new metadata
-                    role = 'cajero';
-                    supabaseUser.user_metadata = { ...supabaseUser.user_metadata, role: 'cajero', name: 'Cajero' };
-                }
+    const enrichUser = async (sessionUser) => {
+        if (!sessionUser) return null;
+
+        let profileData = {};
+        try {
+            // Try to fetch profile from 'profiles' table (created via migration)
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*, branch:branches(*)')
+                .eq('id', sessionUser.id)
+                .single();
+
+            if (data && !error) {
+                profileData = data;
+                console.log("Auth: Perfil cargado desde BD", data);
             }
+        } catch (err) {
+            console.warn("Auth: No se pudo cargar perfil de BD (tabla no existe o error), usando metadata.", err);
+        }
 
-            // Calcular nombre real para mostrar
-            const metadataName = supabaseUser.user_metadata?.name;
-            const emailName = supabaseUser.email?.split('@')[0];
-            // Si el nombre es genérico o vacío, usar el del email
-            const finalName = (metadataName && metadataName !== 'Usuario Nuevo' && metadataName !== 'Colaborador')
-                ? metadataName
-                : (emailName || 'Cajero');
+        // Merge Metadata (Fallback) with Profile (Priority)
+        // Profile ID overrides session ID (they should be same)
+        // Role from profile overrides metadata
+        const metadata = sessionUser.user_metadata || {};
 
-            // Flatten metadata for compatibility with existing app
-            setUser({
-                ...supabaseUser,
-                ...supabaseUser.user_metadata,
-                name: finalName, // Nombre sanitizado
-                role: role || 'cajero' // Fallback visual
-            });
+        return {
+            ...sessionUser,
+            ...metadata, // Base metadata
+            ...profileData, // DB Profile overrides (role, branch_id, permissions)
+            branch: profileData.branch || { name: metadata.branch || 'Sede Principal' }, // Ensure branch object exists
+            name: profileData.full_name || metadata.name || sessionUser.email?.split('@')[0] || 'Usuario'
+        };
+    };
+
+    const handleUserSession = async (session) => {
+        setLoading(true);
+        const sessionUser = session?.user ?? null;
+
+        if (sessionUser) {
+            const enriched = await enrichUser(sessionUser);
+            setUser(enriched);
         } else {
             setUser(null);
         }
+        setLoading(false);
     };
 
     useEffect(() => {
         // 1. Initial Session Check
-        const getSession = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
+        supabase.auth.getSession().then(({ data: { session } }) => {
             handleUserSession(session);
-            setLoading(false);
-        };
-        getSession();
+        });
 
         // 2. Listen for Auth Changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             handleUserSession(session);
-            setLoading(false);
         });
 
-        // Cleanup subscription
         return () => subscription.unsubscribe();
     }, []);
 
@@ -69,7 +74,6 @@ export const AuthProvider = ({ children }) => {
                 email,
                 password,
             });
-
             if (error) throw error;
             return { success: true, data };
         } catch (error) {
@@ -83,26 +87,17 @@ export const AuthProvider = ({ children }) => {
             const { data, error } = await supabase.auth.signUp({
                 email,
                 password,
-                options: {
-                    data: metadata, // Save user name, role, branch, etc.
-                }
+                options: { data: metadata }
             });
-
             if (error) throw error;
             return { success: true, data };
         } catch (error) {
-            console.error("AuthContext: Register error", error);
             return { success: false, message: error.message };
         }
     };
 
     const logout = async () => {
-        try {
-            const { error } = await supabase.auth.signOut();
-            if (error) throw error;
-        } catch (error) {
-            console.error("AuthContext: Logout error", error);
-        }
+        await supabase.auth.signOut();
     };
 
     return (
