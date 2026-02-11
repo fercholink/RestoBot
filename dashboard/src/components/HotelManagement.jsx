@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Printer, Bed, Calendar, Key, Users, History, Settings, Bell, Star, MapPin, Search, Plus, Loader, Trash2, Edit, Tv, Wifi, Wind, ChevronLeft, ChevronRight, Building, Check } from 'lucide-react';
+import { Printer, Bed, Calendar, Key, Users, History, Settings, Bell, Star, MapPin, Search, Plus, Loader, Trash2, Edit, Tv, Wifi, Wind, ChevronLeft, ChevronRight, Building, Check, Hash, LayoutList, Columns } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import NewReservationModal from './NewReservationModal';
 import RoomModal from './RoomModal';
@@ -7,6 +7,48 @@ import ReservationDetailsModal from './ReservationDetailsModal';
 import PaymentModal from './PaymentModal';
 import TicketPrinter from './TicketPrinter';
 import FloorManager from './FloorManager';
+
+// Helper Component for Cleaning Timer
+const CleaningTimer = ({ startTime }) => {
+    const [elapsed, setElapsed] = useState('');
+
+    useEffect(() => {
+        const updateTimer = () => {
+            if (!startTime) return;
+            const start = new Date(startTime);
+            const now = new Date();
+            const diff = Math.floor((now - start) / 1000); // seconds
+
+            if (diff < 0) {
+                setElapsed('00:00');
+                return;
+            }
+
+            const minutes = Math.floor(diff / 60);
+            const seconds = diff % 60;
+            const hours = Math.floor(minutes / 60);
+            const displayMinutes = minutes % 60;
+
+            const fmt = (n) => n.toString().padStart(2, '0');
+
+            if (hours > 0) {
+                setElapsed(`${fmt(hours)}:${fmt(displayMinutes)}:${fmt(seconds)}`);
+            } else {
+                setElapsed(`${fmt(displayMinutes)}:${fmt(seconds)}`);
+            }
+        };
+
+        updateTimer();
+        const interval = setInterval(updateTimer, 1000);
+        return () => clearInterval(interval);
+    }, [startTime]);
+
+    return (
+        <span className="font-mono text-xs font-black bg-white/20 px-1.5 py-0.5 rounded text-yellow-700">
+            {elapsed}
+        </span>
+    );
+};
 
 const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
     // --- ESTADO GLOBAL ---
@@ -23,6 +65,7 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
     // --- ESTADO DE UI ---
     // viewMode replaced by activeSubTab prop
     const [currentDate, setCurrentDate] = useState(new Date());
+    const [floorLayout, setFloorLayout] = useState('vertical'); // 'vertical' | 'horizontal'
     const [expandedFloors, setExpandedFloors] = useState({}); // { floorId: boolean }
 
     // --- MODALES ---
@@ -250,43 +293,46 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
     const toggleFloorExpanded = (floorId) => {
         setExpandedFloors(prev => ({
             ...prev,
-            [floorId]: prev[floorId] === undefined ? false : !prev[floorId]
+            [floorId]: !prev[floorId]
         }));
     };
 
     const handleQuickCheckout = async (booking, taxData, extraData) => {
-        const roomNumber = rooms.find(r => r.id === booking.room_id)?.number || '';
+        if (!booking) return;
 
-        // Custom message if invoice is requested
-        let confirmMsg = `¿Confirmar salida (Check-Out) para la habitación ${roomNumber}?`;
-        if (taxData) {
-            confirmMsg += `\n\nSe generará Factura Electrónica para: ${taxData.names} (${taxData.identification})`;
-        }
-        confirmMsg += `\n\nLa habitación pasará a estado de Limpieza.`;
-
-        if (!confirm(confirmMsg)) return;
-
-        setLoading(true);
+        // Don't set global loading true to avoid full screen flicker
+        // setLoading(true);
         try {
-            // 1. Prepare Update Data
-            const updateData = { status: 'checkout' };
-
-            // 2. Update booking status
-            const { error: bError } = await supabase
+            // 1. Actualizar estado de la reserva
+            const { error: bookingError } = await supabase
                 .from('bookings')
-                .update(updateData)
+                .update({
+                    status: 'checkout',
+                    check_out: new Date().toISOString(), // Actualizar salida real
+                    total_price: booking.total_price // Asegurar precio final
+                })
                 .eq('id', booking.id);
-            if (bError) throw bError;
 
-            // 3. Update room status to cleaning
-            const { error: rError } = await supabase
+            if (bookingError) throw bookingError;
+
+            // 2. Liberar habitación (Poner en limpieza) y guardar hora de inicio
+            // Usamos la columna features para guardar el timestamp sin migración
+            const { error: roomError } = await supabase
                 .from('rooms')
-                .update({ status: 'limpieza' })
+                .update({
+                    status: 'limpieza',
+                    features: {
+                        ...booking.room?.features,
+                        cleaning_start: new Date().toISOString()
+                    }
+                })
                 .eq('id', booking.room_id);
-            if (rError) throw rError;
+
+            if (roomError) throw roomError;
 
             // 4. Generate Receipt Data for Printing
             const currentBranch = branches.find(b => b.id === selectedBranchId);
+            const roomNumber = rooms.find(r => r.id === booking.room_id)?.number || '';
 
             // Calculate nights for receipt detail
             const start = new Date(booking.check_in);
@@ -600,6 +646,25 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                         >
                             HOY
                         </button>
+
+                        <div className="h-8 w-px bg-gray-200 mx-2"></div>
+
+                        <div className="flex bg-gray-100 p-1 rounded-xl">
+                            <button
+                                onClick={() => setFloorLayout('vertical')}
+                                className={`p-1.5 rounded-lg transition-all ${floorLayout === 'vertical' ? 'bg-white text-secondary shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                title="Vista Vertical"
+                            >
+                                <LayoutList size={16} />
+                            </button>
+                            <button
+                                onClick={() => setFloorLayout('horizontal')}
+                                className={`p-1.5 rounded-lg transition-all ${floorLayout === 'horizontal' ? 'bg-white text-secondary shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                title="Vista Horizontal"
+                            >
+                                <Columns size={16} />
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -618,16 +683,19 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
             {/* --- CONTENIDO PRINCIPAL --- */}
 
             {activeSubTab === 'habitaciones' ? (
-                <div className="space-y-6">
+                <div className={`transition-all duration-300 ${floorLayout === 'horizontal' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start' : 'space-y-6'}`}>
                     {floorGroups.length === 0 ? (
-                        <div className="text-center py-20 bg-white rounded-3xl border border-gray-100 border-dashed">
+                        <div className="text-center py-20 bg-white rounded-3xl border border-gray-100 border-dashed w-full col-span-full">
                             <Settings className="mx-auto text-gray-300 mb-4" size={48} />
                             <p className="text-gray-400 font-medium">Esta sede no tiene pisos ni habitaciones configuradas.</p>
                             <p className="mt-2 text-xs text-gray-400">Ve a "Pisos y Zonas" en el menú lateral para configurar.</p>
                         </div>
                     ) : (
                         floorGroups.map(group => (
-                            <div key={group.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div
+                                key={group.id}
+                                className={`bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-300 ${floorLayout === 'horizontal' ? 'w-full' : 'w-full'}`}
+                            >
                                 <div
                                     className="p-4 bg-gray-50/50 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors border-b border-gray-100"
                                     onClick={() => toggleFloorExpanded(group.id)}
@@ -648,11 +716,14 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                                             </div>
                                         </div>
                                     </div>
-                                    <ChevronRight size={20} className={`text-gray-400 transition-transform ${expandedFloors[group.id] !== false ? 'rotate-90' : ''}`} />
+                                    <ChevronRight size={20} className={`text-gray-400 transition-transform ${expandedFloors[group.id] ? 'rotate-90' : ''}`} />
                                 </div>
 
-                                {expandedFloors[group.id] !== false && (
-                                    <div className="p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 animate-in fade-in slide-in-from-top-4 duration-300">
+                                {expandedFloors[group.id] && (
+                                    <div className={`p-4 grid gap-3 animate-in fade-in slide-in-from-top-4 duration-300 ${floorLayout === 'horizontal'
+                                        ? 'grid-cols-2 xl:grid-cols-3'
+                                        : 'grid-cols-2 mobile:grid-cols-3 tablet:grid-cols-4 laptop:grid-cols-5 desktop:grid-cols-6'
+                                        }`}>
                                         {group.rooms.length === 0 && <p className="text-gray-400 text-xs italic col-span-full text-center">No hay habitaciones en este piso.</p>}
 
                                         {group.rooms.map(room => {
@@ -681,13 +752,19 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                                                         </div>
 
                                                         <div className="mb-2">
-                                                            <span className={`block w-full text-center px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${status === 'ocupada' ? 'bg-primary/10 text-primary' :
-                                                                status === 'reservada' ? 'bg-orange-100 text-orange-600' :
-                                                                    status === 'limpieza' ? 'bg-yellow-100 text-yellow-600' :
-                                                                        'bg-success/10 text-success'
-                                                                }`}>
-                                                                {status}
-                                                            </span>
+                                                            {status === 'limpieza' && (
+                                                                <div className="flex flex-col items-center justify-center h-full">
+                                                                    <div className="bg-yellow-100 p-2 rounded-full mb-1 animate-pulse">
+                                                                        <Hash size={16} className="text-yellow-500" />
+                                                                    </div>
+                                                                    <span className="text-[10px] font-black uppercase text-yellow-600">Limpieza</span>
+                                                                    {room.features?.cleaning_start && (
+                                                                        <div className="mt-1">
+                                                                            <CleaningTimer startTime={room.features.cleaning_start} />
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                             <span className="block text-center text-[9px] text-gray-400 font-bold uppercase mt-1 truncate">{room.type}</span>
                                                         </div>
                                                     </div>
@@ -1001,9 +1078,9 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                 isOpen={isRoomModalOpen}
                 onClose={() => setIsRoomModalOpen(false)}
                 room={editingRoom}
-                floors={floors}
+                existingFloors={floors}
                 branchId={selectedBranchId}
-                onSaved={loadBranchData}
+                onRoomSaved={loadBranchData}
             />
 
             {/* Reservation Details / Checkout Modal */}

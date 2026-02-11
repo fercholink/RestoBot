@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeRestaurantSubTab, setActiveRestaurantSubTab, activeHotelSubTab, setActiveHotelSubTab }) => {
     const [isOpen, setIsOpen] = useState(false);
     const { user, logout } = useAuth();
+
     const [expandedMenu, setExpandedMenu] = useState('restaurante'); // Expandir restaurante por defecto
 
     // Solo definimos subitems para restaurante por ahora
@@ -203,6 +204,8 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
             >
                 {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
             </button>
+
+
         </div>
     );
 
