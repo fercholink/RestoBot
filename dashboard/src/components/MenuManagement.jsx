@@ -46,7 +46,7 @@ const MenuManagement = () => {
                 setCategories(cats);
                 // Si la categoría activa actual no existe en los nuevos datos (o es null), seleccionar la primera
                 setActiveCategory(prev => {
-                    if (prev && cats.find(c => c.id === prev)) return prev;
+                    if (prev && cats.find(c => c.id == prev)) return prev;
                     return cats.length > 0 ? cats[0].id : null;
                 });
             }
@@ -90,7 +90,7 @@ const MenuManagement = () => {
 
     // --- FILTRADO ---
     const filteredProducts = products.filter(p =>
-        p.category_id === activeCategory &&
+        p.category_id == activeCategory &&
         (p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (p.description && p.description.toLowerCase().includes(searchTerm.toLowerCase())))
     );
@@ -369,7 +369,7 @@ const MenuManagement = () => {
                                         <span>{cat.name}</span>
                                         {activeCategory === cat.id && <ChevronRight className="ml-auto hidden lg:block" size={16} />}
                                     </button>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex gap-1 transition-opacity">
                                         <button
                                             onClick={() => handleEditCategory(cat)}
                                             className={`p-1 rounded-lg hover:bg-white/20 transition-colors ${activeCategory === cat.id ? 'text-white' : 'text-gray-400 hover:text-secondary'}`}
@@ -519,6 +519,20 @@ const MenuManagement = () => {
                                             defaultValue={editingProduct?.name}
                                             required
                                         />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Categoría</label>
+                                        <select
+                                            name="productCategory"
+                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:outline-none font-bold text-secondary appearance-none"
+                                            defaultValue={editingProduct?.category_id || activeCategory}
+                                            required
+                                        >
+                                            <option value="" disabled>Selecciona una categoría</option>
+                                            {categories.map(cat => (
+                                                <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Precio Base</label>
