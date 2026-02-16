@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Wallet, Clock, ArrowRightLeft, CheckCircle2, AlertCircle, History, User, Building2, TrendingUp, TrendingDown, Landmark, Banknote, Save, X, Plus, Minus, Download, Send, XCircle } from 'lucide-react';
+import { sileo } from 'sileo';
 
 const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
     // Estado local para la UI
@@ -10,6 +11,15 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
 
     const activeShift = shifts.find(s => s.status === 'abierto');
     const { user } = useAuth();
+
+    // Helper para asegurar que renderizamos strings y no objetos (fix error {name})
+    const safeRender = (val, fallback = '') => {
+        if (!val) return fallback;
+        if (typeof val === 'object') {
+            return val.name || val.nombre || JSON.stringify(val);
+        }
+        return String(val);
+    };
 
     // Cargar turnos desde Supabase
     useEffect(() => {
@@ -145,7 +155,7 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
         try {
             // Guard: Check if shift is already open locally or in DB
             if (activeShift) {
-                alert("Ya existe un turno abierto.");
+                sileo.warning({ title: "Atención", description: "Ya existe un turno abierto." });
                 setShowOpenModal(false);
                 return;
             }
@@ -158,15 +168,18 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
                 .maybeSingle();
 
             if (existingOpen) {
-                alert("Detectamos un turno abierto en segundo plano. Sincronizando...");
+                sileo.info({ title: "Sincronizando", description: "Detectamos un turno abierto en segundo plano." });
                 await fetchShifts();
                 setShowOpenModal(false);
                 return;
             }
 
+            const cashierNameSafe = safeRender(user?.name, 'Cajero');
+            const branchNameSafe = safeRender(user?.branch, 'Sede Principal');
+
             const { error } = await supabase.from('shifts').insert([{
-                cashier_name: user?.name || 'Cajero',
-                branch_name: user?.branch || 'Sede Principal',
+                cashier_name: cashierNameSafe,
+                branch_name: branchNameSafe,
                 status: 'abierto',
                 start_time: new Date().toISOString(),
                 initial_cash: Number(initialCash),
@@ -178,8 +191,8 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
             // Force immediate UI update locally to prevent lag
             const newShiftStub = {
                 id: 'temp_' + Date.now(),
-                cashier_name: user?.name,
-                branch_name: user?.branch,
+                cashier_name: cashierNameSafe,
+                branch_name: branchNameSafe,
                 status: 'abierto',
                 start_time: new Date().toISOString(),
                 initial_cash: Number(initialCash),
@@ -189,9 +202,10 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
 
             await syncShifts();
             setShowOpenModal(false);
+            sileo.success({ title: "Turno Abierto", description: "Caja inicializada correctamente." });
         } catch (error) {
             console.error('Error opening shift:', error);
-            alert('Error al abrir turno: ' + (error.message || 'Error desconocido'));
+            sileo.error({ title: "Error", description: 'Error al abrir turno: ' + (error.message || 'Error desconocido') });
             // If error, try to fetch to see if it was created anyway
             fetchShifts();
         }
@@ -219,9 +233,10 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
             setShowExpenseModal(false);
             setExpenseAmount(0);
             setExpenseReason('');
+            sileo.success({ title: "Gasto Registrado", description: "Salida de efectivo guardada." });
         } catch (error) {
             console.error('Error adding expense:', error);
-            alert('Error al registrar gasto');
+            sileo.error({ title: "Error", description: "No se pudo registrar el gasto." });
         }
     };
 
@@ -248,9 +263,10 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
             syncShifts();
             setShowCloseModal(false);
             setCountedCash(0);
+            sileo.success({ title: "Turno Cerrado", description: "Cierre de caja completado." });
         } catch (error) {
             console.error('Error closing shift:', error);
-            alert('Error al cerrar turno');
+            sileo.error({ title: "Error", description: "No se pudo cerrar el turno." });
         }
     };
 
@@ -288,7 +304,7 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
                                             <Clock size={12} /> Iniciado {safeDate(activeShift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
-                                    <h2 className="text-4xl font-black mt-4">{activeShift.cashier_name}</h2>
+                                    <h2 className="text-4xl font-black mt-4">{safeRender(activeShift.cashier_name, 'Cajero')}</h2>
                                     <p className="text-white/40 text-sm font-medium flex items-center gap-2">
                                         <Building2 size={14} /> Global • {metrics.orderCount} pedidos realizados
                                     </p>
@@ -392,17 +408,17 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
                         </thead>
                         <tbody className="divide-y divide-gray-50 font-medium whitespace-nowrap">
                             {shifts
-                                .filter(s => (user?.role === 'admin' || user?.role === 'gerente') ? true : s.cashier_name === user?.name) // Filtro: Cajeros solo ven sus turnos
+                                .filter(s => (user?.role === 'admin' || user?.role === 'gerente') ? true : safeRender(s.cashier_name) === safeRender(user?.name)) // Filtro: Cajeros solo ven sus turnos
                                 .map((shift) => (
                                     <tr key={shift.id} className="hover:bg-gray-50/50 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-secondary font-black text-xs group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                                                    {(shift.cashier_name || 'C').split(' ').map(n => n[0]).join('')}
+                                                    {safeRender(shift.cashier_name, 'C').split(' ').map(n => n[0]).join('')}
                                                 </div>
                                                 <div>
-                                                    <p className="font-black text-secondary text-sm">{shift.cashier_name}</p>
-                                                    <p className="text-[10px] text-gray-400 font-bold uppercase">{shift.branch_name}</p>
+                                                    <p className="font-black text-secondary text-sm">{safeRender(shift.cashier_name, 'Cajero')}</p>
+                                                    <p className="text-[10px] text-gray-400 font-bold uppercase">{safeRender(shift.branch_name, 'Sede Principal')}</p>
                                                 </div>
                                             </div>
                                         </td>

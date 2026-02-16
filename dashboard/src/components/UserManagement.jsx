@@ -25,9 +25,13 @@ const UserManagement = () => {
 
     const INITIAL_PERMISSIONS = {
         restaurante: { create: true, read: true, update: true, delete: false },
-        usuarios: { create: false, read: false, update: false, delete: false },
-        sedes: { create: false, read: true, update: false, delete: false },
+        hotel: { create: false, read: false, update: false, delete: false }, // Nuevo: Gestión Hotel
         financiero: { create: false, read: false, update: false, delete: false },
+        usuarios: { create: false, read: false, update: false, delete: false },
+        sedes: { create: false, read: false, update: false, delete: false },
+        marketing: { create: false, read: false, update: false, delete: false }, // Nuevo: Marketing AI
+        qr_tools: { create: false, read: false, update: false, delete: false }, // Nuevo: Códigos QR
+        operaciones: { create: false, read: false, update: false, delete: false }, // Nuevo: Seguridad/Logs
     };
 
     const [formUser, setFormUser] = useState({
@@ -100,7 +104,9 @@ const UserManagement = () => {
             password: '',
             role: user.role,
             branch_id: user.branch_id || branches[0]?.id,
-            permissions: user.permissions || JSON.parse(JSON.stringify(INITIAL_PERMISSIONS))
+            branch_id: user.branch_id || branches[0]?.id,
+            // Fusionar permisos existentes con los nuevos (para que aparezcan los nuevos módulos en usuarios antiguos)
+            permissions: { ...INITIAL_PERMISSIONS, ...(user.permissions || {}) }
         });
         setShowModal(true);
     };

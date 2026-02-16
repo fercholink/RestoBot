@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { sileo } from 'sileo';
 
 const FloorManager = ({ branchId, onFloorUpdated }) => {
     const [floors, setFloors] = useState([]);
@@ -113,7 +114,7 @@ const FloorManager = ({ branchId, onFloorUpdated }) => {
         } catch (error) {
             console.error('Detailed Error adding floor:', error);
             const msg = error?.message || error?.error_description || (typeof error === 'object' ? JSON.stringify(error) : String(error));
-            alert('Error al agregar piso: ' + msg);
+            sileo.error({ title: "Error al agregar piso", description: msg });
         } finally {
             setLoading(false);
         }
@@ -131,9 +132,10 @@ const FloorManager = ({ branchId, onFloorUpdated }) => {
             if (error) throw error;
             fetchFloors();
             if (onFloorUpdated) onFloorUpdated();
+            sileo.success({ title: "Piso eliminado", description: "Se ha eliminado el piso correctamente." });
         } catch (error) {
             console.error('Error deleting floor:', error);
-            alert('Error al eliminar piso: ' + error.message);
+            sileo.error({ title: "Error al eliminar piso", description: error.message });
         }
     };
 

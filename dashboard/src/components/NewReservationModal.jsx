@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, User, Calendar, CreditCard, Search, Trash2, Key } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
-const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, initialData, bookingToEdit }) => {
+const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, initialData, bookingToEdit, branchId }) => {
     if (!isOpen) return null;
 
     // Helper to get local YYYY-MM-DD

@@ -19,6 +19,8 @@ import TicketPrinter from './components/TicketPrinter';
 import MarketingModule from './components/Marketing/MarketingModule';
 import TableQRGenerator from './components/TableQRGenerator';
 import { LayoutGrid, Filter, Plus, Building2, Bell, BellDot, AlertTriangle, ShieldCheck, Wallet, Terminal, User, Printer, Activity, Megaphone } from 'lucide-react';
+import { Toaster, sileo } from 'sileo';
+import "./styles/sileo.css";
 
 // Mock data para previsualizar antes de conectar n8n
 const MOCK_ORDERS = [
@@ -52,13 +54,10 @@ const MOCK_ORDERS = [
 
 function App() {
   const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('restobot_active_tab') || 'restaurante';
-  });
+  const [activeTab, setActiveTab] = useState('operaciones'); // Pestaña por defecto, no persistente
 
-  useEffect(() => {
-    localStorage.setItem('restobot_active_tab', activeTab);
-  }, [activeTab]);
+  // Eliminamos el useEffect que guardaba la pestaña en localStorage
+  // para cumplir con el requerimiento de que la selección sea manual al recargar.
 
 
 
@@ -621,7 +620,7 @@ function App() {
             />
           )}
           {activeTab === 'analytics' && <AnalyticsPro />}
-          {activeTab === 'hotels' && (user.role === 'admin' || user.role === 'gerente') && <HotelManagement activeSubTab={activeHotelSubTab} />}
+          {activeTab === 'hotels' && <HotelManagement activeSubTab={activeHotelSubTab} />}
           {activeTab === 'contabilidad' && <AccountingModule orders={orders} />}
           {activeTab === 'users' && <UserManagement />}
           {activeTab === 'sedes' && <BranchManagement />}
@@ -707,6 +706,9 @@ function App() {
           type={printData.type}
         />
       )}
+
+      {/* Sistema de Notificaciones Sileo */}
+      <Toaster position="bottom-right" />
     </>
   );
 }

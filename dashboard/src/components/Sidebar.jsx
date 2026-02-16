@@ -6,7 +6,7 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
     const [isOpen, setIsOpen] = useState(false);
     const { user, logout } = useAuth();
 
-    const [expandedMenu, setExpandedMenu] = useState('restaurante'); // Expandir restaurante por defecto
+    const [expandedMenu, setExpandedMenu] = useState(null); // Ningún menú expandido por defecto
 
     // Solo definimos subitems para restaurante por ahora
     const restaurantSubItems = [
