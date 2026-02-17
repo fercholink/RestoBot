@@ -36,6 +36,7 @@ const RestaurantManagement = ({
     });
     const [showPaidTotal, setShowPaidTotal] = useState(false);
     const [shouldAutoOpenShift, setShouldAutoOpenShift] = useState(false);
+    const [showPaidModal, setShowPaidModal] = useState(false);
 
     React.useEffect(() => {
         const handleOpenShiftModal = () => {
@@ -105,12 +106,7 @@ const RestaurantManagement = ({
         <div className="flex-1 flex overflow-hidden bg-gray-50/50">
             {/* Sidebar Izquierdo ELIMINADO - Ahora controlado por Sidebar Principal */}
 
-            {/* Filtros Flotantes / Barra Superior (Opcional, si queremos mantener filtros) */}
-            {activeSubTab === 'board' && (
-                <div className="absolute top-4 right-4 z-20 flex gap-2">
-                    {/* Aquí podríamos poner botones de filtro compactos o un dropdown */}
-                </div>
-            )}
+
 
             {/* Contenido Principal */}
             <div className="flex-1 overflow-hidden relative">
@@ -122,19 +118,35 @@ const RestaurantManagement = ({
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -20 }}
                             transition={{ duration: 0.3 }}
-                            className="h-full p-8 overflow-x-auto"
+                            className="h-full p-4 overflow-y-auto"
                         >
-                            <div className="flex gap-6 h-full min-w-[1200px]">
-                                {['nuevo', 'fabricacion', 'despachado', 'pagado'].map((status) => (
-                                    <div key={status} className="flex-1 flex flex-col bg-gray-200/40 rounded-3xl p-4 border border-gray-300/20">
-                                        <h2 className="uppercase text-[10px] font-black tracking-[0.2em] text-secondary/60 mb-5 px-2 flex items-center gap-2">
-                                            <span className={`w-2.5 h-2.5 rounded-full ${status === 'nuevo' ? 'bg-blue-500' : status === 'fabricacion' ? 'bg-warning' : status === 'despachado' ? 'bg-purple-500' : 'bg-success'}`} />
-                                            {status}
-                                            <span className="bg-white text-secondary px-2 py-0.5 rounded-md text-[10px] font-black shadow-sm border border-gray-100/50 ml-auto">
+                            <div className="flex justify-between items-center mb-4 px-1">
+                                <div>
+                                    <h1 className="text-2xl font-black text-secondary tracking-tight">MONITOR DE PEDIDOS</h1>
+                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Gestión en tiempo real</p>
+                                </div>
+                                <button
+                                    onClick={() => setShowPaidModal(true)}
+                                    className="flex items-center gap-2 bg-white px-5 py-2.5 rounded-2xl shadow-sm border border-gray-200 text-xs font-black uppercase tracking-widest text-secondary hover:bg-gray-50 hover:shadow-md transition-all group"
+                                >
+                                    <div className="bg-success/10 p-1.5 rounded-lg group-hover:bg-success/20 transition-colors">
+                                        <DollarSign size={16} className="text-success" />
+                                    </div>
+                                    <span>Ver Pagados</span>
+                                </button>
+                            </div>
+
+                            <div className="flex gap-4 w-full items-start">
+                                {['nuevo', 'fabricacion', 'despachado'].map((status) => (
+                                    <div key={status} className={`${status === 'fabricacion' ? 'flex-[2]' : 'flex-1'} flex flex-col bg-gray-200/40 rounded-3xl p-4 border border-gray-300/20 min-w-0 h-fit transition-all duration-300`}>
+                                        <h2 className="uppercase text-xs font-black tracking-wider text-secondary/60 mb-5 px-2 flex items-center gap-2">
+                                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${status === 'nuevo' ? 'bg-blue-500' : status === 'fabricacion' ? 'bg-warning' : status === 'despachado' ? 'bg-purple-500' : 'bg-success'}`} />
+                                            <span className="truncate">{status}</span>
+                                            <span className="bg-white text-secondary px-2 py-0.5 rounded-md text-[10px] font-black shadow-sm border border-gray-100/50 ml-auto shrink-0">
                                                 {filteredOrders.filter(o => o.status === status).length}
                                             </span>
                                         </h2>
-                                        <div className="flex-1 overflow-y-auto space-y-4 custom-scrollbar pr-1">
+                                        <div className="space-y-4 pr-1">
                                             {(() => {
                                                 const ordersInStatus = filteredOrders
                                                     .filter(o => o.status === status)
@@ -148,11 +160,11 @@ const RestaurantManagement = ({
                                                     return (
                                                         <div className="flex h-full gap-2">
                                                             {/* Columna Izquierda: Mesas */}
-                                                            <div className="flex-1 flex flex-col bg-white/40 rounded-xl p-2 min-w-[200px]">
+                                                            <div className="flex-1 flex flex-col bg-white/40 rounded-xl p-2 min-w-[200px] h-fit">
                                                                 <div className="flex items-center gap-1 mb-2 text-[9px] font-black text-secondary/70 uppercase tracking-wider pb-1 border-b border-secondary/10">
                                                                     <Utensils size={10} /> Mesas
                                                                 </div>
-                                                                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                                                <div className="space-y-2">
                                                                     {mesaOrders.map(order => (
                                                                         <OrderCard
                                                                             key={order.id}
@@ -171,11 +183,11 @@ const RestaurantManagement = ({
                                                             <div className="w-px bg-secondary/10 my-2"></div>
 
                                                             {/* Columna Derecha: Domicilios */}
-                                                            <div className="flex-1 flex flex-col bg-white/40 rounded-xl p-2 min-w-[200px]">
+                                                            <div className="flex-1 flex flex-col bg-white/40 rounded-xl p-2 min-w-[200px] h-fit">
                                                                 <div className="flex items-center gap-1 mb-2 text-[9px] font-black text-secondary/70 uppercase tracking-wider pb-1 border-b border-secondary/10">
                                                                     <Truck size={10} /> Domicilios
                                                                 </div>
-                                                                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                                                <div className="space-y-2">
                                                                     {domicilioOrders.map(order => (
                                                                         <OrderCard
                                                                             key={order.id}
@@ -229,6 +241,68 @@ const RestaurantManagement = ({
                                     </div>
                                 ))}
                             </div>
+
+                            {/* Modal de Pedidos Pagados */}
+                            <AnimatePresence>
+                                {showPaidModal && (
+                                    <div className="fixed inset-0 bg-secondary/80 backdrop-blur-sm z-50 flex items-center justify-center p-8 animate-in fade-in duration-200">
+                                        <div className="absolute inset-0" onClick={() => setShowPaidModal(false)} />
+                                        <motion.div
+                                            initial={{ opacity: 0, scale: 0.95 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            className="bg-white rounded-3xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden shadow-2xl relative z-10"
+                                        >
+                                            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                                                <h2 className="text-xl font-black text-secondary flex items-center gap-3">
+                                                    <span className="bg-success w-3 h-3 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)]"></span>
+                                                    HISTORIAL DE PEDIDOS PAGADOS
+                                                </h2>
+                                                <button
+                                                    onClick={() => setShowPaidModal(false)}
+                                                    className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                                                >
+                                                    <X size={24} className="text-gray-400" />
+                                                </button>
+                                            </div>
+
+                                            <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50 custom-scrollbar">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                                    {filteredOrders.filter(o => o.status === 'pagado').length === 0 ? (
+                                                        <div className="col-span-full py-20 text-center text-gray-400 font-bold uppercase tracking-widest">
+                                                            No hay pedidos pagados hoy
+                                                        </div>
+                                                    ) : (
+                                                        filteredOrders
+                                                            .filter(o => o.status === 'pagado')
+                                                            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+                                                            .map(order => (
+                                                                <OrderCard
+                                                                    key={order.id}
+                                                                    order={order}
+                                                                    onStatusChange={onStatusChange}
+                                                                    onEdit={onEdit}
+                                                                    onDelete={onDelete}
+                                                                    onPrint={onPrint}
+                                                                    isMinimal={true}
+                                                                />
+                                                            ))
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="p-4 bg-white border-t border-gray-100 flex justify-between items-center">
+                                                <div className="text-xs font-black uppercase text-gray-400 tracking-widest">
+                                                    Total Recaudado:
+                                                </div>
+                                                <div className="text-xl font-black text-success">
+                                                    ${filteredOrders.filter(o => o.status === 'pagado').reduce((sum, o) => sum + (o.total || o.total_price || 0), 0).toLocaleString()}
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    </div>
+                                )}
+                            </AnimatePresence>
                         </motion.div>
                     )}
 
