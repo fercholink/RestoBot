@@ -730,8 +730,6 @@ function App() {
           onClose={() => setPaymentModal({ ...paymentModal, isOpen: false })}
           onConfirm={(id, method, ref, tax) => {
             handlePaymentConfirm(id, method, ref, tax);
-            const order = orders.find(o => o.id === id);
-            if (order) handlePrint({ ...order, payment_method: method, tax_data: tax }, 'recibo');
           }}
         />
 

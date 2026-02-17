@@ -151,12 +151,13 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                         <div className="flex justify-between"><span>FECHA:</span> <span>{new Date(order.created_at).toLocaleDateString()}</span></div>
                         <div className="flex justify-between"><span>HORA:</span> <span>{new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
                         <div className="flex justify-between"><span>TIPO:</span> <span className="uppercase font-bold">{
-                            (type === 'factura_hotel' || type === 'recibo_copia' || order.prefix === 'HTL') ? 'HOSPEDAJE' :
-                                (order.table_id ? `Mesa: ${order.table_id}` : 'Domicilio')
+                            (type === 'factura_hotel' || type === 'recibo_copia' || order.prefix === 'HTL' || order.type === 'habitacion' || (order.table_number && order.table_number.toString().startsWith('HAB'))) ? 'HOSPEDAJE' :
+                                ((order.type === 'domicilio' || order.table_number === 'DOMICILIO') ? 'DOMICILIO' : `MESA ${order.table_number || order.table_id || 'N/A'}`)
                         }</span></div>
                     </div>
 
                     {/* Datos de Entrega (Domicilio) */}
+                    {/* Datos de Entrega (Domicilio) - BLOQUE CONSOLIDADO */}
                     {/* Datos de Entrega (Domicilio) - BLOQUE CONSOLIDADO */}
                     {(order.type === 'domicilio' || order.table_number === 'DOMICILIO') && (
                         <div className="border-t border-dashed border-black mt-2 pt-2 pb-2">
