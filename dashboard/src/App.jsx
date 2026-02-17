@@ -619,6 +619,10 @@ function App() {
                   </span>
                 </p>
               </div>
+
+              {/* Dynamic Header Actions Portal Target */}
+              <div id="header-actions-portal" className="flex items-center gap-2 ml-auto mr-4"></div>
+
               {/* Indicador de Estado de Caja */}
               <div className={`ml-auto md:ml-4 px-3 py-1.5 rounded-xl flex items-center gap-2 border shadow-sm transition-all ${hasActiveShift ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-rose-50 border-rose-100 text-rose-500'}`}>
                 <div className={`w-2 h-2 rounded-full ${hasActiveShift ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />

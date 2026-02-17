@@ -13,7 +13,16 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
 
         if (!hasPrinted.current) {
             hasPrinted.current = true;
-            window.print();
+            // Delay print to ensure DOM is ready and prevent 'callback no longer runnable' error
+            setTimeout(() => {
+                try {
+                    window.print();
+                } catch (error) {
+                    console.error("Error executing print:", error);
+                    // Fallback: If print fails, ensure we close the print view logic
+                    if (onAfterPrint) onAfterPrint();
+                }
+            }, 500);
         }
 
         return () => {

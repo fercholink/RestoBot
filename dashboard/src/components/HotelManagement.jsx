@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Printer, Bed, Calendar, Key, Users, History, Settings, Bell, Star, MapPin, Search, Plus, Loader, Trash2, Edit, Tv, Wifi, Wind, ChevronLeft, ChevronRight, Building, Check, Hash, LayoutList, Columns } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import NewReservationModal from './NewReservationModal';
@@ -288,7 +289,11 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
         // Pero para efectos de "ocupación nocturna", cuenta hasta el día anterior.
         // Sin embargo, si queremos ver quién está hoy, incluimos el día de checkout como "ocupado" hasta que salgan.
 
-        const selectedDateStr = currentDate.toISOString().split('T')[0];
+        // Fix: Use local date string to avoid UTC shift issues
+        const year = currentDate.getFullYear();
+        const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+        const day = String(currentDate.getDate()).padStart(2, '0');
+        const selectedDateStr = `${year}-${month}-${day}`;
 
         const activeBooking = bookings.find(b => {
             // 1. Check Room ID (loose equality for string/number mismatch)
@@ -692,101 +697,86 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
     }
 
     return (
-        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-gray-50/50">
-            {/* --- HEADER: SUCURSALES Y CONTROLES --- */}
-            <div className="flex justify-between items-start mb-8">
-                <div>
-                    <h2 className="text-2xl font-black text-secondary tracking-tight mb-2">Administración de Hotel</h2>
-
+        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar bg-gray-50/50">
+            {/* --- PORTAL CONTROLES AL HEADER --- */}
+            {document.getElementById('header-actions-portal') && createPortal(
+                <div className="flex items-center gap-3 animate-in fade-in zoom-in duration-300">
                     {/* Branch Selector */}
-                    <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                    <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
                         {branches.map(branch => (
                             <button
                                 key={branch.id}
                                 onClick={() => setSelectedBranchId(branch.id)}
-                                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 border ${selectedBranchId === branch.id
-                                    ? 'bg-secondary text-white border-secondary shadow-lg shadow-secondary/30'
-                                    : 'bg-white text-gray-400 border-gray-200 hover:border-secondary/30 hover:text-secondary'
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 ${selectedBranchId === branch.id
+                                    ? 'bg-secondary text-white shadow-sm'
+                                    : 'text-gray-400 hover:text-secondary hover:bg-gray-50'
                                     }`}
                             >
-                                <Building size={14} />
+                                <Building size={12} />
                                 {branch.name}
                             </button>
                         ))}
-                        <button
-                            className="w-8 h-8 rounded-xl border border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:text-primary hover:border-primary transition-colors"
-                            title="Añadir Nueva Sede"
-                            onClick={() => alert("Función para crear nueva sede (Próximamente)")}
-                        >
-                            <Plus size={14} />
-                        </button>
                     </div>
 
                     {/* Date Picker */}
-                    <div className="mt-4 flex items-center gap-2">
-                        <span className="text-xs font-bold text-gray-400 uppercase tracking-widest hidden md:inline">Fecha:</span>
+                    <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
                         <div className="relative">
                             <input
                                 type="date"
-                                className="pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-sm font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer shadow-sm hover:border-gray-300 transition-all"
-                                value={currentDate.toISOString().split('T')[0]} // YYYY-MM-DD
+                                className="pl-7 pr-2 py-1 bg-transparent text-[10px] font-bold text-secondary focus:outline-none w-[90px] cursor-pointer"
+                                value={currentDate.toISOString().split('T')[0]}
                                 onChange={(e) => {
-                                    // Set local date correctly from input string
                                     const parts = e.target.value.split('-');
                                     if (parts.length === 3) {
-                                        // new Date(y, m-1, d) ensures local time midnight
                                         const newDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
                                         setCurrentDate(newDate);
                                     }
                                 }}
                             />
-                            <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                            <Calendar size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                         </div>
+                        <div className="w-px h-4 bg-gray-200"></div>
                         <button
                             onClick={() => setCurrentDate(new Date())}
-                            className="bg-gray-100 p-2 rounded-xl text-xs font-bold text-gray-400 hover:text-primary hover:bg-primary/10 transition-all"
-                            title="Ir a Hoy"
+                            className="px-2 py-1 rounded-md text-[9px] font-bold text-gray-400 hover:text-primary hover:bg-primary/10 transition-colors"
                         >
                             HOY
                         </button>
-
-                        <div className="h-8 w-px bg-gray-200 mx-2"></div>
-
-                        <div className="flex bg-gray-100 p-1 rounded-xl">
-                            <button
-                                onClick={() => setFloorLayout('vertical')}
-                                className={`p-1.5 rounded-lg transition-all ${floorLayout === 'vertical' ? 'bg-white text-secondary shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                                title="Vista Vertical"
-                            >
-                                <LayoutList size={16} />
-                            </button>
-                            <button
-                                onClick={() => setFloorLayout('horizontal')}
-                                className={`p-1.5 rounded-lg transition-all ${floorLayout === 'horizontal' ? 'bg-white text-secondary shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                                title="Vista Horizontal"
-                            >
-                                <Columns size={16} />
-                            </button>
-                        </div>
                     </div>
-                </div>
 
-                <div className="flex gap-3">
-                    {/* Action Buttons */}
+                    {/* Layout Toggles */}
+                    <div className="flex bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
+                        <button
+                            onClick={() => setFloorLayout('vertical')}
+                            className={`p-1.5 rounded-lg transition-all ${floorLayout === 'vertical' ? 'bg-secondary text-white shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                            title="Vista Vertical"
+                        >
+                            <LayoutList size={14} />
+                        </button>
+                        <button
+                            onClick={() => setFloorLayout('horizontal')}
+                            className={`p-1.5 rounded-lg transition-all ${floorLayout === 'horizontal' ? 'bg-secondary text-white shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                            title="Vista Horizontal"
+                        >
+                            <Columns size={14} />
+                        </button>
+                    </div>
+
+                    {/* New Room Button */}
                     <button
                         onClick={() => { setEditingRoom(null); setIsRoomModalOpen(true); }}
-                        className="bg-primary text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-primary/90 transition-all flex items-center gap-2 shadow-lg shadow-primary/30"
+                        className="bg-primary text-white p-2 rounded-xl hover:bg-primary/90 transition-all shadow-sm flex items-center justify-center"
+                        title="Nueva Habitación"
                     >
-                        <Plus size={14} /> Habitación
+                        <Plus size={16} />
                     </button>
-                    {/* Floor Manager moved to Sidebar */}
-                </div>
-            </div>
+                </div>,
+                document.getElementById('header-actions-portal')
+            )}
 
             {/* --- CONTENIDO PRINCIPAL --- */}
-
             {activeSubTab === 'habitaciones' ? (
-                <div className={`transition-all duration-300 ${floorLayout === 'horizontal' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start' : 'space-y-6'}`}>
+                <div className={`transition-all duration-300 ${floorLayout === 'horizontal' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 items-start' : 'space-y-4'}`}>
                     {branches.length === 0 && !loading ? (
                         <div className="text-center py-20 bg-white rounded-3xl border border-red-100 border-dashed w-full col-span-full">
                             <AlertCircle className="mx-auto text-red-300 mb-4" size={48} />
@@ -833,114 +823,131 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                                 </div>
 
                                 {expandedFloors[group.id] && (
-                                    <div className={`p-4 grid gap-3 animate-in fade-in slide-in-from-top-4 duration-300 ${floorLayout === 'horizontal'
-                                        ? 'grid-cols-2 xl:grid-cols-3'
-                                        : 'grid-cols-2 mobile:grid-cols-3 tablet:grid-cols-4 laptop:grid-cols-5 desktop:grid-cols-6'
+                                    <div className={`p-2 grid gap-2 animate-in fade-in slide-in-from-top-4 duration-300 ${floorLayout === 'horizontal'
+                                        ? 'grid-cols-2' // Force 2 columns to make them smaller
+                                        : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
                                         }`}>
                                         {group.rooms.length === 0 && <p className="text-gray-400 text-xs italic col-span-full text-center">No hay habitaciones en este piso.</p>}
 
                                         {group.rooms.map(room => {
                                             const { status, booking } = getRoomCurrentStatus(room);
                                             return (
-                                                <div key={room.id} className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all relative group h-full flex flex-col justify-between">
-                                                    <div>
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <div className={`p-1.5 rounded-xl ${status === 'ocupada' ? 'bg-primary text-white' :
-                                                                status === 'reservada' ? 'bg-orange-500 text-white' :
-                                                                    status === 'limpieza' ? 'bg-yellow-400 text-white' :
-                                                                        'bg-success/10 text-success'
-                                                                }`}>
-                                                                {status === 'limpieza' ? <Wind size={14} className="animate-pulse" /> : <Key size={14} />}
-                                                            </div>
-                                                            <div className="text-right">
-                                                                <button
-                                                                    onClick={(e) => { e.stopPropagation(); setEditingRoom(room); setIsRoomModalOpen(true); }}
-                                                                    className="absolute top-2 right-2 text-gray-300 hover:text-primary transition-colors opacity-0 group-hover:opacity-100"
-                                                                    title="Editar"
-                                                                >
-                                                                    <Edit size={12} />
-                                                                </button>
-                                                                <span className="block text-lg font-black text-secondary">#{room.number}</span>
-                                                            </div>
-                                                        </div>
+                                                <div key={room.id} className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all relative group flex flex-col justify-between overflow-hidden">
 
-                                                        <div className="mb-2">
-                                                            {status === 'limpieza' && (
-                                                                <div className="flex flex-col items-center justify-center h-full">
-                                                                    <div className="bg-yellow-100 p-2 rounded-full mb-1 animate-pulse">
-                                                                        <Hash size={16} className="text-yellow-500" />
-                                                                    </div>
-                                                                    <span className="text-[10px] font-black uppercase text-yellow-600">Limpieza</span>
-                                                                    {room.features?.cleaning_start && (
-                                                                        <div className="mt-1">
-                                                                            <CleaningTimer startTime={room.features.cleaning_start} />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                            <span className="block text-center text-[9px] text-gray-400 font-bold uppercase mt-1 truncate">{room.type}</span>
+                                                    {/* Header Card: Status & Edit */}
+                                                    <div className={`p-1.5 flex justify-between items-start ${status === 'ocupada' ? 'bg-primary/5' : status === 'reservada' ? 'bg-orange-50' : status === 'limpieza' ? 'bg-yellow-50' : 'bg-gray-50/50'}`}>
+                                                        <div className={`p-1 rounded-lg shadow-sm ${status === 'ocupada' ? 'bg-primary text-white' :
+                                                            status === 'reservada' ? 'bg-orange-500 text-white' :
+                                                                status === 'limpieza' ? 'bg-yellow-400 text-white' :
+                                                                    'bg-emerald-500 text-white'
+                                                            }`}>
+                                                            {status === 'limpieza' ? <Wind size={12} className="animate-spin-slow" /> :
+                                                                status === 'ocupada' ? <Users size={12} /> :
+                                                                    status === 'reservada' ? <Calendar size={12} /> :
+                                                                        <Key size={12} />}
                                                         </div>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setEditingRoom(room); setIsRoomModalOpen(true); }}
+                                                            className="p-1 bg-white text-gray-400 hover:text-primary hover:bg-primary/10 rounded-md transition-colors border border-gray-100 shadow-sm"
+                                                            title="Editar Habitación"
+                                                        >
+                                                            <Edit size={10} />
+                                                        </button>
                                                     </div>
 
-                                                    {/* Actions */}
-                                                    <div className="pt-2 border-t border-gray-100 grid grid-cols-1 gap-1">
+                                                    {/* Body: Info */}
+                                                    <div className="px-2 py-1 text-center">
+                                                        <h4 className="text-sm font-black text-secondary tracking-tight">#{room.number}</h4>
+                                                        <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-1 truncate">{room.type}</p>
+
+                                                        {/* Amenities Row */}
+                                                        <div className="flex justify-center gap-1 mb-1 flex-wrap min-h-[16px]">
+                                                            {room.features?.ac && <Wind size={10} className="text-blue-400" title="Aire Acondicionado" />}
+                                                            {room.features?.tv && <Tv size={10} className="text-gray-600" title="TV" />}
+                                                            {room.features?.wifi && <Wifi size={10} className="text-indigo-500" title="WiFi" />}
+                                                            <div className="flex items-center gap-0.5 text-gray-400" title="Camas">
+                                                                <Bed size={10} />
+                                                                <span className="text-[8px] font-bold">{room.features?.beds || 1}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Cleaning Timer */}
+                                                        {status === 'limpieza' && (
+                                                            <div className="bg-yellow-100/50 p-1 rounded-lg mb-1 flex flex-col items-center">
+                                                                {room.features?.cleaning_start && <CleaningTimer startTime={room.features.cleaning_start} />}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Guest Name if Occupied/Reserved */}
+                                                        {(status === 'ocupada' || status === 'reservada') && (
+                                                            <div className="bg-white border border-gray-100 p-1 rounded-lg mb-1 shadow-sm">
+                                                                <p className="text-[9px] font-bold text-secondary truncate max-w-[80px] mx-auto">
+                                                                    {booking?.guest?.full_name || 'Huésped'}
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+
+                                                    {/* Footer: Actions */}
+                                                    <div className="p-1.5 bg-gray-50/50 border-t border-gray-100 flex flex-col gap-1">
                                                         {status === 'disponible' ? (
-                                                            <>
+                                                            <div className="grid grid-cols-2 gap-1">
                                                                 <button
-                                                                    className="w-full bg-primary/10 text-primary py-1.5 rounded-lg text-[9px] font-black uppercase hover:bg-primary/20 transition-colors"
                                                                     onClick={() => {
-                                                                        setPreSelectedBooking({ roomId: room.id, checkIn: new Date().toISOString().split('T')[0], status: 'ocupada' }); // Direct Check-in intent
+                                                                        setPreSelectedBooking({ roomId: room.id, checkIn: new Date().toISOString().split('T')[0], status: 'ocupada' });
                                                                         setIsNewReservationModalOpen(true);
                                                                     }}
+                                                                    className="bg-secondary text-white py-1 rounded text-[8px] font-black uppercase hover:bg-secondary/90 shadow-sm"
+                                                                    title="Check-In Rápido"
                                                                 >
-                                                                    Check-In
+                                                                    IN
                                                                 </button>
                                                                 <button
-                                                                    className="w-full bg-secondary text-white py-1.5 rounded-lg text-[9px] font-black uppercase hover:bg-secondary/90 transition-colors"
                                                                     onClick={() => {
                                                                         setPreSelectedBooking({ roomId: room.id, checkIn: new Date().toISOString().split('T')[0] });
                                                                         setIsNewReservationModalOpen(true);
                                                                     }}
+                                                                    className="bg-white text-secondary border border-gray-200 py-1 rounded text-[8px] font-black uppercase hover:bg-gray-50 shadow-sm"
+                                                                    title="Reservar"
                                                                 >
-                                                                    Reservar
+                                                                    RES
                                                                 </button>
-                                                            </>
+                                                            </div>
                                                         ) : status === 'limpieza' ? (
                                                             <button
-                                                                className="w-full bg-yellow-400 text-white py-1.5 rounded-lg text-[9px] font-black uppercase hover:bg-yellow-500 transition-colors shadow-sm"
                                                                 onClick={() => handleFinishCleaning(room)}
+                                                                className="w-full bg-yellow-400 text-white py-1 rounded text-[8px] font-black uppercase hover:bg-yellow-500 shadow-sm flex items-center justify-center gap-1"
                                                             >
-                                                                Listo
+                                                                <Check size={10} /> OK
                                                             </button>
                                                         ) : (
-                                                            <>
+                                                            <div className="grid grid-cols-2 gap-1">
                                                                 <button
-                                                                    className="w-full bg-gray-100 text-gray-500 py-1.5 rounded-lg text-[9px] font-black uppercase hover:bg-gray-200 transition-colors flex items-center justify-center gap-1 truncate"
                                                                     onClick={() => setSelectedBooking(booking)}
+                                                                    className="bg-white text-secondary border border-gray-200 py-1 rounded text-[8px] font-black uppercase hover:bg-gray-50 shadow-sm flex justify-center items-center"
+                                                                    title="Ver Detalles"
                                                                 >
-                                                                    <Users size={10} />
-                                                                    <span className="truncate">{booking?.guest?.first_name || 'Huésped'}</span>
+                                                                    <Search size={10} />
                                                                 </button>
-                                                                {status === 'ocupada' && (
+                                                                {status === 'ocupada' ? (
                                                                     <button
-                                                                        className="w-full mt-1 bg-red-50 text-red-500 py-1.5 rounded-lg text-[9px] font-black uppercase hover:bg-red-100 transition-colors flex items-center justify-center gap-1"
                                                                         onClick={() => setSelectedBooking(booking)}
+                                                                        className="bg-red-50 text-red-500 border border-red-100 py-1 rounded text-[8px] font-black uppercase hover:bg-red-100"
+                                                                        title="Check-Out"
                                                                     >
-                                                                        Check-Out
+                                                                        OUT
                                                                     </button>
-                                                                )}
-                                                                {status === 'reservada' && (
+                                                                ) : (
                                                                     <button
-                                                                        className="w-full mt-1 bg-blue-50 text-blue-600 py-1.5 rounded-lg text-[9px] font-black uppercase hover:bg-blue-100 transition-colors flex items-center justify-center gap-1"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleCheckIn(booking);
-                                                                        }}
+                                                                        onClick={() => handleCheckIn(booking)}
+                                                                        className="bg-blue-50 text-blue-600 border border-blue-100 py-1 rounded text-[8px] font-black uppercase hover:bg-blue-100"
+                                                                        title="Check-In"
                                                                     >
-                                                                        Check-In
+                                                                        IN
                                                                     </button>
                                                                 )}
-                                                            </>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </div>
