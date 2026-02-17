@@ -15,7 +15,7 @@ export const AuthProvider = ({ children }) => {
             // Try to fetch profile from 'profiles' table (created via migration)
             const { data, error } = await supabase
                 .from('profiles')
-                .select('*, branch:branches(*)')
+                .select('*')
                 .eq('id', sessionUser.id)
                 .single();
 
@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }) => {
             ...sessionUser,
             ...metadata, // Base metadata
             ...profileData, // DB Profile overrides (role, branch_id, permissions)
-            branch: profileData.branch || { name: metadata.branch || 'Sede Principal' }, // Ensure branch object exists
+            branch: { name: 'Sede Principal', id: profileData.branch_id || metadata.branch_id }, // Fallback simplified
             name: profileData.full_name || metadata.name || sessionUser.email?.split('@')[0] || 'Usuario'
         };
     };

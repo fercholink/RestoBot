@@ -53,14 +53,22 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
         { id: 'qr_tools', label: 'Códigos QR', icon: QrCode, roles: ['admin', 'gerente'] },
         { id: 'operaciones', label: 'Seguridad / Logs', icon: ShieldAlert, roles: ['gerente'] },
     ].filter(item => {
-        // 1. Filtrar por rol (Legacy check)
-        const hasRole = item.roles.includes(user?.role || 'cajero');
-        // 2. Filtrar por permiso explícito si tiene módulo asociado
+        // 0. Super Admin siempre ve todo
+        if (user?.role === 'admin' || user?.role === 'gerente') return true;
+
+        // 1. Si no hay permisos definidos, usamos validación legacy por roles
+        // Esto aplica para usuarios antiguos o si la carga de perfil falló parcialmente
+        if (!user?.permissions) {
+            return item.roles.includes(user?.role || 'cajero');
+        }
+
+        // 2. Si hay permisos explícitos (Modelo SaaS)
         if (item.module) {
             return hasPermission(item.module);
         }
-        // Si no tiene módulo (ej. Marketing), fallback al rol
-        return hasRole;
+
+        // 3. Módulos sin 'module' key (como Marketing/QR por ahora), fallback a rol
+        return item.roles.includes(user?.role || 'cajero');
     });
 
     const toggleSubmenu = (menuId) => {

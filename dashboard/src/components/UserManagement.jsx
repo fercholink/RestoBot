@@ -15,9 +15,12 @@ const UserManagement = () => {
     const { user } = useAuth();
     const [users, setUsers] = useState([]);
     const [branches, setBranches] = useState([]);
+    const [rolesList, setRolesList] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const [searchTerm, setSearchTerm] = useState('');
+    const [filterRole, setFilterRole] = useState('all');
+    const [filterBranch, setFilterBranch] = useState('all');
     const [showModal, setShowModal] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [showPassModal, setShowPassModal] = useState(false);
@@ -40,7 +43,8 @@ const UserManagement = () => {
         password: '', // Nota: No se guardará en profiles, solo para creación Auth futura
         role: 'cajero',
         branch_id: '',
-        permissions: INITIAL_PERMISSIONS
+        permissions: INITIAL_PERMISSIONS,
+        organization_id: user.organization_id // Nuevo: Heredar organización del admin
     });
 
     const [isPassUpdated, setIsPassUpdated] = useState(false);
@@ -52,13 +56,15 @@ const UserManagement = () => {
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [profilesRes, branchesRes] = await Promise.all([
+            const [profilesRes, branchesRes, rolesRes] = await Promise.all([
                 supabase.from('profiles').select('*, branch:branches(name)'),
-                supabase.from('branches').select('id, name')
+                supabase.from('branches').select('id, name').order('name'),
+                supabase.from('roles').select('*').order('name')
             ]);
 
             setUsers(profilesRes.data || []);
             setBranches(branchesRes.data || []);
+            setRolesList(rolesRes.data || []);
         } catch (error) {
             console.error("Error cargando datos:", error);
         } finally {
@@ -111,6 +117,40 @@ const UserManagement = () => {
         setShowModal(true);
     };
 
+    const handleRoleChange = (e) => {
+        const selectedRoleName = e.target.value;
+        const roleObj = rolesList.find(r => r.name === selectedRoleName);
+
+        let newPermissions = { ...INITIAL_PERMISSIONS };
+        if (roleObj && roleObj.permissions) {
+            // Merge or replace based on logic. For now, replace entire structure if format matches, or merge deeply.
+            // Simplified: If role has "all": true, enable everything.
+            if (roleObj.permissions.all) {
+                Object.keys(newPermissions).forEach(k => {
+                    newPermissions[k] = { create: true, read: true, update: true, delete: true };
+                });
+            } else {
+                // Apply specific overrides
+                Object.keys(roleObj.permissions).forEach(k => {
+                    if (newPermissions[k]) {
+                        // If boolean true, enable fully
+                        if (roleObj.permissions[k] === true) {
+                            newPermissions[k] = { create: true, read: true, update: true, delete: true };
+                        } else if (typeof roleObj.permissions[k] === 'object') {
+                            newPermissions[k] = { ...newPermissions[k], ...roleObj.permissions[k] };
+                        }
+                    }
+                });
+            }
+        }
+
+        setFormUser(prev => ({
+            ...prev,
+            role: selectedRoleName,
+            permissions: newPermissions
+        }));
+    };
+
     const handlePermissionChange = (module, action) => {
         setFormUser(prev => ({
             ...prev,
@@ -133,6 +173,7 @@ const UserManagement = () => {
                 branch_id: formUser.branch_id,
                 permissions: formUser.permissions,
                 active: true,
+                organization_id: user.organization_id // Nuevo: Asegurar que el usuario pertenece a la misma organización
                 // Si tuviéramos email en perfil, lo guardamos
                 // email: formUser.email 
             };
@@ -191,32 +232,78 @@ const UserManagement = () => {
         setShowPassModal(false);
     };
 
-    const filteredUsers = users.filter(u =>
-        (u.full_name || u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (u.email || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredUsers = users.filter(u => {
+        const matchesSearch = (u.full_name || u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (u.email || '').toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesRole = filterRole === 'all' || u.role === filterRole;
+        const matchesBranch = filterBranch === 'all' || (u.branch_id === filterBranch) || (!u.branch_id && filterBranch === 'global');
+
+        return matchesSearch && matchesRole && matchesBranch;
+    });
+
+    const sendInvite = (user) => {
+        const subject = "Bienvenido a RestoBot - Tus Credenciales";
+        const body = `Hola ${user.full_name},\n\nTe hemos creado una cuenta en RestoBot.\n\nUsuario: ${user.email}\nContraseña Temporal: (Solicita al administrador)\n\nIngresa aquí: ${window.location.origin}`;
+        window.open(`mailto:${user.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+    };
+
+    const toggleUserStatus = async (user) => {
+        if (!confirm(`¿${user.active ? 'Desactivar' : 'Activar'} acceso para ${user.full_name}?`)) return;
+        try {
+            const { error } = await supabase.from('profiles').update({ active: !user.active }).eq('id', user.id);
+            if (error) throw error;
+            fetchData();
+        } catch (e) {
+            alert("Error actualizando estado: " + e.message);
+        }
+    };
 
     return (
         <div className="space-y-6 pb-20 animate-in fade-in duration-500">
-            {/* Header Control */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div className="relative w-full md:w-96">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                    <input
-                        type="text"
-                        placeholder="Buscar por nombre o correo..."
-                        className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm font-medium"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+            {/* Header Control & Filters */}
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="relative w-full md:w-96">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Buscar por nombre, correo o cargo..."
+                            className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm font-medium"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex gap-2 w-full md:w-auto">
+                        <select
+                            className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            value={filterRole}
+                            onChange={(e) => setFilterRole(e.target.value)}
+                        >
+                            <option value="all">Todos los Roles</option>
+                            <option value="admin">Administradores</option>
+                            <option value="gerente">Gerentes</option>
+                            <option value="cajero">Cajeros</option>
+                            <option value="mesero">Meseros</option>
+                            <option value="cocina">Cocina</option>
+                        </select>
+                        <select
+                            className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            value={filterBranch}
+                            onChange={(e) => setFilterBranch(e.target.value)}
+                        >
+                            <option value="all">Todas las Sedes</option>
+                            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                    </div>
+                    <button
+                        onClick={handleOpenCreate}
+                        className="flex items-center gap-2 bg-secondary text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-premium hover:brightness-110 active:scale-95 transition-all w-full md:w-auto justify-center"
+                    >
+                        <UserPlus size={18} />
+                        <span className="hidden md:inline">Nuevo Personal</span>
+                        <span className="md:hidden">Crear</span>
+                    </button>
                 </div>
-                <button
-                    onClick={handleOpenCreate}
-                    className="flex items-center gap-2 bg-secondary text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-premium hover:brightness-110 active:scale-95 transition-all w-full md:w-auto justify-center"
-                >
-                    <UserPlus size={18} />
-                    Registrar Personal
-                </button>
             </div>
 
             {/* User Cards / List */}
@@ -225,61 +312,85 @@ const UserManagement = () => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-gray-50/50 border-b border-gray-100">
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Perfil de Usuario</th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Nivel de Acceso</th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Sede Asignada</th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 text-right">Acciones</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-wider text-gray-400">Usuario</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-wider text-gray-400">Rol & Acceso</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-wider text-gray-400">Sede</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-wider text-gray-400 text-center">Estado</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-wider text-gray-400 text-right">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
                             {filteredUsers.map((user) => (
                                 <tr key={user.id} className="hover:bg-gray-50/30 transition-colors group">
-                                    <td className="px-8 py-5">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-2xl bg-secondary text-white flex items-center justify-center font-black text-lg shadow-sm">
-                                                {(user.full_name || user.name || '?').charAt(0)}
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-sm shadow-sm ${user.active ? 'bg-secondary' : 'bg-gray-300'}`}>
+                                                {(user.full_name || user.name || '?').charAt(0).toUpperCase()}
                                             </div>
                                             <div>
-                                                <p className="font-black text-secondary text-sm tracking-tight">{user.full_name || user.name}</p>
-                                                <p className="text-[11px] text-gray-400 font-medium">{user.email || 'Sin email'}</p>
+                                                <p className={`font-bold text-sm ${user.active ? 'text-secondary' : 'text-gray-400'}`}>{user.full_name || user.name}</p>
+                                                <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                                                    <Mail size={10} />
+                                                    {user.email || 'Sin email'}
+                                                </p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-8 py-5">
-                                        <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg border ${user.role === 'gerente' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+                                    <td className="px-6 py-4">
+                                        <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-md border inline-flex items-center gap-1 ${user.role === 'gerente' ? 'bg-purple-50 text-purple-600 border-purple-100' :
                                             user.role === 'admin' ? 'bg-blue-50 text-blue-600 border-blue-100' :
                                                 'bg-orange-50 text-orange-600 border-orange-100'
                                             }`}>
-                                            <Shield size={10} className="inline mr-1 mb-0.5" />
+                                            <Shield size={10} />
                                             {user.role}
                                         </span>
                                     </td>
-                                    <td className="px-8 py-5 text-gray-500 font-bold text-sm">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-600">
+                                            <Building2 size={12} className="text-gray-400" />
                                             {user.branch?.name || 'Globál / Sin Asignar'}
                                         </div>
                                     </td>
-                                    <td className="px-8 py-5 text-right">
-                                        <div className="flex items-center justify-end gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                                    <td className="px-6 py-4 text-center">
+                                        <button
+                                            onClick={() => toggleUserStatus(user)}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 ${user.active ? 'bg-emerald-500' : 'bg-gray-200'}`}
+                                        >
+                                            <span className="sr-only">Activar usuario</span>
+                                            <span
+                                                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${user.active ? 'translate-x-5' : 'translate-x-1'}`}
+                                            />
+                                        </button>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex items-center justify-end gap-1">
+                                            <button
+                                                onClick={() => sendInvite(user)}
+                                                className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                                title="Enviar Credenciales por Correo"
+                                            >
+                                                <Mail size={14} />
+                                            </button>
                                             <button
                                                 onClick={() => { setSelectedUserForPass(user); setShowPassModal(true); setIsPassUpdated(false); }}
-                                                className="p-2.5 text-gray-400 hover:text-warning hover:bg-warning/10 rounded-xl transition-all"
+                                                className="p-2 text-gray-400 hover:text-warning hover:bg-warning/10 rounded-lg transition-all"
                                                 title="Cambiar Contraseña"
                                             >
-                                                <Key size={16} />
+                                                <Key size={14} />
                                             </button>
                                             <button
                                                 onClick={() => handleOpenEdit(user)}
-                                                className="p-2.5 text-gray-400 hover:text-primary hover:bg-primary/10 rounded-xl transition-all"
+                                                className="p-2 text-gray-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                                                title="Editar"
                                             >
-                                                <Edit2 size={16} />
+                                                <Edit2 size={14} />
                                             </button>
                                             <button
                                                 onClick={() => handleDeleteUser(user.id)}
-                                                className="p-2.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                title="Eliminar"
                                             >
-                                                <Trash2 size={16} />
+                                                <Trash2 size={14} />
                                             </button>
                                         </div>
                                     </td>
@@ -356,12 +467,20 @@ const UserManagement = () => {
                                     <select
                                         className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-xs font-black appearance-none"
                                         value={formUser.role}
-                                        onChange={(e) => setFormUser({ ...formUser, role: e.target.value })}
+                                        onChange={handleRoleChange}
                                     >
-                                        <option value="cajero">Cajero</option>
-                                        <option value="mesero">Mesero</option>
-                                        <option value="admin">Administrador</option>
-                                        <option value="gerente">Gerente General</option>
+                                        <option value="">Seleccionar Rol...</option>
+                                        {rolesList.map(role => (
+                                            <option key={role.id} value={role.code}>{role.name}</option>
+                                        ))}
+                                        {!rolesList.length && (
+                                            <>
+                                                <option value="cajero">Cajero (Default)</option>
+                                                <option value="mesero">Mesero (Default)</option>
+                                                <option value="admin">Administrador (Default)</option>
+                                                <option value="gerente">Gerente (Default)</option>
+                                            </>
+                                        )}
                                     </select>
                                 </div>
                                 <div className="space-y-1">
