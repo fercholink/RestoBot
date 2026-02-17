@@ -354,10 +354,91 @@ function App() {
     }
   };
 
-  const handleUpdateOrder = async (updatedOrderData) => {
-    // Este handler era para edición full. Por ahora lo dejamos simple o logueamos.
-    // En Supabase implicaría Updates a 'orders' y upserts/deletes a 'order_items'.
-    console.warn("Edición completa de pedido pendiente de refactorizar para Supabase");
+  const handleUpdateOrder = async (orderId, updatedData) => {
+    try {
+
+      // 1. Obtener items antiguos para devolver stock
+      const { data: oldItems, error: oldItemsError } = await supabase
+        .from('order_items')
+        .select('product_id, quantity')
+        .eq('order_id', orderId);
+
+      if (oldItemsError) throw oldItemsError;
+
+      // 2. Devolver Stock (Iterativo para seguridad)
+      for (const item of oldItems) {
+        const { data: product } = await supabase
+          .from('products')
+          .select('stock')
+          .eq('id', item.product_id)
+          .single();
+
+        if (product) {
+          await supabase
+            .from('products')
+            .update({ stock: product.stock + item.quantity })
+            .eq('id', item.product_id);
+        }
+      }
+
+      // 3. Eliminar items antiguos
+      const { error: deleteError } = await supabase
+        .from('order_items')
+        .delete()
+        .eq('order_id', orderId);
+
+      if (deleteError) throw deleteError;
+
+      // 4. Actualizar datos de la orden (sin el campo items)
+      const { items, ...orderFields } = updatedData;
+
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update(orderFields)
+        .eq('id', orderId);
+
+      if (updateError) throw updateError;
+
+      // 5. Insertar nuevos items
+      const newItemsFormatted = items.map(item => ({
+        order_id: orderId,
+        product_id: item.id,
+        product_name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        customization: item.customizations
+      }));
+
+      const { error: insertError } = await supabase
+        .from('order_items')
+        .insert(newItemsFormatted);
+
+      if (insertError) throw insertError;
+
+      // 6. Descontar nuevo stock
+      for (const item of items) {
+        const { data: product } = await supabase
+          .from('products')
+          .select('stock')
+          .eq('id', item.id)
+          .single();
+
+        if (product) {
+          await supabase
+            .from('products')
+            .update({ stock: Math.max(0, product.stock - item.quantity) })
+            .eq('id', item.id);
+        }
+      }
+
+      // 7. Refrescar y notificar
+      await fetchOrders();
+      alert("✅ Pedido actualizado correctamente");
+
+    } catch (error) {
+      console.error("Error updating order:", error);
+      alert("❌ Error al actualizar el pedido: " + error.message);
+    }
   };
 
   const handleDeleteOrder = async (orderId) => {

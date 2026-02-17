@@ -154,31 +154,8 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
             )}
 
             {/* Botones de acción rápida (Edición/Borrado) */}
-            {(order.status === 'nuevo' || order.status === 'fabricacion') && (
-                <div className="absolute top-3 right-20 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                    <button
-                        onClick={() => onPrint(order)}
-                        className="p-1 bg-white border border-gray-100 text-accent hover:text-blue-500 hover:border-blue-200 rounded-md shadow-sm transition-all"
-                        title="Imprimir Comanda"
-                    >
-                        <Printer size={12} />
-                    </button>
-                    <button
-                        onClick={() => onEdit(order)}
-                        className="p-1 bg-white border border-gray-100 text-accent hover:text-primary hover:border-primary/30 rounded-md shadow-sm transition-all"
-                        title="Editar Pedido"
-                    >
-                        <Edit2 size={12} />
-                    </button>
-                    <button
-                        onClick={() => onDelete(order.id)}
-                        className="p-1 bg-white border border-gray-100 text-accent hover:text-red-500 hover:border-red-200 rounded-md shadow-sm transition-all"
-                        title="Eliminar Pedido"
-                    >
-                        <Trash2 size={12} />
-                    </button>
-                </div>
-            )}
+            {/* Botones de acción rápida (Edición/Borrado) - SIEMPRE VISIBLES */}
+
 
             <div className="flex justify-between items-start mb-2">
                 <div className="flex items-center gap-2">
@@ -290,6 +267,24 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
                                 {order.is_paid ? 'Cerrar' : 'Pagado'}
                             </button>
                         )}
+                    </>
+                )}
+                {(order.status === 'nuevo' || order.status === 'fabricacion') && (
+                    <>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onEdit(order); }}
+                            className="aspect-square bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-primary p-2 rounded-lg transition-all border border-gray-100 flex items-center justify-center group/edit shadow-sm"
+                            title="Editar Pedido"
+                        >
+                            <Edit2 size={14} className="group-hover/edit:scale-110 transition-transform" />
+                        </button>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onDelete(order.id); }}
+                            className="aspect-square bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500 p-2 rounded-lg transition-all border border-gray-100 flex items-center justify-center group/delete shadow-sm"
+                            title="Eliminar Pedido"
+                        >
+                            <Trash2 size={14} className="group-hover/delete:scale-110 transition-transform" />
+                        </button>
                     </>
                 )}
                 <button

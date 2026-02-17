@@ -3,7 +3,7 @@ import { X, Plus, Minus, ShoppingCart, Check, Trash2, PlusCircle, MinusCircle, A
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 
-const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [], shiftId }) => {
+const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrder, orders = [], shiftId }) => {
     const { user } = useAuth();
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
@@ -45,8 +45,55 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [], shiftId }) =>
         if (isOpen) {
             fetchData();
             fetchActiveBookings();
+
+            if (editingOrder) {
+                // Populate Form
+                setCustomerName(editingOrder.customer_name || '');
+                setCustomerPhone(editingOrder.customer_phone || '');
+                setOrderType(editingOrder.table_number === 'DOMICILIO' ? 'domicilio' : (editingOrder.table_number?.toString().startsWith('HAB') ? 'habitacion' : 'mesa'));
+
+                if (editingOrder.table_number !== 'DOMICILIO' && !editingOrder.table_number?.toString().startsWith('HAB')) {
+                    setTableId(editingOrder.table_number || '');
+                }
+
+                if (editingOrder.delivery_info) {
+                    setDeliveryDetails({
+                        housingType: editingOrder.delivery_info.housingType || 'casa',
+                        city: editingOrder.delivery_info.city || 'Montería',
+                        address: editingOrder.delivery_info.address || '',
+                        neighborhood: editingOrder.delivery_info.neighborhood || '',
+                        complex: editingOrder.delivery_info.complex || '',
+                        unit: editingOrder.delivery_info.unit || '',
+                        notes: editingOrder.delivery_info.notes || ''
+                    });
+                    if (editingOrder.delivery_info.booking_id) {
+                        setSelectedBookingRooms(editingOrder.delivery_info.booking_id);
+                    }
+                }
+
+                setInitialPayment({
+                    isPaid: editingOrder.is_paid || false,
+                    method: editingOrder.payment_method || 'efectivo',
+                    reference: editingOrder.payment_reference
+                });
+
+                // Populate Cart
+                if (editingOrder.items) {
+                    const formattedCart = editingOrder.items.map((item, idx) => ({
+                        id: item.product_id,
+                        name: item.product_name,
+                        price: item.price, // Unit price
+                        quantity: item.quantity,
+                        customizations: item.customization || { excluded_ingredients: [], added_extras: [] },
+                        cartId: Date.now() + idx
+                    }));
+                    setCart(formattedCart);
+                }
+            } else {
+                resetForm();
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, editingOrder]);
 
     const fetchActiveBookings = async () => {
         try {
@@ -220,7 +267,8 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [], shiftId }) =>
             const existingOrder = orders.find(o =>
                 (o.table_number === tableId) &&
                 o.status !== 'pagado' &&
-                o.status !== 'cancelado'
+                o.status !== 'cancelado' &&
+                (!editingOrder || o.id !== editingOrder.id) // Ignorar el pedido actual si estamos editando
             );
 
             if (existingOrder) {
@@ -233,6 +281,69 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [], shiftId }) =>
         }
 
         setSubmitting(true);
+
+        // Si estamos editando, usamos un flujo diferente
+        if (editingOrder) {
+            try {
+                // Reconstruir estructura de datos similar a Insert pero para Update
+                let deliveryAddressStr = null;
+                let finalCustomerName = customerName;
+                let finalTableNumber = 'DOMICILIO';
+                let finalPhone = customerPhone;
+
+                if (orderType === 'domicilio') {
+                    deliveryAddressStr = `${deliveryDetails.address}, ${deliveryDetails.neighborhood} (${deliveryDetails.city}) - ${deliveryDetails.housingType} ${deliveryDetails.complex || ''} ${deliveryDetails.unit || ''}. Notas: ${deliveryDetails.notes}`;
+                } else if (orderType === 'mesa') {
+                    finalTableNumber = tableId;
+                } else if (orderType === 'habitacion') {
+                    const booking = activeBookings.find(b => b.id === selectedBookingRooms);
+                    if (booking) {
+                        finalTableNumber = `HAB-${booking.room?.number}`;
+                        finalCustomerName = booking.guest?.full_name || customerName;
+                        deliveryAddressStr = `Servicio a la Habitación ${booking.room?.number}`;
+                    } else if (editingOrder.table_number.startsWith('HAB')) {
+                        // Mantener si no se cambió la habitación
+                        finalTableNumber = editingOrder.table_number;
+                        deliveryAddressStr = editingOrder.delivery_info?.address || editingOrder.delivery_address;
+                    }
+                }
+
+                let formattedPhone = '';
+                if (finalPhone && finalPhone.trim().length > 0) {
+                    const cleanPhone = finalPhone.replace(/\D/g, '');
+                    formattedPhone = cleanPhone.startsWith('57') && cleanPhone.length > 10
+                        ? `+${cleanPhone}`
+                        : `+57${cleanPhone}`;
+                }
+
+                // Call parent handler
+                await onUpdateOrder(editingOrder.id, {
+                    customer_name: finalCustomerName,
+                    table_number: finalTableNumber,
+                    total: total,
+                    payment_method: initialPayment.isPaid ? initialPayment.method : 'pendiente',
+                    is_paid: initialPayment.isPaid,
+                    payment_reference: initialPayment.isPaid ? initialPayment.reference : null,
+                    delivery_address: deliveryAddressStr,
+                    notes: orderType === 'domicilio' ? `Dir: ${deliveryAddressStr}` : (orderType === 'habitacion' ? 'Room Service' : ''),
+                    customer_phone: formattedPhone,
+                    delivery_info: {
+                        ...(orderType === 'domicilio' ? deliveryDetails : {}),
+                        booking_id: orderType === 'habitacion' ? selectedBookingRooms : null,
+                        updated_by: user?.id
+                    },
+                    items: cart // Enviamos el carrito nuevo completo
+                });
+
+                onClose();
+            } catch (error) {
+                console.error("Error updating order:", error);
+                alert("Error al actualizar el pedido: " + error.message);
+            } finally {
+                setSubmitting(false);
+            }
+            return;
+        }
 
         try {
             let deliveryAddressStr = null;
@@ -455,13 +566,13 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [], shiftId }) =>
                                                 placeholder="# Mesa"
                                                 value={tableId}
                                                 onChange={(e) => setTableId(e.target.value)}
-                                                className={`w-full bg-white ring-1 rounded-xl px-3 py-2 text-xs font-bold outline-none shadow-sm ${orders.some(o => o.table_number === tableId && o.status !== 'pagado' && o.status !== 'cancelado')
+                                                className={`w-full bg-white ring-1 rounded-xl px-3 py-2 text-xs font-bold outline-none shadow-sm ${orders.some(o => o.table_number === tableId && o.status !== 'pagado' && o.status !== 'cancelado' && (!editingOrder || o.id !== editingOrder.id))
                                                     ? 'ring-red-500 text-red-500 bg-red-50'
                                                     : 'ring-gray-200 focus:ring-primary'
                                                     }`}
                                                 required
                                             />
-                                            {tableId && orders.some(o => o.table_number === tableId && o.status !== 'pagado' && o.status !== 'cancelado') && (
+                                            {tableId && orders.some(o => o.table_number === tableId && o.status !== 'pagado' && o.status !== 'cancelado' && (!editingOrder || o.id !== editingOrder.id)) && (
                                                 <p className="text-[9px] font-black text-red-500 mt-1 animate-pulse">
                                                     ⚠️ Mesa Ocupada
                                                 </p>
@@ -690,7 +801,7 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, orders = [], shiftId }) =>
                                     className="w-full bg-secondary text-white py-4 rounded-xl font-black text-xs uppercase tracking-[0.2em] shadow-premium hover:shadow-2xl hover:-translate-y-1 active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
                                 >
                                     {submitting ? <Loader2 className="animate-spin" /> : <Check size={18} />}
-                                    {submitting ? 'Enviando...' : 'Confirmar Pedido'}
+                                    {submitting ? 'Procesando...' : (editingOrder ? 'Actualizar Pedido' : 'Confirmar Pedido')}
                                 </button>
                             </div>
                         </form>
