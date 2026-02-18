@@ -288,7 +288,7 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
                     </>
                 )}
                 <button
-                    onClick={() => onPrint(order)}
+                    onClick={() => onPrint(order, order.status === 'pagado' ? 'recibo' : 'comanda')}
                     className="aspect-square bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-secondary p-2 rounded-lg transition-all border border-gray-100 flex items-center justify-center group/print shadow-sm"
                     title="Imprimir Ticket"
                 >

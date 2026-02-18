@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Landmark, TrendingUp, TrendingDown, FileText, Receipt, PieChart, Calculator, AlertCircle, Save, Download, Plus, Briefcase, FileSpreadsheet, ShieldCheck, ChevronRight } from 'lucide-react';
+import ElectronicInvoicing from './accounting/ElectronicInvoicing';
 
 const AccountingModule = ({ orders }) => {
     const [activeSubTab, setActiveSubTab] = useState('summary');
@@ -147,93 +148,7 @@ const AccountingModule = ({ orders }) => {
                 )}
 
                 {activeSubTab === 'invoicing' && (
-                    <div className="space-y-6">
-                        <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-                            <div className="flex justify-between items-center mb-8">
-                                <div>
-                                    <h3 className="text-xl font-black text-secondary uppercase tracking-tight">Emisión de Facturas DIAN</h3>
-                                    <p className="text-sm font-medium text-accent">Pedidos con requerimiento de factura electrónica</p>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button className="bg-secondary text-white px-6 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center gap-2">
-                                        <ShieldCheck size={16} /> Validar Todo
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-gray-50/50">
-                                            <th className="px-6 py-4 text-[10px] font-black text-accent uppercase tracking-widest">Pedido</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-accent uppercase tracking-widest">Cliente / NIT</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-accent uppercase tracking-widest text-right">Monto</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-accent uppercase tracking-widest text-center">Estado Factus</th>
-                                            <th className="px-6 py-4 text-[10px] font-black text-accent uppercase tracking-widest text-right">Acción</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                        {orders?.filter(o => o.is_electronic_invoiced).length > 0 ? (
-                                            orders.filter(o => o.is_electronic_invoiced).map((order) => (
-                                                <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
-                                                    <td className="px-6 py-4">
-                                                        <div className="text-xs font-black text-secondary">#{order.id}</div>
-                                                        <div className="text-[10px] text-accent font-medium">{new Date(order.created_at).toLocaleDateString()}</div>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="text-xs font-black text-secondary">{order.tax_data.names}</div>
-                                                        <div className="text-[10px] text-accent font-bold uppercase">{order.tax_data.identification}</div>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right text-xs font-black text-secondary">
-                                                        ${order.total_price?.toLocaleString()}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-center">
-                                                        <span className="px-3 py-1 bg-warning/10 text-warning text-[9px] font-black uppercase rounded-full">
-                                                            Pendiente Emisión
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right">
-                                                        <button className="p-2 bg-secondary/10 text-secondary hover:bg-secondary hover:text-white rounded-xl transition-all">
-                                                            <Save size={16} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan="5" className="px-6 py-20 text-center">
-                                                    <div className="flex flex-col items-center">
-                                                        <Receipt size={40} className="text-gray-200 mb-4" />
-                                                        <p className="text-sm font-black text-accent uppercase tracking-widest">No hay facturas pendientes</p>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {/* Banner publicitario de Factus */}
-                        <div className="bg-gradient-to-r from-secondary to-secondary/80 rounded-3xl p-8 flex items-center justify-between shadow-premium overflow-hidden relative">
-                            <div className="relative z-10">
-                                <h4 className="text-white font-black text-lg mb-2 flex items-center gap-2">
-                                    <ShieldCheck size={24} className="text-success" />
-                                    Conexión Segura con Factus.com.co
-                                </h4>
-                                <p className="text-white/60 text-sm max-w-lg mb-4">
-                                    Toda la información capturada será enviada automáticamente a la DIAN a través de la API oficial de Factus.
-                                </p>
-                                <div className="flex gap-4">
-                                    <div className="px-4 py-2 bg-white/10 rounded-xl text-white text-[9px] font-black uppercase tracking-widest border border-white/10">Tokens OAuth2: Activos</div>
-                                    <div className="px-4 py-2 bg-white/10 rounded-xl text-white text-[9px] font-black uppercase tracking-widest border border-white/10">DIAN Res: 1876...</div>
-                                </div>
-                            </div>
-                            <div className="absolute right-0 top-0 p-10 opacity-10 scale-150 rotate-12">
-                                <Landmark size={200} />
-                            </div>
-                        </div>
-                    </div>
+                    <ElectronicInvoicing />
                 )}
 
                 {activeSubTab === 'payroll' && (

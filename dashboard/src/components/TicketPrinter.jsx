@@ -68,7 +68,11 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
 
         order.items.forEach(item => {
             // Asegurar que usamos el valor total de la línea
-            const lineTotal = item.total || (item.unit_price * item.quantity) || 0;
+            const quantity = parseFloat(item.quantity) || 0;
+            // Prioridad: 1. Precio guardado (price/unit_price), 2. Precio actual producto
+            const unitPrice = parseFloat(item.price) || parseFloat(item.unit_price) || parseFloat(item.product?.price) || 0;
+            const lineTotal = parseFloat(item.total) || (unitPrice * quantity) || 0;
+
             stats.total += lineTotal;
 
             // Determinar Tipo de Impuesto
@@ -76,7 +80,7 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
             // 2. Inferir por nombre
             let taxType = item.tax_type;
             if (!taxType) {
-                const name = (item.product_name || '').toLowerCase();
+                const name = (item.product_name || item.product?.name || '').toLowerCase();
                 if (name.includes('alojamiento') || name.includes('hospedaje') || name.includes('habitación') || name.includes('noche')) {
                     taxType = 'IVA_19';
                 } else if (name.includes('(exento)')) {
@@ -302,7 +306,7 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                                     <tr>
                                         <td className="py-1 align-top">{item.quantity}</td>
                                         <td className="py-1">
-                                            <span className="font-bold uppercase text-[9px]">{item.product_name}</span>
+                                            <span className="font-bold uppercase text-[9px]">{item.product_name || item.product?.name || 'Producto Desconocido'}</span>
                                             {/* Mostrar Personalizaciones */}
                                             {item.customizations && (
                                                 <div className="text-[7px] leading-tight text-gray-600 pl-1 mt-0.5">
@@ -317,7 +321,10 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                                         </td>
                                         {(type === 'recibo' || type === 'factura_hotel') && (
                                             <td className="py-1 text-right text-[9px]">
-                                                ${(item.total || (item.unit_price * item.quantity)).toLocaleString()}
+                                                ${(
+                                                    parseFloat(item.total) ||
+                                                    ((parseFloat(item.price) || parseFloat(item.unit_price) || parseFloat(item.product?.price) || 0) * (parseFloat(item.quantity) || 0))
+                                                ).toLocaleString()}
                                             </td>
                                         )}
                                     </tr>

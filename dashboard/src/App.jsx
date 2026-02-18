@@ -158,7 +158,10 @@ function App() {
         .from('orders')
         .select(`
           *,
-          items:order_items(*),
+          items:order_items(
+            *,
+            product:products(name, price)
+          ),
           branch:branches(*)
         `)
         .order('created_at', { ascending: false });
@@ -499,7 +502,8 @@ function App() {
       const updates = {
         status: 'pagado',
         payment_method: method,
-        preparation_time_seconds: prepTime
+        preparation_time_seconds: prepTime,
+        tax_data: taxData // Save tax/customer data for electronic invoicing
       };
 
       // LOGICA DE CARGO A HABITACIÓN
@@ -543,10 +547,10 @@ function App() {
 
   const handlePrint = (order, type = 'comanda') => {
     setPrintData({ order, type });
-    // Reset after print dialog would ideally close, but for now just setting it works 
-    // as TicketPrinter usually handles its own lifecycle or we can reset it on effective print.
-    // However, keeping it simple:
-    setTimeout(() => setPrintData({ order: null, type: 'comanda' }), 100);
+  };
+
+  const handleAfterPrint = () => {
+    setPrintData({ order: null, type: 'comanda' });
   };
 
   // Esta función ahora será llamada por NewOrderModal cuando termine de insertar en Supabase
@@ -787,6 +791,7 @@ function App() {
         <TicketPrinter
           order={printData.order}
           type={printData.type}
+          onAfterPrint={handleAfterPrint}
         />
       )}
 

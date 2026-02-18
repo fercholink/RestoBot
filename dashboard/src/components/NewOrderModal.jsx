@@ -417,7 +417,7 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                 product_id: item.id,
                 product_name: item.name,
                 quantity: item.quantity,
-                price: item.price,
+                price: item.price, // CORRECTED: DB expects 'price' (NOT NULL), not 'unit_price'
                 customization: item.customizations
             }));
 
