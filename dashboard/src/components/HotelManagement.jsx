@@ -447,44 +447,48 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
             let nights = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
             if (nights < 1) nights = 1; // Mínimo 1 noche
 
-            const accommodationTotal = booking.price_per_night * nights; // Recalcular basado en noches reales o usar booking.total_price?
-            // Mejor usamos booking.total_price seguro, pero para el item necesitamos desglose
+            const accommodationTotal = (booking.price_per_night || 0) * nights;
             const finalTotal = extraData?.grandTotal || booking.total_price || 0;
+
+            // Construír payload solo con columnas que existen en la tabla orders
+            const shadowOrderPayload = {
+                customer_name: taxData?.names || booking.guest?.full_name || 'Huésped Hotel',
+                customer_phone: taxData?.phone || booking.guest?.phone || null,
+                table_number: `HAB-${roomNumber}`,
+                status: 'pagado',
+                total: finalTotal,
+                total_price: finalTotal,   // guardar en ambas columnas por compatibilidad
+                payment_method: 'efectivo',
+                is_paid: true,
+                branch_id: selectedBranchId,
+                tax_data: taxData || null,
+                notes: `Checkout Habitación ${roomNumber}. Estadía: ${startStr} a ${endStr}`
+            };
 
             const { data: orderData, error: orderError } = await supabase
                 .from('orders')
-                .insert([{
-                    customer_name: taxData?.names || booking.guest?.full_name || 'Huésped Hotel',
-                    customer_phone: taxData?.phone || booking.guest?.phone,
-                    table_number: `HAB-${roomNumber}`, // Identificador especial
-                    status: 'pagado', // Ya sale pagado
-                    total: finalTotal,
-                    payment_method: 'efectivo', // Ojo: Deberíamos capturar el método real desde el modal
-                    is_paid: true,
-                    type: 'habitacion', // Nuevo tipo implícito
-                    branch_id: selectedBranchId,
-                    tax_data: taxData, // ¡CRÍTICO! Aquí van los datos de facturación
-                    notes: `Checkout Habitación ${roomNumber}. Estadía: ${startStr} a ${endStr}`
-                }])
+                .insert([shadowOrderPayload])
                 .select()
                 .single();
 
             if (orderError) {
                 console.error("Error creating shadow order:", orderError);
-                // No bloqueamos el checkout si falla esto, pero avisamos
-                // alert("Advertencia: No se pudo crear el registro para facturación.");
+                // Avisar pero no bloquear el checkout
+                alert(`⚠️ Checkout realizado, pero no se pudo registrar en contabilidad:\n${orderError.message}\n\nRevisa la consola para más detalles.`);
             } else {
+                console.log('[Hotel] Shadow order creado:', orderData.id);
+
                 // Crear Items del Pedido (Alojamiento + Extras)
                 const orderItems = [];
 
                 // Item Alojamiento
                 orderItems.push({
                     order_id: orderData.id,
-                    product_id: null, // No es un producto del inventario
+                    product_id: null,
                     product_name: `Alojamiento Hab. ${roomNumber} (${nights} noches)`,
-                    quantity: 1, // O nights? Factus prefiere cantidad 1 con valor total a veces, o unit * nights
-                    unit_price: accommodationTotal,
-                    price: accommodationTotal, // Legacy/New column fix
+                    quantity: nights,
+                    unit_price: booking.price_per_night || 0,
+                    price: booking.price_per_night || 0,
                     total: accommodationTotal
                 });
 
@@ -496,9 +500,9 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                             product_id: null,
                             product_name: charge.description || 'Consumo Extra Hotel',
                             quantity: 1,
-                            unit_price: charge.amount,
-                            price: charge.amount,
-                            total: charge.amount
+                            unit_price: charge.amount || 0,
+                            price: charge.amount || 0,
+                            total: charge.amount || 0
                         });
                     });
                 }
@@ -506,6 +510,7 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                 const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
                 if (itemsError) console.error("Error creating order items:", itemsError);
             }
+
 
             // 4. Generate Receipt Data for Printing (Legacy Logic preserved)
             const receiptItems = [

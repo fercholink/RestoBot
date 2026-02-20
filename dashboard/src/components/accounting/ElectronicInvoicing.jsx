@@ -279,7 +279,10 @@ const ElectronicInvoicing = () => {
                 ) : (
                     <div className="space-y-3">
                         {orders.map(order => {
-                            const typeInfo = ORDER_TYPE_LABEL[order.type] || ORDER_TYPE_LABEL.mesa;
+                            // Detectar tipo de orden aunque no tenga el campo 'type'
+                            const detectedType = order.type ||
+                                (order.table_number?.startsWith('HAB-') ? 'habitacion' : 'mesa');
+                            const typeInfo = ORDER_TYPE_LABEL[detectedType] || ORDER_TYPE_LABEL.mesa;
                             const TypeIcon = typeInfo.icon;
                             const isProcessing = processingId === order.id;
 
