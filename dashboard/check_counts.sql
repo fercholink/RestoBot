@@ -1,0 +1,1 @@
+SELECT COUNT(id) AS orders_hoy FROM orders WHERE DATE(created_at) = CURRENT_DATE; SELECT COUNT(id) AS charges_hoy FROM room_charges WHERE DATE(created_at) = CURRENT_DATE; SELECT COUNT(id) AS egresos_hoy FROM accounting_entries WHERE DATE(created_at) = CURRENT_DATE AND journal_type = 'egreso';

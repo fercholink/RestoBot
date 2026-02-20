@@ -457,7 +457,6 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                 table_number: `HAB-${roomNumber}`,
                 status: 'pagado',
                 total: finalTotal,
-                total_price: finalTotal,   // guardar en ambas columnas por compatibilidad
                 payment_method: 'efectivo',
                 is_paid: true,
                 branch_id: selectedBranchId,
@@ -492,18 +491,37 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                     total: accommodationTotal
                 });
 
-                // Items Extras (Room Charges)
+                // Items Extras (Room Charges sumados de los pedios del restaurante / adiciones)
                 if (extraData?.roomCharges?.length > 0) {
                     extraData.roomCharges.forEach(charge => {
-                        orderItems.push({
-                            order_id: orderData.id,
-                            product_id: null,
-                            product_name: charge.description || 'Consumo Extra Hotel',
-                            quantity: 1,
-                            unit_price: charge.amount || 0,
-                            price: charge.amount || 0,
-                            total: charge.amount || 0
-                        });
+                        // Si el cargo viene de una orden, extraer los items (si ya los incluimos en la consulta al cargar history/charges)
+                        // Como en charge tenemos amount y description, mapemoslo como 1 item genérico, EXCEPTO que sepamos el detalle.
+                        // Para facilitar la facturación detallada, vamos a intentar ver si existe un breakdown.
+                        if (charge.orders && charge.orders.order_items && charge.orders.order_items.length > 0) {
+                            // Sub-items of the order
+                            charge.orders.order_items.forEach(cItem => {
+                                orderItems.push({
+                                    order_id: orderData.id,
+                                    product_id: cItem.product_id || null,
+                                    product_name: cItem.product_name || 'Item de Cocina',
+                                    quantity: cItem.quantity || 1,
+                                    unit_price: cItem.unit_price || cItem.price || 0,
+                                    price: cItem.price || cItem.unit_price || 0,
+                                    total: (cItem.quantity || 1) * (cItem.unit_price || cItem.price || 0)
+                                });
+                            });
+                        } else {
+                            // Genérico si no viene de una orden específica de POS con items
+                            orderItems.push({
+                                order_id: orderData.id,
+                                product_id: null,
+                                product_name: charge.description || 'Consumo Extra Hotel',
+                                quantity: 1,
+                                unit_price: charge.amount || 0,
+                                price: charge.amount || 0,
+                                total: charge.amount || 0
+                            });
+                        }
                     });
                 }
 

@@ -22,21 +22,24 @@ import { sileo } from 'sileo';
  * (Orden inverso al de Factus)
  */
 const mapPersonType = (taxData) => {
-    if (!taxData?.type_person) return '2'; // Default: Persona Natural
-    return taxData.type_person === '1' ? '2' : '1';
+    if (!taxData?.type_person) return 2; // Default: 2 = Persona Natural
+    // Modal: '1' Natural, '2' Jurídica | Factus: 2 Natural, 1 Jurídica
+    return taxData.type_person === '1' ? 2 : 1;
 };
 
-/**
- * tribute_id del CLIENTE (no del item):
- * "21" → No Aplica (consumidor final / Persona Natural sin responsabilidad IVA)
- * "18" → IVA (Responsable de IVA / Persona Jurídica)
- */
-const mapTributeId = (legalOrg) => legalOrg === '1' ? '18' : '21';
+const mapTributeId = (legalOrg) => {
+    // 18 = Responsable de IVA (Jurídica), 21 = No responsable (Natural)
+    return legalOrg === 1 ? 18 : 21;
+};
 
-/**
- * Método de pago según Factus:
- * "10" = Efectivo, "31" = Transferencia/Bancaria, "42" = Consignación
- */
+const mapDocType = (taxData, legalOrg) => {
+    const raw = taxData?.document_type;
+    if (raw == '13') return 3; // DIAN Cédula -> Factus 3
+    if (raw == '31') return 6; // DIAN NIT -> Factus 6
+    if (raw && /^\d{1,2}$/.test(raw)) return Number(raw);
+    return legalOrg === 1 ? 6 : 3; // 6 = NIT, 3 = Cédula
+};
+
 const mapPaymentMethod = (method) => {
     const map = { efectivo: '10', transferencia: '31', tarjeta: '31', nequi: '31', daviplata: '31' };
     return map[method?.toLowerCase()] || '10';
@@ -101,55 +104,90 @@ const ElectronicInvoicing = () => {
     // -------------------------------------------------------
     const handleEmitInvoice = async (order) => {
         setProcessingId(order.id);
-        const toastId = sileo.loading('Emitiendo factura...');
+
+        // Timeout de seguridad: el botón nunca quedará bloqueado más de 20s
+        const safetyTimer = setTimeout(() => {
+            setProcessingId(null);
+            sileo.error({ title: 'Timeout', description: 'Factus no respondió. Verifica tu conexión o las credenciales.' });
+        }, 20_000);
 
         try {
-            // 1. Obtener rangos de numeración
-            const ranges = await factusService.getRanges();
-            const selectedRange = ranges?.data?.[0];
-            if (!selectedRange) throw new Error('No hay rangos de numeración activos en Factus. Verifica la configuración.');
+            console.log('[Factus] Iniciando emisión para orden:', order.id);
 
-            // 2. Mapear datos del cliente
+            // 0. Verificar credenciales
+            const creds = await factusService.getCredentials();
+            if (!creds?.email || !creds?.client_id) {
+                throw new Error('Credenciales Factus no configuradas. Ve a Facturación → Configuración.');
+            }
+            console.log('[Factus] Credenciales OK, entorno:', creds.environment);
+
+            // 1. Obtener rangos de numeración
+            console.log('[Factus] Obteniendo rangos...');
+            const rangesResp = await factusService.getRanges();
+            // Factus puede devolver { data: [...] } o { data: { data: [...] } } (paginado)
+            const rangesList = Array.isArray(rangesResp?.data)
+                ? rangesResp.data
+                : Array.isArray(rangesResp?.data?.data)
+                    ? rangesResp.data.data
+                    : [];
+            console.log('[Factus] Rangos disponibles:', rangesList.length, rangesList);
+            if (rangesList.length > 0) console.table(rangesList);
+            // Intentar encontrar el rango correcto de "Factura de Venta". Si no, tomar el primero.
+            const selectedRange = rangesList.find(r => r.document === "Factura de Venta" || r.document === "Factura de venta") || rangesList[0];
+            if (!selectedRange) {
+                const env = creds.environment === 'production' ? 'Producción (factus.com.co)' : 'Sandbox (api-sandbox.factus.com.co)';
+                throw new Error(`No hay rangos de numeración activos en Factus (${env}). Ve a Configuración → Rangos de Numeración en el portal de Factus y crea uno.`);
+            }
+
+            // 2. Mapear cliente
             const legalOrg = mapPersonType(order.tax_data);
             const tributeIdClient = mapTributeId(legalOrg);
-            const docType = order.tax_data?.document_type || '13'; // 13=Cédula, 31=NIT
+            const docType = mapDocType(order.tax_data, legalOrg);
+            console.log('[Factus] Mapeo cliente → legalOrg:', legalOrg, '| tributeId:', tributeIdClient, '| docType:', docType);
 
-            // 3. Mapear ítems
-            const items = (order.order_items?.length > 0 ? order.order_items : [{
-                product_name: 'Servicio General',
-                quantity: 1,
-                price: order.total || order.total_price || 0,
-                unit_price: order.total || order.total_price || 0
-            }]).map((item, idx) => ({
-                code_reference: `ITM-${item.id || idx + 1}`,
-                name: (item.product_name || 'Producto').slice(0, 250), // Factus limita a 256 chars
-                quantity: item.quantity || 1,
-                discount_rate: 0,
-                price: parseFloat(item.unit_price || item.price || 0),
-                tax_rate: '19.00',         // IVA 19% — ajustar según producto si es necesario
-                unit_measure_id: '70',     // Unidad
-                standard_code_id: '1',    // Estándar UNSPSC
-                is_excluded: 0,
-                tribute_id: '1',           // IVA (ítem)
-                withholding_taxes: []
-            }));
+            // 3. Ítems — Ajuste de impuestos (Precios POS ya tienen IVA, Factus lo suma)
+            const rawItems = order.order_items?.length > 0
+                ? order.order_items
+                : [{ product_name: 'Servicio General', quantity: 1, unit_price: order.total || 0 }];
 
-            // 4. Construir payload
+            const items = rawItems.map((item, idx) => {
+                const totalPrice = parseFloat(item.unit_price || item.price || 0);
+                // Si el precio es total, la base es precio / 1.19
+                const basePrice = Math.round((totalPrice / 1.19) * 100) / 100;
+
+                return {
+                    code_reference: `ITM-${item.id || idx + 1}`,
+                    name: (item.product_name || item.name || 'Servicio').slice(0, 250),
+                    quantity: Number(item.quantity) || 1,
+                    discount_rate: 0,
+                    price: basePrice > 0 ? basePrice : 1,
+                    tax_rate: '19.00',
+                    unit_measure_id: 70,     // 70 = Unidad (Numérico)
+                    standard_code_id: 1,      // 1 = EAN (Numérico)
+                    is_excluded: 0,
+                    tribute_id: 1,            // 1 = IVA (Numérico)
+                    withholding_taxes: []
+                };
+            });
+
+            // 4. Payload completo
             const invoicePayload = {
-                numbering_range_id: selectedRange.id,
-                reference_code: `ORD-${order.id}`,
-                observation: `Pedido #${order.id} generado desde sistema POS`,
-                payment_form: '1',         // 1=Contado, 2=Crédito
+                numbering_range_id: Number(selectedRange.id),
+                reference_code: `ORD-${order.id}-${Date.now()}`,
+                observation: `Pedido #${order.id} - POS RestoBot`,
+                payment_form: '1',
                 payment_method_code: mapPaymentMethod(order.payment_method),
                 customer: {
-                    identification: order.tax_data?.identification || '222222222222',
-                    dv: order.tax_data?.dv || '',
-                    company: legalOrg === '1' ? (order.tax_data?.names || '') : '',
-                    trade_name: legalOrg === '1' ? (order.tax_data?.names || '') : '',
-                    names: legalOrg === '2' ? (order.tax_data?.names || 'Consumidor Final') : '',
-                    address: order.tax_data?.address || 'Dirección General',
-                    email: order.tax_data?.email || 'consumidor@final.com',
-                    phone: order.customer_phone || order.tax_data?.phone || '3000000000',
+                    identification: String(order.tax_data?.identification || '222222222222'),
+                    dv: (order.tax_data?.dv !== undefined && order.tax_data?.dv !== null && order.tax_data?.dv !== '')
+                        ? Number(order.tax_data.dv)
+                        : null,
+                    company: legalOrg === 1 ? (order.tax_data?.names || 'Empresa') : null,
+                    trade_name: legalOrg === 1 ? (order.tax_data?.trade_name || order.tax_data?.names || 'Empresa') : null,
+                    names: legalOrg === 2 ? (order.tax_data?.names || order.customer_name || 'Consumidor Final') : null,
+                    address: order.tax_data?.address || 'Colombia',
+                    email: order.tax_data?.email || 'factura@contabilidad.com',
+                    phone: String(order.customer_phone || order.tax_data?.phone || '3000000000'),
                     legal_organization_id: legalOrg,
                     tribute_id: tributeIdClient,
                     identification_document_id: docType
@@ -157,48 +195,50 @@ const ElectronicInvoicing = () => {
                 items
             };
 
-            console.log('[Factus] Payload:', invoicePayload);
+            console.log('[Factus] Payload FINAL (tipos corregidos):', JSON.stringify(invoicePayload, null, 2));
 
-            // 5. Enviar a Factus
+            // 5. Enviar
             const result = await factusService.createInvoice(invoicePayload);
+            console.log('[Factus] Respuesta:', result);
             const bill = result?.data?.bill;
 
             if (!bill?.number) {
                 throw new Error('Respuesta incompleta de Factus: ' + JSON.stringify(result));
             }
 
-            // 6. Guardar en Supabase el número de doc (NO la URL del PDF — se descarga bajo demanda)
+            // 6. Guardar en Supabase
             const { error: updateError } = await supabase
                 .from('orders')
                 .update({
                     factus_id: bill.id,
                     factus_doc_number: bill.number,
                     factus_status: bill.status,
-                    pdf_url: null // Limpiar URLs viejas — el PDF se descarga autenticado
+                    pdf_url: null
                 })
                 .eq('id', order.id);
 
             if (updateError) throw updateError;
 
-            sileo.dismiss(toastId);
+            clearTimeout(safetyTimer);
             sileo.success({ title: '✓ Factura Emitida', description: `Documento ${bill.number} registrado ante la DIAN.` });
             fetchOrders();
 
         } catch (error) {
-            sileo.dismiss(toastId);
-            // Mostrar errores de validación de Factus de forma legible
-            sileo.error({ title: 'Error de Emisión', description: error.message });
-            console.error('[Factus] Emission Error:', error);
+            clearTimeout(safetyTimer);
+            const msg = typeof error.message === 'string' ? error.message : JSON.stringify(error);
+            sileo.error({ title: 'Error al Emitir Factura', description: msg });
+            console.error('[Factus] Error completo:', error);
         } finally {
+            clearTimeout(safetyTimer);
             setProcessingId(null);
         }
     };
+
 
     // -------------------------------------------------------
     // Descargar / Ver PDF (siempre autenticado)
     // -------------------------------------------------------
     const handleViewPdf = async (order) => {
-        const toastId = sileo.loading('Descargando PDF...');
         // Abrir ventana antes del await para evitar popup blocker
         const newWindow = window.open('', '_blank');
         if (newWindow) {
@@ -215,11 +255,9 @@ const ElectronicInvoicing = () => {
                 window.open(url, '_blank');
             }
 
-            sileo.dismiss(toastId);
-            sileo.success('PDF abierto en nueva pestaña');
+            sileo.success({ title: 'PDF listo', description: 'Abierto en nueva pestaña.' });
             setTimeout(() => URL.revokeObjectURL(url), 60_000);
         } catch (error) {
-            sileo.dismiss(toastId);
             sileo.error({ title: 'Error descargando PDF', description: error.message });
             if (newWindow) newWindow.close();
         }

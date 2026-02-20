@@ -11,24 +11,20 @@ const ENVIRONMENTS = {
 };
 
 // ----------------------------------------------------------------
-// Token Cache en memoria (se pierde al recargar la página, 
-// pero evita múltiples logins en la misma sesión)
+// Token Cache en memoria
 // ----------------------------------------------------------------
 let _tokenCache = {
     access_token: null,
     refresh_token: null,
-    expires_at: null,       // timestamp en ms
-    environment: null       // 'sandbox' | 'production'
+    expires_at: null,
+    environment: null
 };
 
-const _isTokenValid = (env) => {
-    return (
-        _tokenCache.access_token &&
-        _tokenCache.environment === env &&
-        _tokenCache.expires_at &&
-        Date.now() < _tokenCache.expires_at - 60_000 // 1 min de margen
-    );
-};
+const _isTokenValid = (env) =>
+    _tokenCache.access_token &&
+    _tokenCache.environment === env &&
+    _tokenCache.expires_at &&
+    Date.now() < _tokenCache.expires_at - 60_000;
 
 const _setTokenCache = (data, env) => {
     _tokenCache = {
@@ -40,12 +36,58 @@ const _setTokenCache = (data, env) => {
 };
 
 // ----------------------------------------------------------------
-// Helper: Obtener la URL base según el entorno guardado
+// Helper: fetch con timeout (evita que se cuelgue indefinidamente)
+// ----------------------------------------------------------------
+const _fetchWithTimeout = async (url, options = {}, timeoutMs = 15_000) => {
+    const controller = new AbortController();
+    const timerId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(timerId);
+        return response;
+    } catch (err) {
+        clearTimeout(timerId);
+        if (err.name === 'AbortError') {
+            throw new Error(`Timeout: Factus no respondió en ${timeoutMs / 1000}s. Verifica tu conexión o el estado del servicio.`);
+        }
+        throw err;
+    }
+};
+
+// ----------------------------------------------------------------
+// Helper: Obtener URL base y entorno
 // ----------------------------------------------------------------
 const _getBaseUrl = async () => {
     const creds = await factusService.getCredentials();
     const env = creds?.environment || 'sandbox';
     return { baseUrl: ENVIRONMENTS[env], env };
+};
+
+// ----------------------------------------------------------------
+// Helper: parsear error de Factus de forma segura
+// ----------------------------------------------------------------
+const _parseFactusError = (data, status) => {
+    try {
+        const parts = [];
+        // Mensaje general
+        if (data.message && typeof data.message === 'string') {
+            parts.push(data.message);
+        }
+        // Errores de campo específicos
+        const errors = data.errors;
+        if (errors && typeof errors === 'object' && !Array.isArray(errors)) {
+            const fieldErrors = Object.entries(errors)
+                .map(([k, v]) => `• ${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+                .join('\n');
+            if (fieldErrors) parts.push(fieldErrors);
+        } else if (Array.isArray(errors)) {
+            parts.push(errors.join('\n'));
+        }
+        const result = parts.join('\n');
+        return result || `Error HTTP ${status} de Factus`;
+    } catch {
+        return `Error HTTP ${status}: ${JSON.stringify(data)}`;
+    }
 };
 
 const factusService = {
@@ -54,14 +96,11 @@ const factusService = {
     // 1. AUTENTICACIÓN — OAuth 2.0 Password Grant
     // ============================================================
 
-    /**
-     * Login explícito (no usa caché). Útil para probar credenciales.
-     */
     login: async (credentials) => {
         const env = credentials.environment || 'sandbox';
         const baseUrl = ENVIRONMENTS[env];
 
-        const response = await fetch(`${baseUrl}/oauth/token`, {
+        const response = await _fetchWithTimeout(`${baseUrl}/oauth/token`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -76,34 +115,30 @@ const factusService = {
             })
         });
 
-        const data = await response.json();
+        let data;
+        try { data = await response.json(); }
+        catch { throw new Error(`Factus devolvió una respuesta inválida al autenticar (HTTP ${response.status})`); }
+
         if (!response.ok) {
             throw new Error(data.error_description || data.message || 'Error en autenticación Factus');
         }
 
-        // Guardar en caché
         _setTokenCache(data, env);
         return data;
     },
 
-    /**
-     * Obtiene un token válido: reutiliza caché, refresca si casi expira,
-     * o hace login completo si no hay nada.
-     */
     getToken: async () => {
         const { baseUrl, env } = await _getBaseUrl();
 
-        // 1. Token en caché y válido → reutilizar
         if (_isTokenValid(env)) {
             console.log('[Factus] Reutilizando token en caché');
             return _tokenCache.access_token;
         }
 
-        // 2. Hay refresh_token → intentar refrescar
         if (_tokenCache.refresh_token && _tokenCache.environment === env) {
             try {
                 const creds = await factusService.getCredentials();
-                const response = await fetch(`${baseUrl}/oauth/token`, {
+                const response = await _fetchWithTimeout(`${baseUrl}/oauth/token`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -116,7 +151,6 @@ const factusService = {
                         refresh_token: _tokenCache.refresh_token
                     })
                 });
-
                 if (response.ok) {
                     const data = await response.json();
                     _setTokenCache(data, env);
@@ -128,10 +162,9 @@ const factusService = {
             }
         }
 
-        // 3. Login completo
         console.log('[Factus] Haciendo login completo');
         const credentials = await factusService.getCredentials();
-        if (!credentials) throw new Error('No hay credenciales de Factus configuradas. Ve a Contabilidad → Facturación → Configuración.');
+        if (!credentials) throw new Error('No hay credenciales de Factus configuradas. Ve a Facturación → Configuración.');
         const data = await factusService.login(credentials);
         return data.access_token;
     },
@@ -140,15 +173,11 @@ const factusService = {
     // 2. FACTURAS (BILLS)
     // ============================================================
 
-    /**
-     * Crea y valida una factura electrónica en la DIAN vía Factus.
-     * @param {object} invoiceData - Payload completo para /v1/bills/validate
-     */
     createInvoice: async (invoiceData) => {
         const { baseUrl } = await _getBaseUrl();
         const token = await factusService.getToken();
 
-        const response = await fetch(`${baseUrl}/v1/bills/validate`, {
+        const response = await _fetchWithTimeout(`${baseUrl}/v1/bills/validate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -158,28 +187,22 @@ const factusService = {
             body: JSON.stringify(invoiceData)
         });
 
-        const data = await response.json();
+        let data;
+        try { data = await response.json(); }
+        catch { throw new Error(`Factus respondió con un formato inesperado (HTTP ${response.status})`); }
+
         if (!response.ok) {
-            // Factus retorna errores de validación estructurados
-            const errorsObj = data.errors || data.message || data;
-            const errorMsg = typeof errorsObj === 'object'
-                ? Object.entries(errorsObj).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n')
-                : String(errorsObj);
-            throw new Error(errorMsg);
+            throw new Error(_parseFactusError(data, response.status));
         }
 
         return data;
     },
 
-    /**
-     * Consulta el detalle de una factura por número de documento.
-     * @param {string} docNumber - Ej: "FV-001" o "1"
-     */
     getInvoice: async (docNumber) => {
         const { baseUrl } = await _getBaseUrl();
         const token = await factusService.getToken();
 
-        const response = await fetch(`${baseUrl}/v1/bills/show/${docNumber}`, {
+        const response = await _fetchWithTimeout(`${baseUrl}/v1/bills/show/${docNumber}`, {
             headers: {
                 'Accept': 'application/json',
                 'Authorization': `Bearer ${token}`
@@ -191,41 +214,44 @@ const factusService = {
         return data;
     },
 
-    /**
-     * Descarga el PDF de una factura como Blob.
-     * @param {string} docNumber - Número de documento Factus
-     */
     downloadPdf: async (docNumber) => {
         const { baseUrl } = await _getBaseUrl();
         const token = await factusService.getToken();
 
-        const response = await fetch(`${baseUrl}/v1/bills/download-pdf/${docNumber}`, {
+        const response = await _fetchWithTimeout(`${baseUrl}/v1/bills/download-pdf/${docNumber}`, {
             headers: {
                 'Accept': 'application/json',
                 'Authorization': `Bearer ${token}`
             }
-        });
+        }, 20_000); // PDF puede tardar un poco más
 
+        const data = await response.json();
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.message || `Error ${response.status} descargando PDF`);
+            throw new Error(data.message || `Error ${response.status} descargando PDF`);
         }
 
-        return response.blob();
+        if (data && data.data && data.data.pdf_base_64_encoded) {
+            const byteCharacters = atob(data.data.pdf_base_64_encoded);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            return new Blob([byteArray], { type: 'application/pdf' });
+        }
+
+        throw new Error('El PDF no está disponible en la respuesta de Factus');
     },
 
     // ============================================================
     // 3. RANGOS DE NUMERACIÓN
     // ============================================================
 
-    /**
-     * Obtiene los rangos de numeración activos de la cuenta.
-     */
     getRanges: async () => {
         const { baseUrl } = await _getBaseUrl();
         const token = await factusService.getToken();
 
-        const response = await fetch(
+        const response = await _fetchWithTimeout(
             `${baseUrl}/v1/numbering-ranges?filter[id]=&filter[document]=&filter[company_id]=`,
             {
                 headers: {
@@ -235,7 +261,10 @@ const factusService = {
             }
         );
 
-        const data = await response.json();
+        let data;
+        try { data = await response.json(); }
+        catch { throw new Error(`Factus devolvió una respuesta inválida al consultar rangos (HTTP ${response.status})`); }
+
         if (!response.ok) throw new Error(data.message || 'Error consultando rangos');
         return data;
     },
@@ -244,9 +273,6 @@ const factusService = {
     // 4. CREDENCIALES (Supabase)
     // ============================================================
 
-    /**
-     * Guarda las credenciales en la tabla app_settings de Supabase.
-     */
     saveCredentials: async (credentials) => {
         const { error } = await supabase
             .from('app_settings')
@@ -257,15 +283,9 @@ const factusService = {
             }, { onConflict: 'key' });
 
         if (error) throw error;
-
-        // Limpiar caché al cambiar credenciales
         _tokenCache = { access_token: null, refresh_token: null, expires_at: null, environment: null };
     },
 
-    /**
-     * Recupera las credenciales guardadas en Supabase.
-     * @returns {object|null} credentials con campos: email, password, client_id, client_secret, environment
-     */
     getCredentials: async () => {
         const { data, error } = await supabase
             .from('app_settings')
@@ -277,9 +297,6 @@ const factusService = {
         return data?.value || null;
     },
 
-    /**
-     * Expone el estado del token en caché (para mostrar en UI).
-     */
     getTokenStatus: () => {
         if (!_tokenCache.access_token) return { active: false };
         const remainingMs = _tokenCache.expires_at - Date.now();
