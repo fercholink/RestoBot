@@ -434,16 +434,80 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
 
             if (roomError) throw roomError;
 
-            // 4. Generate Receipt Data for Printing
+            // 3. Crear Registro en ORDERS para Facturación Electrónica (Shadow Order)
+            // Esto permite que el checkout aparezca en el módulo de facturación
             const currentBranch = branches.find(b => b.id === selectedBranchId);
             const roomNumber = rooms.find(r => r.id === booking.room_id)?.number || '';
 
-            // Calculate nights for receipt detail
-            const start = new Date(booking.check_in);
-            const end = new Date(booking.check_out);
+            // Calcular noches
+            const startStr = booking.check_in.split('T')[0];
+            const endStr = new Date().toISOString().split('T')[0]; // Fecha real de salida
+            const start = new Date(startStr);
+            const end = new Date(endStr);
             let nights = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-            if (nights < 1) nights = 1;
+            if (nights < 1) nights = 1; // Mínimo 1 noche
 
+            const accommodationTotal = booking.price_per_night * nights; // Recalcular basado en noches reales o usar booking.total_price?
+            // Mejor usamos booking.total_price seguro, pero para el item necesitamos desglose
+            const finalTotal = extraData?.grandTotal || booking.total_price || 0;
+
+            const { data: orderData, error: orderError } = await supabase
+                .from('orders')
+                .insert([{
+                    customer_name: taxData?.names || booking.guest?.full_name || 'Huésped Hotel',
+                    customer_phone: taxData?.phone || booking.guest?.phone,
+                    table_number: `HAB-${roomNumber}`, // Identificador especial
+                    status: 'pagado', // Ya sale pagado
+                    total: finalTotal,
+                    payment_method: 'efectivo', // Ojo: Deberíamos capturar el método real desde el modal
+                    is_paid: true,
+                    type: 'habitacion', // Nuevo tipo implícito
+                    branch_id: selectedBranchId,
+                    tax_data: taxData, // ¡CRÍTICO! Aquí van los datos de facturación
+                    notes: `Checkout Habitación ${roomNumber}. Estadía: ${startStr} a ${endStr}`
+                }])
+                .select()
+                .single();
+
+            if (orderError) {
+                console.error("Error creating shadow order:", orderError);
+                // No bloqueamos el checkout si falla esto, pero avisamos
+                // alert("Advertencia: No se pudo crear el registro para facturación.");
+            } else {
+                // Crear Items del Pedido (Alojamiento + Extras)
+                const orderItems = [];
+
+                // Item Alojamiento
+                orderItems.push({
+                    order_id: orderData.id,
+                    product_id: null, // No es un producto del inventario
+                    product_name: `Alojamiento Hab. ${roomNumber} (${nights} noches)`,
+                    quantity: 1, // O nights? Factus prefiere cantidad 1 con valor total a veces, o unit * nights
+                    unit_price: accommodationTotal,
+                    price: accommodationTotal, // Legacy/New column fix
+                    total: accommodationTotal
+                });
+
+                // Items Extras (Room Charges)
+                if (extraData?.roomCharges?.length > 0) {
+                    extraData.roomCharges.forEach(charge => {
+                        orderItems.push({
+                            order_id: orderData.id,
+                            product_id: null,
+                            product_name: charge.description || 'Consumo Extra Hotel',
+                            quantity: 1,
+                            unit_price: charge.amount,
+                            price: charge.amount,
+                            total: charge.amount
+                        });
+                    });
+                }
+
+                const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
+                if (itemsError) console.error("Error creating order items:", itemsError);
+            }
+
+            // 4. Generate Receipt Data for Printing (Legacy Logic preserved)
             const receiptItems = [
                 {
                     quantity: nights,
@@ -468,7 +532,7 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
             }
 
             const receiptData = {
-                id: booking.id, // Consecutivo
+                id: orderData ? orderData.id : booking.id, // Preferimos el ID del pedido nuevo si existe
                 prefix: 'HTL',
                 created_at: new Date().toISOString(),
                 type: taxData ? 'factura_hotel' : 'recibo',
@@ -494,13 +558,13 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
 
                 // Items & Totals
                 items: receiptItems,
-                subtotal: extraData?.grandTotal || booking.total_price || 0, // Simplified for now
-                total_price: extraData?.grandTotal || booking.total_price || 0,
+                subtotal: finalTotal,
+                total_price: finalTotal,
                 payment_method: 'Efectivo', // This should technically come from PaymentModal
 
-                // Electronic Invoice Mocks
-                cufe: taxData ? '8e4f2a5b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4' : null,
-                qr_code: taxData ? 'QR_DATA' : null
+                // Electronic Invoice Mocks (Solo visual si no hay integración real aquí todavía)
+                cufe: null,
+                qr_code: null
             };
 
             console.log("Generating Receipt:", receiptData);
@@ -510,7 +574,6 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
             setSelectedBooking(null); // Close modal
         } catch (error) {
             console.error("Error en checkout:", error);
-            // Revert optimistic update if failed (Optional but recommended)
             alert("Error al procesar salida: " + error.message);
             await loadBranchData();
         } finally {

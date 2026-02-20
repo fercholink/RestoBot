@@ -106,6 +106,24 @@ const factusService = {
         }
     },
 
+    // 5. Download Pdf
+    downloadPdf: async (token, number) => {
+        try {
+            const response = await fetch(`${BASE_URL}/v1/bills/download-pdf/${number}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (!response.ok) throw new Error('Error descargando PDF');
+            return await response.blob();
+        } catch (error) {
+            throw error;
+        }
+    },
+
     // Helper: Save Credentials to Supabase
     saveCredentials: async (credentials) => {
         const { error } = await supabase

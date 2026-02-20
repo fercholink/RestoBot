@@ -404,6 +404,7 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                     },
                     shift_id: shiftId,
                     branch_id: user?.branch_id,
+                    tax_data: null, // Explicitly set null to avoid issues
                     created_at: new Date().toISOString()
                 }])
                 .select()
@@ -417,7 +418,9 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                 product_id: item.id,
                 product_name: item.name,
                 quantity: item.quantity,
-                price: item.price, // CORRECTED: DB expects 'price' (NOT NULL), not 'unit_price'
+                quantity: item.quantity,
+                price: item.price,
+                unit_price: item.price, // Send both to be safe with schema variations
                 customization: item.customizations
             }));
 
