@@ -1119,7 +1119,7 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
 
                                                             {/* Render Bookings for this Room */}
                                                             {bookings
-                                                                .filter(b => b.room_id == room.id && b.status !== 'cancelada')
+                                                                .filter(b => b.room_id == room.id && b.status !== 'cancelada' && b.status !== 'checkout')
                                                                 .map(booking => {
                                                                     // Safe Parse for Calendar
                                                                     const parseDate = (dateStr) => {
@@ -1287,28 +1287,7 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                     onAfterPrint={() => setLastReceipt(null)}
                 />
             )}
-            {/* DEBUG OVERLAY - TEMPORARY */}
-            <div className="fixed bottom-4 right-4 bg-black/90 text-white p-4 rounded-xl z-[9999] text-xs max-w-sm shadow-2xl border border-white/20">
-                <p className="font-bold border-b border-gray-600 pb-2 mb-2 flex justify-between items-center">
-                    <span>Debug Info</span>
-                    <button onClick={() => loadBranchData()} className="bg-white/20 px-2 py-0.5 rounded hover:bg-white/30">Reload</button>
-                </p>
-                <div className="space-y-1 font-mono">
-                    <p>Branch ID: <span className="text-yellow-400 font-bold">{selectedBranchId}</span></p>
-                    <p>Reservas en memoria: <span className="text-green-400 font-bold">{bookings.length}</span></p>
-                    <p>Habitaciones: <span className="text-blue-400 font-bold">{rooms.length}</span></p>
-                    <p>Current Date: {currentDate.toISOString().split('T')[0]}</p>
-                    {bookings.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-gray-700 text-[10px] opacity-75">
-                            <p>First Booking:</p>
-                            <p>ID: {bookings[0].id}</p>
-                            <p>In: {bookings[0].check_in}</p>
-                            <p>Out: {bookings[0].check_out}</p>
-                            <p>Room: {bookings[0].room_id} ({typeof bookings[0].room_id})</p>
-                        </div>
-                    )}
-                </div>
-            </div>
+
 
         </div>
     );
