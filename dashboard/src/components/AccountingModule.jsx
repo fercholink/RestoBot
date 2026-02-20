@@ -1,16 +1,54 @@
-import React, { useState } from 'react';
-import { Landmark, TrendingUp, TrendingDown, FileText, Receipt, PieChart, Calculator, AlertCircle, Save, Download, Plus, Briefcase, FileSpreadsheet, ShieldCheck, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Landmark, TrendingUp, TrendingDown, FileText, Receipt, PieChart, Calculator, AlertCircle, Save, Download, Plus, Briefcase, FileSpreadsheet, ShieldCheck, ChevronRight, RefreshCw, CheckCircle } from 'lucide-react';
 import ElectronicInvoicing from './accounting/ElectronicInvoicing';
+import { supabase } from '../lib/supabase';
 
 const AccountingModule = ({ orders }) => {
     const [activeSubTab, setActiveSubTab] = useState('summary');
+    const [dailyStats, setDailyStats] = useState({
+        totalIncome: 0,
+        invoicesEmitted: 0,
+        paidOrders: 0,
+        pendingToInvoice: 0,
+        loadingStats: true
+    });
 
-    // Datos simulados para contabilidad
-    const financials = {
-        utility: '$2.840.000',
-        utilityPercent: '+8.4%',
-        activeAccounts: 12,
-        pendingTax: '$450.000'
+    useEffect(() => {
+        if (activeSubTab === 'summary') fetchDailyStats();
+    }, [activeSubTab]);
+
+    const fetchDailyStats = async () => {
+        setDailyStats(prev => ({ ...prev, loadingStats: true }));
+        try {
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+            const todayEnd = new Date();
+            todayEnd.setHours(23, 59, 59, 999);
+
+            const { data: ordersToday, error } = await supabase
+                .from('orders')
+                .select('id, total, total_price, is_paid, factus_doc_number')
+                .gte('created_at', todayStart.toISOString())
+                .lte('created_at', todayEnd.toISOString());
+
+            if (error) throw error;
+
+            const paid = (ordersToday || []).filter(o => o.is_paid);
+            const totalIncome = paid.reduce((sum, o) => sum + (o.total || o.total_price || 0), 0);
+            const invoicesEmitted = paid.filter(o => o.factus_doc_number).length;
+            const pendingToInvoice = paid.filter(o => !o.factus_doc_number).length;
+
+            setDailyStats({
+                totalIncome,
+                invoicesEmitted,
+                paidOrders: paid.length,
+                pendingToInvoice,
+                loadingStats: false
+            });
+        } catch (err) {
+            console.error('Error cargando stats:', err);
+            setDailyStats(prev => ({ ...prev, loadingStats: false }));
+        }
     };
 
     const ledgers = [
@@ -64,36 +102,52 @@ const AccountingModule = ({ orders }) => {
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                 {activeSubTab === 'summary' && (
                     <>
-                        {/* Quick Cards */}
+
+                        {/* Quick Cards — Datos Reales */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            {/* Ingresos del Día */}
                             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
                                 <div className="flex justify-between items-center mb-4">
-                                    <div className="p-3 rounded-2xl bg-success/10 text-success"><TrendingUp size={20} /></div>
-                                    <span className="text-[10px] font-black text-success uppercase tracking-widest">{financials.utilityPercent}</span>
+                                    <div className="p-3 rounded-2xl bg-emerald-100 text-emerald-600"><TrendingUp size={20} /></div>
+                                    {dailyStats.loadingStats
+                                        ? <RefreshCw size={14} className="animate-spin text-gray-300" />
+                                        : <span className="text-[10px] font-black text-emerald-600 uppercase">Hoy</span>
+                                    }
                                 </div>
-                                <p className="text-[10px] font-black text-accent uppercase tracking-widest mb-1">Utilidad Neta</p>
-                                <h3 className="text-2xl font-black text-secondary">{financials.utility}</h3>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ingresos del Día</p>
+                                <h3 className="text-2xl font-black text-secondary">
+                                    ${dailyStats.totalIncome.toLocaleString('es-CO')}
+                                </h3>
                             </div>
+
+                            {/* Pedidos Pagados */}
                             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
                                 <div className="flex justify-between items-center mb-4">
-                                    <div className="p-3 rounded-2xl bg-primary/10 text-primary"><Calculator size={20} /></div>
+                                    <div className="p-3 rounded-2xl bg-blue-100 text-blue-600"><Calculator size={20} /></div>
                                 </div>
-                                <p className="text-[10px] font-black text-accent uppercase tracking-widest mb-1">Cuentas por Cobrar</p>
-                                <h3 className="text-2xl font-black text-secondary">$1.200.000</h3>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Pedidos Pagados Hoy</p>
+                                <h3 className="text-2xl font-black text-secondary">{dailyStats.paidOrders}</h3>
                             </div>
+
+                            {/* Facturas Emitidas */}
                             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
                                 <div className="flex justify-between items-center mb-4">
-                                    <div className="p-3 rounded-2xl bg-warning/10 text-warning"><Landmark size={20} /></div>
+                                    <div className="p-3 rounded-2xl bg-purple-100 text-purple-600"><CheckCircle size={20} /></div>
                                 </div>
-                                <p className="text-[10px] font-black text-accent uppercase tracking-widest mb-1">Pasivos Totales</p>
-                                <h3 className="text-2xl font-black text-secondary">$840.000</h3>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Facturas Emitidas</p>
+                                <h3 className="text-2xl font-black text-secondary">{dailyStats.invoicesEmitted}</h3>
                             </div>
-                            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm border-l-4 border-l-secondary">
+
+                            {/* Pendientes por Facturar */}
+                            <div className={`bg-white p-6 rounded-3xl border shadow-sm ${dailyStats.pendingToInvoice > 0 ? 'border-orange-200 border-l-4 border-l-orange-400' : 'border-gray-100'}`}>
                                 <div className="flex justify-between items-center mb-4">
-                                    <div className="p-3 rounded-2xl bg-secondary/5 text-secondary"><AlertCircle size={20} /></div>
+                                    <div className="p-3 rounded-2xl bg-orange-100 text-orange-500"><AlertCircle size={20} /></div>
+                                    {dailyStats.pendingToInvoice > 0 && (
+                                        <span className="text-[10px] font-black text-orange-500 bg-orange-50 px-2 py-1 rounded-full">Pendiente</span>
+                                    )}
                                 </div>
-                                <p className="text-[10px] font-black text-accent uppercase tracking-widest mb-1">Impuestos Pendientes</p>
-                                <h3 className="text-2xl font-black text-secondary">{financials.pendingTax}</h3>
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Sin Facturar</p>
+                                <h3 className="text-2xl font-black text-secondary">{dailyStats.pendingToInvoice}</h3>
                             </div>
                         </div>
 
