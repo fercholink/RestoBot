@@ -84,10 +84,13 @@ const ElectronicInvoicing = () => {
                 .limit(100);
 
             if (subTab === 'pending') {
-                query = query.eq('is_paid', true).is('factus_doc_number', null);
+                query = query.or('is_paid.eq.true,status.eq.pagado').is('factus_doc_number', null);
             } else if (subTab === 'history') {
                 query = query.not('factus_doc_number', 'is', null);
             }
+
+            // Filtrar y excluir cargos a habitación, ya que se facturan en el checkout del huésped
+            query = query.or('table_number.not.ilike.HAB-%,table_number.is.null');
 
             const { data, error } = await query;
             if (error) throw error;

@@ -114,7 +114,7 @@ const AccountingModule = () => {
                 totalIncome,
                 invoicesEmitted: paid.filter(o => o.factus_doc_number).length,
                 paidOrders: paid.length,
-                pendingToInvoice: paid.filter(o => !o.factus_doc_number).length,
+                pendingToInvoice: paid.filter(o => !o.factus_doc_number && getOrderType(o) !== 'habitacion').length,
                 loading: false
             });
             setTodayOrders(allMovements);
