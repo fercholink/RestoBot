@@ -418,7 +418,6 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                 product_id: item.id,
                 product_name: item.name,
                 quantity: item.quantity,
-                quantity: item.quantity,
                 price: item.price,
                 unit_price: item.price, // Send both to be safe with schema variations
                 customization: item.customizations
