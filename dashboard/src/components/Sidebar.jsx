@@ -19,6 +19,7 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
     const hotelSubItems = [
         { id: 'habitaciones', label: 'Habitaciones', roles: ['admin', 'gerente'] },
         { id: 'calendario', label: 'Calendario', roles: ['admin', 'gerente'] },
+        { id: 'canales', label: '📩 Canales OTA', roles: ['admin', 'gerente'] },
         { id: 'historial', label: 'Historial', roles: ['admin', 'gerente'] },
         { id: 'floors', label: 'Pisos y Zonas', roles: ['admin', 'gerente'] },
     ].filter(item => item.roles.includes(user?.role || 'cajero'));

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Printer, Bed, Calendar, Key, Users, History, Settings, Bell, Star, MapPin, Search, Plus, Loader, Trash2, Edit, Tv, Wifi, Wind, ChevronLeft, ChevronRight, Building, Check, Hash, LayoutList, Columns } from 'lucide-react';
+import { Printer, Bed, Calendar, Key, Users, History, Settings, Bell, Star, MapPin, Search, Plus, Loader, Trash2, Edit, Tv, Wifi, Wind, ChevronLeft, ChevronRight, Building, Check, Hash, LayoutList, Columns, Inbox } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import NewReservationModal from './NewReservationModal';
 import RoomModal from './RoomModal';
@@ -8,6 +8,7 @@ import ReservationDetailsModal from './ReservationDetailsModal';
 import PaymentModal from './PaymentModal';
 import TicketPrinter from './TicketPrinter';
 import FloorManager from './FloorManager';
+import ChannelInbox from './ChannelInbox';
 
 // Helper Component for Cleaning Timer
 const CleaningTimer = ({ startTime }) => {
@@ -1208,6 +1209,14 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                             );
                         })()}
                     </div>
+                </div>
+            ) : activeSubTab === 'canales' ? (
+                <div className="p-4">
+                    <ChannelInbox
+                        rooms={rooms}
+                        branches={branches}
+                        selectedBranchId={selectedBranchId}
+                    />
                 </div>
             ) : activeSubTab === 'historial' ? (
                 <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
