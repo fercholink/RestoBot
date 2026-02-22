@@ -304,50 +304,72 @@ const ChannelInbox = ({ rooms = [], branches = [], selectedBranchId }) => {
             return;
         }
         try {
-            // 1. Crear booking real
+            const nights = cb.nights || Math.max(
+                1,
+                Math.ceil((new Date(cb.check_out) - new Date(cb.check_in)) / (1000 * 60 * 60 * 24))
+            );
+
+            // 1. Crear booking real — solo campos que seguro existen en la tabla
+            const bookingPayload = {
+                room_id: Number(roomId),
+                check_in: cb.check_in,
+                check_out: cb.check_out,
+                status: 'reservada',
+                total_price: cb.total_amount || 0,
+                price_per_night: nights > 0 ? Math.round((cb.total_amount || 0) / nights) : 0,
+            };
+
+            // Agregar branch_id solo si existe
+            if (selectedBranchId) bookingPayload.branch_id = Number(selectedBranchId);
+
+            console.log('[ChannelInbox] Inserting booking:', bookingPayload);
+
             const { data: newBooking, error: bError } = await supabase
                 .from('bookings')
-                .insert([{
-                    room_id: roomId,
-                    branch_id: selectedBranchId,
-                    check_in: cb.check_in,
-                    check_out: cb.check_out,
-                    status: 'reservada',
-                    total_price: cb.total_amount || 0,
-                    price_per_night: cb.nights ? (cb.total_amount / cb.nights) : 0,
-                    notes: `[${CHANNEL_CONFIG[cb.channel]?.label || cb.channel}] ${cb.notes || ''}`.trim(),
-                }])
+                .insert([bookingPayload])
                 .select()
                 .single();
 
-            if (bError) throw bError;
-
-            // Si hay datos del huésped, crear/actualizar el guest
-            if (cb.guest_name) {
-                const { data: guest } = await supabase
-                    .from('guests')
-                    .insert([{
-                        full_name: cb.guest_name,
-                        email: cb.guest_email || null,
-                        phone: cb.guest_phone || null,
-                    }])
-                    .select()
-                    .single();
-
-                if (guest) {
-                    await supabase.from('bookings').update({ guest_id: guest.id }).eq('id', newBooking.id);
-                }
+            if (bError) {
+                console.error('[ChannelInbox] bookings insert error:', bError);
+                throw new Error(`Error creando reserva: ${bError.message}`);
             }
 
-            // 2. Actualizar channel_booking
-            await supabase
+            // 2. Intentar crear guest (silencioso si falla — tabla opcional)
+            try {
+                if (cb.guest_name) {
+                    const { data: guest, error: gError } = await supabase
+                        .from('guests')
+                        .insert([{
+                            full_name: cb.guest_name,
+                            email: cb.guest_email || null,
+                            phone: cb.guest_phone || null,
+                        }])
+                        .select()
+                        .single();
+
+                    if (!gError && guest) {
+                        await supabase.from('bookings').update({ guest_id: guest.id }).eq('id', newBooking.id);
+                    } else if (gError) {
+                        console.warn('[ChannelInbox] guest insert skipped:', gError.message);
+                    }
+                }
+            } catch (guestErr) {
+                console.warn('[ChannelInbox] guest creation failed (non-blocking):', guestErr.message);
+            }
+
+            // 3. Marcar channel_booking como confirmada
+            const { error: cbError } = await supabase
                 .from('channel_bookings')
                 .update({ status: 'confirmada', booking_id: Number(newBooking.id) })
                 .eq('id', cb.id);
 
-            sileo.success({ title: '✅ Reserva Confirmada', description: `${cb.guest_name} asignado/a correctamente.` });
+            if (cbError) console.warn('[ChannelInbox] channel_booking update error:', cbError.message);
+
+            sileo.success({ title: '✅ Reserva Confirmada', description: `${cb.guest_name} asignado/a a la habitación correctamente.` });
             fetchChannelBookings();
         } catch (error) {
+            console.error('[ChannelInbox] handleConfirm error:', error);
             sileo.error({ title: 'Error al confirmar', description: error.message });
         }
     };
