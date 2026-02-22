@@ -110,7 +110,6 @@ const UserManagement = () => {
             password: '',
             role: user.role,
             branch_id: user.branch_id || branches[0]?.id,
-            branch_id: user.branch_id || branches[0]?.id,
             // Fusionar permisos existentes con los nuevos (para que aparezcan los nuevos módulos en usuarios antiguos)
             permissions: { ...INITIAL_PERMISSIONS, ...(user.permissions || {}) }
         });
