@@ -12,6 +12,13 @@ const TenantAccountingConfig = () => {
     const [errorMsg, setErrorMsg] = useState(null);
     const [activeModules, setActiveModules] = useState([]);
 
+    const DOC_TYPES = [
+        { id: 'NIT', label: 'NIT' },
+        { id: 'CC', label: 'Cédula de Ciudadanía' },
+        { id: 'CE', label: 'Cédula de Extranjería' },
+        { id: 'TI', label: 'Tarjeta de Identidad' },
+    ];
+
     const MACRO_SECTORS = ['Servicios', 'Comercio', 'Manufactura'];
     const SIZES = ['Microempresa', 'Pequeña', 'Mediana', 'Grande'];
     const LEGAL_FORMS = ['Persona Natural', 'SAS', 'SA', 'Limitada', 'En Comandita'];
@@ -74,7 +81,15 @@ const TenantAccountingConfig = () => {
                     size_classification: 'Microempresa',
                     legal_form: 'SAS',
                     niif_group: 3,
-                    tax_regime: 'responsable_iva'
+                    tax_regime: 'responsable_iva',
+                    business_name: profile?.organizations?.name || 'Nombre Empresa',
+                    document_type: 'NIT',
+                    document_number: '',
+                    verification_digit: '',
+                    email: profile?.organizations?.contact_email || '',
+                    phone: '',
+                    address: '',
+                    city: ''
                 };
                 const { data: inserted, error: insertError } = await supabase
                     .from('tenant_accounting_config')
@@ -119,6 +134,14 @@ const TenantAccountingConfig = () => {
                     is_great_contributor: config.is_great_contributor,
                     is_self_retaining: config.is_self_retaining,
                     tax_regime: config.tax_regime,
+                    business_name: config.business_name,
+                    document_type: config.document_type,
+                    document_number: config.document_number,
+                    verification_digit: config.verification_digit,
+                    email: config.email,
+                    phone: config.phone,
+                    address: config.address,
+                    city: config.city,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', config.id);
@@ -166,6 +189,106 @@ const TenantAccountingConfig = () => {
 
             <form onSubmit={handleSave} className="space-y-6">
 
+                {/* 0. PERFIL EMPRESARIAL BÁSICO (DIAN) */}
+                <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-2 h-full bg-rose-500 rounded-l-[2rem]"></div>
+                    <h3 className="text-base font-black text-secondary mb-4 uppercase tracking-widest flex items-center gap-2">
+                        <Briefcase size={18} className="text-rose-500" />
+                        Perfil Empresarial (Obligatorio FE)
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                        <div className="lg:col-span-2">
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Razón Social / Nombre Comercial</label>
+                            <input
+                                required
+                                type="text"
+                                value={config?.business_name || ''}
+                                onChange={e => setConfig({ ...config, business_name: e.target.value })}
+                                placeholder="NOMBRE DE LA EMPRESA SAS"
+                                className="w-full bg-gray-50 border border-gray-200 text-secondary text-sm rounded-xl focus:ring-rose-500 focus:border-rose-500 block p-3 font-bold outline-none uppercase transition-all"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Tipo Doc.</label>
+                            <select
+                                value={config?.document_type || 'NIT'}
+                                onChange={e => setConfig({ ...config, document_type: e.target.value })}
+                                className="w-full bg-gray-50 border border-gray-200 text-secondary text-sm rounded-xl focus:ring-rose-500 focus:border-rose-500 block p-3 font-medium outline-none transition-all"
+                            >
+                                {DOC_TYPES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                            </select>
+                        </div>
+                        <div className="flex gap-2">
+                            <div className="flex-1">
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">NIT / CC</label>
+                                <input
+                                    required
+                                    type="text"
+                                    value={config?.document_number || ''}
+                                    onChange={e => setConfig({ ...config, document_number: e.target.value })}
+                                    className="w-full bg-gray-50 border border-gray-200 text-secondary text-sm rounded-xl focus:ring-rose-500 focus:border-rose-500 block p-3 font-mono font-bold outline-none transition-all"
+                                />
+                            </div>
+                            {config?.document_type === 'NIT' && (
+                                <div className="w-16">
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">DV</label>
+                                    <input
+                                        type="text"
+                                        maxLength="1"
+                                        value={config?.verification_digit || ''}
+                                        onChange={e => setConfig({ ...config, verification_digit: e.target.value.replace(/\D/g, '') })}
+                                        className="w-full bg-gray-50 border border-gray-200 text-secondary text-sm rounded-xl focus:ring-rose-500 focus:border-rose-500 block p-3 text-center font-mono font-bold outline-none transition-all"
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="lg:col-span-1">
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Correo Facturación</label>
+                            <input
+                                required
+                                type="email"
+                                value={config?.email || ''}
+                                onChange={e => setConfig({ ...config, email: e.target.value })}
+                                placeholder="fe@empresa.com"
+                                className="w-full bg-gray-50 border border-gray-200 text-secondary text-sm rounded-xl focus:ring-rose-500 focus:border-rose-500 block p-3 font-medium outline-none transition-all"
+                            />
+                        </div>
+                        <div className="lg:col-span-1">
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Teléfono Principal</label>
+                            <input
+                                required
+                                type="text"
+                                value={config?.phone || ''}
+                                onChange={e => setConfig({ ...config, phone: e.target.value })}
+                                className="w-full bg-gray-50 border border-gray-200 text-secondary text-sm rounded-xl focus:ring-rose-500 focus:border-rose-500 block p-3 font-medium outline-none transition-all"
+                            />
+                        </div>
+                        <div className="lg:col-span-1">
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Ciudad (Código DANE)</label>
+                            <input
+                                type="text"
+                                value={config?.city || ''}
+                                onChange={e => setConfig({ ...config, city: e.target.value })}
+                                className="w-full bg-gray-50 border border-gray-200 text-secondary text-sm rounded-xl focus:ring-rose-500 focus:border-rose-500 block p-3 font-medium outline-none transition-all"
+                            />
+                        </div>
+                        <div className="lg:col-span-1">
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Dirección Sede Principal</label>
+                            <input
+                                required
+                                type="text"
+                                value={config?.address || ''}
+                                onChange={e => setConfig({ ...config, address: e.target.value })}
+                                className="w-full bg-gray-50 border border-gray-200 text-secondary text-sm rounded-xl focus:ring-rose-500 focus:border-rose-500 block p-3 font-medium outline-none transition-all"
+                            />
+                        </div>
+                    </div>
+                </div>
+
                 {/* 1. MÓDULO PRINCIPAL */}
                 <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-2 h-full bg-blue-500 rounded-l-[2rem]"></div>
@@ -184,8 +307,8 @@ const TenantAccountingConfig = () => {
                                 key={ind.id}
                                 onClick={() => setConfig({ ...config, primary_industry: ind.id })}
                                 className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${config?.primary_industry === ind.id
-                                        ? 'border-blue-500 bg-blue-50/50'
-                                        : 'border-gray-100 hover:border-gray-200'
+                                    ? 'border-blue-500 bg-blue-50/50'
+                                    : 'border-gray-100 hover:border-gray-200'
                                     }`}
                             >
                                 <div className="flex items-center gap-3 mb-2">
