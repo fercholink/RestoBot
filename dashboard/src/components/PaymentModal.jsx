@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Banknote, Landmark, CheckCircle2, FileText, ChevronDown, Hotel, Search, Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import ThirdPartyModal from './accounting/ThirdPartyModal';
 
 const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
     const [method, setMethod] = useState('efectivo');
@@ -17,6 +18,7 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedThirdParty, setSelectedThirdParty] = useState(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isThirdPartyModalOpen, setIsThirdPartyModalOpen] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -29,8 +31,17 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
             setSearchTerm('');
             setIsDropdownOpen(false);
             setIsElectronic(false);
+            setIsThirdPartyModalOpen(false);
         }
     }, [isOpen]);
+
+    const handleThirdPartySaved = (newTp) => {
+        fetchThirdParties();
+        setSelectedThirdParty(newTp);
+        setIsThirdPartyModalOpen(false);
+        setIsDropdownOpen(false);
+        setSearchTerm('');
+    };
 
     const fetchThirdParties = async () => {
         try {
@@ -296,10 +307,17 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
                                                     </ul>
                                                 ) : (
                                                     <div className="p-4 text-center">
-                                                        <p className="text-xs text-gray-500 mb-2">No se encontraron terceros.</p>
-                                                        <p className="text-[10px] font-bold text-orange-500 bg-orange-50 p-2 rounded-lg">
-                                                            Debe crearlo primero en Contabilidad - Directorio DIAN.
-                                                        </p>
+                                                        <p className="text-xs text-gray-500 mb-3">No se encontraron terceros.</p>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.preventDefault();
+                                                                setIsThirdPartyModalOpen(true);
+                                                            }}
+                                                            className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-100 transition-colors flex items-center gap-2 mx-auto shadow-sm active:scale-95"
+                                                        >
+                                                            <Plus size={14} /> Crear Nuevo Cliente
+                                                        </button>
                                                     </div>
                                                 )}
                                             </div>
@@ -319,6 +337,16 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
                     </button>
                 </form>
             </div>
+
+            {/* Quick Add Third Party Modal */}
+            {isThirdPartyModalOpen && (
+                <ThirdPartyModal
+                    isOpen={isThirdPartyModalOpen}
+                    onClose={() => setIsThirdPartyModalOpen(false)}
+                    onSaved={handleThirdPartySaved}
+                    initialDocNumber={/^\d+$/.test(searchTerm) ? searchTerm : ''}
+                />
+            )}
         </div>
     );
 };
