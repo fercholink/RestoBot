@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Banknote, Landmark, CheckCircle2, FileText, ChevronDown, Hotel } from 'lucide-react';
+import { X, Banknote, Landmark, CheckCircle2, FileText, ChevronDown, Hotel, Search, Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
@@ -13,29 +13,37 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
     const [loadingBookings, setLoadingBookings] = useState(false);
 
     // Datos Tributarios (Factus / DIAN)
-    const [taxData, setTaxData] = useState({
-        document_type: '13', // Cédula de Ciudadanía por defecto
-        identification: '',
-        names: '',
-        email: '',
-        type_person: '1' // Persona Natural por defecto
-    });
+    const [thirdParties, setThirdParties] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedThirdParty, setSelectedThirdParty] = useState(null);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             fetchActiveBookings();
+            fetchThirdParties();
             setMethod('efectivo');
             setReference('');
             setSelectedBooking('');
-            setTaxData({
-                document_type: '13',
-                identification: '',
-                names: '',
-                email: '',
-                type_person: '1'
-            });
+            setSelectedThirdParty(null);
+            setSearchTerm('');
+            setIsDropdownOpen(false);
+            setIsElectronic(false);
         }
     }, [isOpen]);
+
+    const fetchThirdParties = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('third_parties')
+                .select('id, document_number, verification_digit, business_name, first_name, last_name, document_type')
+                .eq('is_client', true);
+            if (error) throw error;
+            setThirdParties(data || []);
+        } catch (error) {
+            console.error('Error fetching third parties:', error);
+        }
+    };
 
     const fetchActiveBookings = async () => {
         setLoadingBookings(true);
@@ -70,12 +78,25 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
             return;
         }
 
+        if (isElectronic && !selectedThirdParty) {
+            alert("Por favor seleccione un cliente/tercero para la factura electrónica.");
+            return;
+        }
+
         // If Hotel Charge, we pass bookingId as reference
         const finalRef = method === 'cargo_habitacion' ? selectedBooking : reference;
 
-        onConfirm(orderId, method, finalRef, isElectronic ? taxData : null);
+        // Pasamos el ID del tercero en lugar del objeto manual
+        onConfirm(orderId, method, finalRef, isElectronic ? { third_party_id: selectedThirdParty.id } : null);
         onClose();
     };
+
+    const filteredThirdParties = thirdParties.filter(tp =>
+        (tp.business_name && tp.business_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (tp.first_name && tp.first_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (tp.last_name && tp.last_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        tp.document_number.includes(searchTerm)
+    );
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
@@ -211,67 +232,80 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
 
                         {isElectronic && (
                             <div className="mt-6 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-accent uppercase tracking-widest px-1">Tipo de Persona</label>
-                                        <select
-                                            value={taxData.type_person}
-                                            onChange={(e) => setTaxData({ ...taxData, type_person: e.target.value })}
-                                            className="w-full bg-gray-100 border-none rounded-xl p-3 text-xs font-black text-secondary outline-none focus:ring-2 focus:ring-secondary/20 appearance-none"
+                                <label className="text-[10px] font-black text-accent uppercase tracking-widest px-1">Tercero Contable (Receptor DIAN)</label>
+
+                                {selectedThirdParty ? (
+                                    <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl flex justify-between items-center shadow-sm">
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded font-black uppercase">{selectedThirdParty.document_type}</span>
+                                                <span className="text-sm font-bold text-secondary font-mono">{selectedThirdParty.document_number}{selectedThirdParty.verification_digit ? `-${selectedThirdParty.verification_digit}` : ''}</span>
+                                            </div>
+                                            <p className="text-secondary font-black capitalize mt-1">
+                                                {selectedThirdParty.business_name || `${selectedThirdParty.first_name} ${selectedThirdParty.last_name}`.trim()}
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedThirdParty(null)}
+                                            className="text-rose-500 hover:bg-rose-100 p-2 rounded-lg transition-colors"
                                         >
-                                            <option value="1">Natural</option>
-                                            <option value="2">Jurídica</option>
-                                        </select>
+                                            <X size={16} />
+                                        </button>
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-black text-accent uppercase tracking-widest px-1">Tipo Identificación</label>
-                                        <select
-                                            value={taxData.document_type}
-                                            onChange={(e) => setTaxData({ ...taxData, document_type: e.target.value })}
-                                            className="w-full bg-gray-100 border-none rounded-xl p-3 text-xs font-black text-secondary outline-none focus:ring-2 focus:ring-secondary/20 appearance-none"
-                                        >
-                                            <option value="13">Cédula</option>
-                                            <option value="31">NIT</option>
-                                            <option value="22">Cédula Extranjería</option>
-                                        </select>
+                                ) : (
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <Search size={16} className="text-gray-400" />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-sm font-bold focus:border-secondary focus:ring-2 focus:ring-secondary/20 transition-all outline-none"
+                                            placeholder="Buscar por nombre, razón social o NIT/CC..."
+                                            value={searchTerm}
+                                            onChange={(e) => {
+                                                setSearchTerm(e.target.value);
+                                                setIsDropdownOpen(true);
+                                            }}
+                                            onFocus={() => setIsDropdownOpen(true)}
+                                        />
+
+                                        {isDropdownOpen && searchTerm.length > 0 && (
+                                            <div className="absolute z-10 w-full mt-2 bg-white rounded-xl shadow-xl border border-gray-100 max-h-60 overflow-y-auto custom-scrollbar">
+                                                {filteredThirdParties.length > 0 ? (
+                                                    <ul className="py-2">
+                                                        {filteredThirdParties.map(tp => (
+                                                            <li
+                                                                key={tp.id}
+                                                                className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0"
+                                                                onClick={() => {
+                                                                    setSelectedThirdParty(tp);
+                                                                    setIsDropdownOpen(false);
+                                                                    setSearchTerm('');
+                                                                }}
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-black uppercase">{tp.document_type}</span>
+                                                                    <span className="text-xs font-mono font-bold text-gray-500">{tp.document_number}</span>
+                                                                </div>
+                                                                <div className="text-sm font-black text-secondary mt-0.5">
+                                                                    {tp.business_name || `${tp.first_name} ${tp.last_name}`.trim()}
+                                                                </div>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                ) : (
+                                                    <div className="p-4 text-center">
+                                                        <p className="text-xs text-gray-500 mb-2">No se encontraron terceros.</p>
+                                                        <p className="text-[10px] font-bold text-orange-500 bg-orange-50 p-2 rounded-lg">
+                                                            Debe crearlo primero en Contabilidad - Directorio DIAN.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-accent uppercase tracking-widest px-1">Número de Identificación</label>
-                                    <input
-                                        type="text"
-                                        required={isElectronic}
-                                        value={taxData.identification}
-                                        onChange={(e) => setTaxData({ ...taxData, identification: e.target.value })}
-                                        className="w-full bg-gray-100 border-2 border-transparent rounded-xl p-3 text-sm font-bold focus:border-secondary focus:bg-white transition-all outline-none"
-                                        placeholder="Ej: 1012345678"
-                                    />
-                                </div>
-
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-accent uppercase tracking-widest px-1">Nombre / Razón Social</label>
-                                    <input
-                                        type="text"
-                                        required={isElectronic}
-                                        value={taxData.names}
-                                        onChange={(e) => setTaxData({ ...taxData, names: e.target.value })}
-                                        className="w-full bg-gray-100 border-2 border-transparent rounded-xl p-3 text-sm font-bold focus:border-secondary focus:bg-white transition-all outline-none"
-                                        placeholder="Ej: Juan Perez o Empresa SAS"
-                                    />
-                                </div>
-
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-accent uppercase tracking-widest px-1">Email Tributario</label>
-                                    <input
-                                        type="email"
-                                        required={isElectronic}
-                                        value={taxData.email}
-                                        onChange={(e) => setTaxData({ ...taxData, email: e.target.value })}
-                                        className="w-full bg-gray-100 border-2 border-transparent rounded-xl p-3 text-sm font-bold focus:border-secondary focus:bg-white transition-all outline-none"
-                                        placeholder="ejemplo@correo.com"
-                                    />
-                                </div>
+                                )}
                             </div>
                         )}
                     </div>

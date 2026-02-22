@@ -136,16 +136,42 @@ const ElectronicInvoicing = () => {
             console.log('[Factus] Rangos disponibles:', rangesList.length, rangesList);
             if (rangesList.length > 0) console.table(rangesList);
             // Intentar encontrar el rango correcto de "Factura de Venta". Si no, tomar el primero.
-            const selectedRange = rangesList.find(r => r.document === "Factura de Venta" || r.document === "Factura de venta") || rangesList[0];
             if (!selectedRange) {
                 const env = creds.environment === 'production' ? 'Producción (factus.com.co)' : 'Sandbox (api-sandbox.factus.com.co)';
                 throw new Error(`No hay rangos de numeración activos en Factus (${env}). Ve a Configuración → Rangos de Numeración en el portal de Factus y crea uno.`);
             }
 
+            // 1.5 Obtener datos del tercero si viene referenciado
+            let finalTaxData = order.tax_data;
+            if (order.tax_data?.third_party_id) {
+                const { data: tp, error: tpError } = await supabase
+                    .from('third_parties')
+                    .select('*')
+                    .eq('id', order.tax_data.third_party_id)
+                    .single();
+
+                if (tpError || !tp) {
+                    throw new Error('No se pudo cargar la información del tercero para la factura electrónica.');
+                }
+
+                // Adapter para mapear ThirdParty a nuestro viejo TaxData para no romper el resto del código
+                // En third_parties document_type es texto ('13', '31'), que mapDocType ya maneja.
+                finalTaxData = {
+                    document_type: tp.document_type || '13',
+                    identification: tp.document_number,
+                    names: tp.business_name || `${tp.first_name || ''} ${tp.last_name || ''}`.trim(),
+                    email: tp.email || 'factura@contabilidad.com',
+                    phone: tp.phone || '0000000000',
+                    dv: tp.verification_digit,
+                    type_person: tp.document_type === '31' ? '2' : '1', // '31' (NIT) -> Jurídica, else Natural
+                    address: tp.address || 'Colombia',
+                };
+            }
+
             // 2. Mapear cliente
-            const legalOrg = mapPersonType(order.tax_data);
+            const legalOrg = mapPersonType(finalTaxData);
             const tributeIdClient = mapTributeId(legalOrg);
-            const docType = mapDocType(order.tax_data, legalOrg);
+            const docType = mapDocType(finalTaxData, legalOrg);
             console.log('[Factus] Mapeo cliente → legalOrg:', legalOrg, '| tributeId:', tributeIdClient, '| docType:', docType);
 
             // 3. Ítems — Ajuste de impuestos (Precios POS ya tienen IVA, Factus lo suma)
@@ -181,16 +207,16 @@ const ElectronicInvoicing = () => {
                 payment_form: '1',
                 payment_method_code: mapPaymentMethod(order.payment_method),
                 customer: {
-                    identification: String(order.tax_data?.identification || '222222222222'),
-                    dv: (order.tax_data?.dv !== undefined && order.tax_data?.dv !== null && order.tax_data?.dv !== '')
-                        ? Number(order.tax_data.dv)
+                    identification: String(finalTaxData?.identification || '222222222222'),
+                    dv: (finalTaxData?.dv !== undefined && finalTaxData?.dv !== null && finalTaxData?.dv !== '')
+                        ? Number(finalTaxData.dv)
                         : null,
-                    company: legalOrg === 1 ? (order.tax_data?.names || 'Empresa') : null,
-                    trade_name: legalOrg === 1 ? (order.tax_data?.trade_name || order.tax_data?.names || 'Empresa') : null,
-                    names: legalOrg === 2 ? (order.tax_data?.names || order.customer_name || 'Consumidor Final') : null,
-                    address: order.tax_data?.address || 'Colombia',
-                    email: order.tax_data?.email || 'factura@contabilidad.com',
-                    phone: String(order.customer_phone || order.tax_data?.phone || '3000000000'),
+                    company: legalOrg === 1 ? (finalTaxData?.names || 'Empresa') : null,
+                    trade_name: legalOrg === 1 ? (finalTaxData?.trade_name || finalTaxData?.names || 'Empresa') : null,
+                    names: legalOrg === 2 ? (finalTaxData?.names || order.customer_name || 'Consumidor Final') : null,
+                    address: finalTaxData?.address || 'Colombia',
+                    email: finalTaxData?.email || 'factura@contabilidad.com',
+                    phone: String(order.customer_phone || finalTaxData?.phone || '3000000000'),
                     legal_organization_id: legalOrg,
                     tribute_id: tributeIdClient,
                     identification_document_id: docType

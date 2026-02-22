@@ -16,11 +16,12 @@ const AccountingEntryForm = ({ onCancel, onSuccess }) => {
 
     // Items State
     const [items, setItems] = useState([
-        { id: 1, account_id: '', description: '', debit: 0, credit: 0 },
-        { id: 2, account_id: '', description: '', debit: 0, credit: 0 }
+        { id: 1, account_id: '', description: '', debit: 0, credit: 0, third_party_id: '' },
+        { id: 2, account_id: '', description: '', debit: 0, credit: 0, third_party_id: '' }
     ]);
 
     const [error, setError] = useState(null);
+    const [thirdParties, setThirdParties] = useState([]);
 
     useEffect(() => {
         fetchAccounts();
@@ -29,10 +30,16 @@ const AccountingEntryForm = ({ onCancel, onSuccess }) => {
     const fetchAccounts = async () => {
         const { data } = await supabase
             .from('accounting_accounts')
-            .select('id, code, name')
+            .select('id, code, name, requires_third_party, requires_cost_center')
             .eq('is_movement', true) // Only movement accounts
             .order('code');
         setAccounts(data || []);
+
+        const { data: tpData } = await supabase
+            .from('third_parties')
+            .select('id, business_name, first_name, last_name, document_number')
+            .order('id');
+        setThirdParties(tpData || []);
     };
 
     // Calculations
@@ -42,7 +49,7 @@ const AccountingEntryForm = ({ onCancel, onSuccess }) => {
     const isBalanced = Math.abs(difference) < 0.01;
 
     const handleAddItem = () => {
-        setItems([...items, { id: Date.now(), account_id: '', description: '', debit: 0, credit: 0 }]);
+        setItems([...items, { id: Date.now(), account_id: '', description: '', debit: 0, credit: 0, third_party_id: '' }]);
     };
 
     const handleRemoveItem = (index) => {
@@ -55,6 +62,13 @@ const AccountingEntryForm = ({ onCancel, onSuccess }) => {
     const handleItemChange = (index, field, value) => {
         const newItems = [...items];
         newItems[index][field] = value;
+        // Si cambia la cuenta, limpiar el tercero si la nueva no lo requiere
+        if (field === 'account_id') {
+            const acc = accounts.find(a => a.id === value);
+            if (!acc?.requires_third_party) {
+                newItems[index].third_party_id = '';
+            }
+        }
         setItems(newItems);
     };
 
@@ -75,6 +89,16 @@ const AccountingEntryForm = ({ onCancel, onSuccess }) => {
         if (items.some(i => !i.account_id)) {
             setError('Todas las líneas deben tener una cuenta contable seleccionada.');
             return;
+        }
+
+        // Validar requerimientos DIAN (Tercero)
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const acc = accounts.find(a => a.id === item.account_id);
+            if (acc?.requires_third_party && !item.third_party_id) {
+                setError(`La línea ${i + 1} (${acc.code}) exige un Tercero (NIT). Selecciona uno antes de guardar.`);
+                return;
+            }
         }
 
         setLoading(true);
@@ -99,6 +123,7 @@ const AccountingEntryForm = ({ onCancel, onSuccess }) => {
             const itemsToInsert = items.map(item => ({
                 entry_id: entryData.id,
                 account_id: item.account_id,
+                third_party_id: item.third_party_id || null, // Guardar el tercero asociado
                 description: item.description || header.description, // Fallback to header desc
                 debit: item.debit || 0,
                 credit: item.credit || 0
@@ -220,13 +245,37 @@ const AccountingEntryForm = ({ onCancel, onSuccess }) => {
                                         </select>
                                     </td>
                                     <td className="p-3">
-                                        <input
-                                            type="text"
-                                            className="w-full p-2 rounded-lg border border-gray-200 text-sm focus:border-primary"
-                                            value={item.description}
-                                            onChange={e => handleItemChange(index, 'description', e.target.value)}
-                                            placeholder={header.description || "Detalle..."}
-                                        />
+                                        <div className="flex flex-col gap-1.5">
+                                            <input
+                                                type="text"
+                                                className="w-full p-2 rounded-lg border border-gray-200 text-sm focus:border-primary"
+                                                value={item.description}
+                                                onChange={e => handleItemChange(index, 'description', e.target.value)}
+                                                placeholder={header.description || "Detalle..."}
+                                            />
+                                            {/* Si la cuenta exige tercero, mostrar el select */}
+                                            {(() => {
+                                                const selectedAcc = accounts.find(a => a.id === item.account_id);
+                                                if (selectedAcc?.requires_third_party) {
+                                                    return (
+                                                        <select
+                                                            className="w-full p-1.5 rounded-md border border-amber-200 bg-amber-50 text-xs font-bold text-amber-800 focus:border-amber-400 focus:ring-1 focus:ring-amber-400 outline-none"
+                                                            value={item.third_party_id}
+                                                            onChange={e => handleItemChange(index, 'third_party_id', e.target.value)}
+                                                            required
+                                                        >
+                                                            <option value="">+ Seleccionar Tercero (NIT) requerido...</option>
+                                                            {thirdParties.map(tp => (
+                                                                <option key={tp.id} value={tp.id}>
+                                                                    {tp.document_number} - {tp.business_name || `${tp.first_name} ${tp.last_name}`.trim()}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
+                                        </div>
                                     </td>
                                     <td className="p-3">
                                         <input

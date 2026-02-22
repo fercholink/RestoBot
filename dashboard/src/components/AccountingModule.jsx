@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
     Landmark, TrendingUp, FileText, Receipt, PieChart,
     Calculator, AlertCircle, Briefcase, FileSpreadsheet,
-    ChevronRight, RefreshCw, CheckCircle
+    ChevronRight, RefreshCw, CheckCircle, Building2, Users
 } from 'lucide-react';
 import ElectronicInvoicing from './accounting/ElectronicInvoicing';
+import TenantAccountingConfig from './accounting/TenantAccountingConfig';
+import ThirdPartiesDirectory from './accounting/ThirdPartiesDirectory';
 import { supabase } from '../lib/supabase';
 
 // ─── Helpers de tipo de pedido ───────────────────────────────────────────────
@@ -129,8 +131,10 @@ const AccountingModule = () => {
     const subMenuItems = [
         { id: 'summary', label: 'Resumen Diario', icon: PieChart },
         { id: 'invoicing', label: 'Facturación DIAN', icon: Receipt },
+        { id: 'third_parties', label: 'Directorio DIAN', icon: Users },
         { id: 'payroll', label: 'Nómina Electrónica', icon: Briefcase },
         { id: 'reports', label: 'Informes Legales', icon: FileSpreadsheet },
+        { id: 'config', label: 'Estructura Empresa', icon: Building2 },
     ];
 
     return (
@@ -356,6 +360,12 @@ const AccountingModule = () => {
 
                 {/* ══════════ FACTURACIÓN DIAN ══════════ */}
                 {activeSubTab === 'invoicing' && <ElectronicInvoicing />}
+
+                {/* ══════════ ESTUCTURA EMPRESA (CORE COLOMBIANO) ══════════ */}
+                {activeSubTab === 'config' && <TenantAccountingConfig />}
+
+                {/* ══════════ DIRECTORIO DE TERCEROS ══════════ */}
+                {activeSubTab === 'third_parties' && <ThirdPartiesDirectory />}
 
                 {/* ══════════ NÓMINA ══════════ */}
                 {activeSubTab === 'payroll' && (
