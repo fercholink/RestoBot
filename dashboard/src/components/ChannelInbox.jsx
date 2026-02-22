@@ -319,8 +319,8 @@ const ChannelInbox = ({ rooms = [], branches = [], selectedBranchId }) => {
                 price_per_night: nights > 0 ? Math.round((cb.total_amount || 0) / nights) : 0,
             };
 
-            // Agregar branch_id solo si existe
-            if (selectedBranchId) bookingPayload.branch_id = Number(selectedBranchId);
+            // Agregar branch_id solo si existe en bookings (no todas las instancias lo tienen)
+            // if (selectedBranchId) bookingPayload.branch_id = Number(selectedBranchId);
 
             console.log('[ChannelInbox] Inserting booking:', bookingPayload);
 
