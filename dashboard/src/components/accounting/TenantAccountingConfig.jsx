@@ -59,10 +59,24 @@ const TenantAccountingConfig = () => {
             }
 
             if (!orgId) {
-                // Si definitivamente no hay organización, mostramos un error para que completen la migración SaaS
-                setErrorMsg("Aún no tienes una Organización asignada. Contacta al soporte para inicializar tu cuenta SaaS.");
-                setLoading(false);
-                return;
+                // Si definitivamente no hay organización, intentamos auto-crear una por defecto.
+                // Esto facilita el desarrollo y evita bloquear al usuario.
+                const { data: newOrg, error: newOrgError } = await supabase
+                    .from('organizations')
+                    .insert([{ name: 'Mi Empresa (Default)', owner_id: user.id }])
+                    .select()
+                    .single();
+
+                if (newOrgError) {
+                    setErrorMsg("Aún no tienes una Organización asignada y falló la auto-creación. Por favor, asegúrate de haber ejecutado 'migration_saas_init.sql' en tu panel de Supabase SQL. Detalle: " + newOrgError.message);
+                    setLoading(false);
+                    return;
+                }
+
+                orgId = newOrg.id;
+
+                // Actualizamos el perfil del usuario para asociarlo a esta nueva organización
+                await supabase.from('profiles').update({ organization_id: orgId }).eq('id', user.id);
             }
 
             // 3. Buscar configuración del Tenant
