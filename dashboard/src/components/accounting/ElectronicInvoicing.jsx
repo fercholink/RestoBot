@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
     FileText, CheckCircle, Clock, AlertCircle, RefreshCw,
-    Download, Send, Filter, Building2, UtensilsCrossed, Bike
+    Download, Send, Filter, Building2, UtensilsCrossed, Bike,
+    ChevronLeft, Inbox, ArrowRight, Receipt
 } from 'lucide-react';
 import factusService from '../../services/factusService';
 import FactusConfig from './FactusConfig';
@@ -56,6 +57,7 @@ const ORDER_TYPE_LABEL = {
 // -------------------------------------------------------
 
 const ElectronicInvoicing = () => {
+    const [view, setView] = useState('menu'); // menu | electronic | support | reception
     const [subTab, setSubTab] = useState('pending'); // pending | history | config
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -63,9 +65,9 @@ const ElectronicInvoicing = () => {
     const [envBadge, setEnvBadge] = useState(null);
 
     useEffect(() => {
-        if (subTab !== 'config') fetchOrders();
-        loadEnvBadge();
-    }, [subTab]);
+        if (view === 'electronic' && subTab !== 'config') fetchOrders();
+        if (view !== 'menu') loadEnvBadge();
+    }, [subTab, view]);
 
     const loadEnvBadge = async () => {
         try {
@@ -295,8 +297,80 @@ const ElectronicInvoicing = () => {
     // -------------------------------------------------------
     // Render
     // -------------------------------------------------------
+
+    if (view === 'menu') {
+        const menuOptions = [
+            {
+                id: 'electronic',
+                title: 'Factura electrónica y notas crédito',
+                description: 'Genera facturas electrónicas de venta cumpliendo con todos los requisitos de la DIAN.',
+                icon: FileText,
+                disabled: false
+            },
+            {
+                id: 'support',
+                title: 'Documentos soporte y notas de ajuste',
+                description: 'Emite documentos soporte y notas de ajuste de forma automática y segura.',
+                icon: Receipt,
+                disabled: true
+            },
+            {
+                id: 'reception',
+                title: 'Recepción de documentos',
+                description: 'Emite eventos de acuse para facturas a crédito.',
+                icon: Inbox,
+                disabled: true
+            }
+        ];
+
+        return (
+            <div className="h-full flex flex-col items-center justify-center p-8 fade-in">
+                <div className="max-w-4xl w-full text-center mb-12">
+                    <h2 className="text-3xl font-black text-secondary mb-4 tracking-tight">Integra nuestra API a tu solución de software</h2>
+                    <p className="text-gray-500 font-medium">Si tienes un sistema interno, SaaS, ERP, PMS, TMS, CMS, POS, etc.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full">
+                    {menuOptions.map(opt => (
+                        <div
+                            key={opt.id}
+                            onClick={() => !opt.disabled && setView(opt.id)}
+                            className={`bg-white p-8 rounded-3xl border ${opt.disabled ? 'border-gray-100 opacity-60' : 'border-gray-100 shadow-sm hover:shadow-md cursor-pointer hover:-translate-y-1'} transition-all text-left flex flex-col h-full group`}
+                        >
+                            <div className="w-10 h-10 rounded-2xl bg-slate-100 text-slate-500 flex items-center justify-center mb-6 shrink-0 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                                <opt.icon size={20} />
+                            </div>
+                            <h3 className="text-lg font-black text-secondary mb-3 leading-tight">{opt.title}</h3>
+                            <p className="text-sm font-medium text-gray-500 flex-1">{opt.description}</p>
+
+                            {!opt.disabled ? (
+                                <div className="mt-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    Ingresar <ArrowRight size={12} />
+                                </div>
+                            ) : (
+                                <div className="mt-6">
+                                    <span className="text-[10px] font-black uppercase tracking-widest bg-gray-100 text-gray-400 px-3 py-1 rounded-full">Próximamente</span>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="h-full flex flex-col">
+        <div className="h-full flex flex-col fade-in">
+            {/* Nav / Atrás */}
+            <div className="mb-4">
+                <button
+                    onClick={() => setView('menu')}
+                    className="flex items-center gap-2 text-xs font-black text-gray-400 hover:text-secondary uppercase tracking-widest transition-colors w-fit"
+                >
+                    <ChevronLeft size={16} /> Volver al menú
+                </button>
+            </div>
+
             {/* Tabs + Entorno Badge */}
             <div className="flex items-center gap-2 mb-6 border-b border-gray-100 pb-2">
                 {['pending', 'history', 'config'].map(tab => (
