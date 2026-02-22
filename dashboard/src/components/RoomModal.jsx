@@ -22,8 +22,6 @@ const RoomModal = ({ isOpen, onClose, onRoomSaved, roomToEdit = null, branchId, 
         status: 'disponible',
         beds: 1,
         bathrooms: 1,
-        beds: 1,
-        bathrooms: 1,
         floor_id: '', // Will hold the UID of the floor
         features: {}
     });
