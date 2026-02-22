@@ -14,6 +14,29 @@ const ThirdPartiesDirectory = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingModal, setEditingModal] = useState(null);
+
+    useEffect(() => {
+        fetchThirdParties();
+    }, []);
+
+    const fetchThirdParties = async () => {
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('third_parties')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setThirdParties(data || []);
+        } catch (error) {
+            console.error('Error fetching third parties:', error);
+            sileo.error({ title: 'Error', description: 'No se pudieron cargar los terceros.' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleOpenModal = (tp = null) => {
         setEditingModal(tp);
         setIsModalOpen(true);
