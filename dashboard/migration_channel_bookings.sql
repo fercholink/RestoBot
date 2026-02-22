@@ -41,8 +41,8 @@ CREATE TABLE IF NOT EXISTS public.channel_bookings (
 
     -- Estado en el sistema
     status TEXT DEFAULT 'pendiente' CHECK (status IN ('pendiente', 'confirmada', 'cancelada', 'ignorada')),
-    -- booking_id apunta a la reserva real una vez confirmada
-    booking_id UUID REFERENCES public.bookings(id) ON DELETE SET NULL,
+    -- booking_id apunta a la reserva real una vez confirmada (BIGINT para coincidir con bookings.id)
+    booking_id BIGINT REFERENCES public.bookings(id) ON DELETE SET NULL,
     -- branch_id para multi-sede
     branch_id UUID REFERENCES public.branches(id) ON DELETE SET NULL,
 

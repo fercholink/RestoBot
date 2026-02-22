@@ -342,7 +342,7 @@ const ChannelInbox = ({ rooms = [], branches = [], selectedBranchId }) => {
             // 2. Actualizar channel_booking
             await supabase
                 .from('channel_bookings')
-                .update({ status: 'confirmada', booking_id: newBooking.id })
+                .update({ status: 'confirmada', booking_id: Number(newBooking.id) })
                 .eq('id', cb.id);
 
             sileo.success({ title: '✅ Reserva Confirmada', description: `${cb.guest_name} asignado/a correctamente.` });
