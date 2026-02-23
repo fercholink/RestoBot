@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { updateOrderStatus } from './api';
 import { useAuth } from './context/AuthContext';
+import { useRealtime } from './context/RealtimeContext';
 import { supabase } from './lib/supabase';
 import LoginPage from './pages/LoginPage';
 import Sidebar from './components/Sidebar';
@@ -18,7 +19,8 @@ import OperationsHub from './components/OperationsHub';
 import TicketPrinter from './components/TicketPrinter';
 import MarketingModule from './components/Marketing/MarketingModule';
 import TableQRGenerator from './components/TableQRGenerator';
-import { LayoutGrid, Filter, Plus, Building2, Bell, BellDot, AlertTriangle, ShieldCheck, Wallet, Terminal, User, Printer, Activity, Megaphone } from 'lucide-react';
+import NotificationPanel from './components/NotificationPanel';
+import { LayoutGrid, Filter, Plus, Building2, ShieldCheck, Wallet, Activity } from 'lucide-react';
 import { Toaster, sileo } from 'sileo';
 import "./styles/sileo.css";
 
@@ -54,13 +56,13 @@ const MOCK_ORDERS = [
 
 function App() {
   const { user, loading } = useAuth();
+  const { ordersVersion } = useRealtime();
   const [activeTab, setActiveTab] = useState('operaciones'); // Pestaña por defecto, no persistente
 
   // Eliminamos el useEffect que guardaba la pestaña en localStorage
   // para cumplir con el requerimiento de que la selección sea manual al recargar.
 
-
-
+  const [showNotifications, setShowNotifications] = useState(false);
   const [showShiftWarning, setShowShiftWarning] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
   const [autoAdvanceEnabled, setAutoAdvanceEnabled] = useState(true);
@@ -73,7 +75,6 @@ function App() {
   const [activeHotelSubTab, setActiveHotelSubTab] = useState('habitaciones');
   const [activeAccountingSubTab, setActiveAccountingSubTab] = useState('summary');
   const [paymentModal, setPaymentModal] = useState({ isOpen: false, orderId: null, totalPrice: 0 });
-  const [showNotifications, setShowNotifications] = useState(false);
   const [printData, setPrintData] = useState({ order: null, type: 'comanda' });
 
   // Estados de turno movidos arriba
@@ -88,8 +89,8 @@ function App() {
     }
   };
 
-  // Mock de notificaciones de inventario (Pending migration to real alerts)
-  const stockAlerts = [];
+
+
 
   // Ajustar pestaña inicial y UI según el rol
   useEffect(() => {
@@ -110,19 +111,14 @@ function App() {
 
   useEffect(() => {
     fetchOrders();
-
-    // Suscripción Realtime para la tabla 'orders'
-    const ordersChannel = supabase.channel('orders-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
-        console.log('Realtime Order Change:', payload);
-        fetchOrders(); // Recarga simple por ahora para traer items relacionados también
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(ordersChannel);
-    };
   }, []);
+
+  // Re-fetch de pedidos cuando RealtimeContext detecta cambios (desde cualquier cliente)
+  useEffect(() => {
+    if (ordersVersion > 0) {
+      fetchOrders();
+    }
+  }, [ordersVersion]);
 
   // Escuchar eventos de actualización de turno (emitidos por ShiftManagement)
   useEffect(() => {
@@ -637,48 +633,11 @@ function App() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
-              {/* Sistema de Notificaciones */}
-              {(user.role === 'admin' || user.role === 'gerente') && (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowNotifications(!showNotifications)}
-                    className={`p-2 md:p-2.5 rounded-xl border border-gray-200 transition-all relative ${showNotifications ? 'bg-secondary text-white' : 'bg-white text-secondary hover:bg-gray-50'}`}
-                  >
-                    {stockAlerts.length > 0 ? <BellDot size={18} className="text-primary" /> : <Bell size={18} />}
-                    {stockAlerts.length > 0 && (
-                      <span className="absolute -top-1 -right-1 w-4 h-4 md:w-5 md:h-5 bg-primary text-white text-[8px] md:text-[10px] font-black rounded-full flex items-center justify-center border-2 border-[#f8fafc]">
-                        {stockAlerts.length}
-                      </span>
-                    )}
-                  </button>
-
-                  {showNotifications && (
-                    <div className="absolute right-0 mt-3 w-72 md:w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
-                      <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-secondary">Alertas de Inventario</h4>
-                        <span className="text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">Crítico</span>
-                      </div>
-                      <div className="max-h-64 overflow-y-auto custom-scrollbar">
-                        {stockAlerts.map(alert => (
-                          <div key={alert.id} className="p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors flex gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-warning/10 text-warning flex items-center justify-center shrink-0">
-                              <AlertTriangle size={18} />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-xs font-black text-secondary">{alert.product}</p>
-                              <p className="text-[10px] text-gray-400 font-medium">Quedan {alert.stock} unidades</p>
-                              <div className="flex items-center gap-1 mt-1 text-[9px] font-black text-primary uppercase">
-                                <Building2 size={10} />
-                                {alert.branch}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Sistema de Notificaciones en Tiempo Real */}
+              <NotificationPanel
+                isOpen={showNotifications}
+                onClose={() => setShowNotifications(prev => !prev)}
+              />
 
               {activeTab === 'restaurante' && (
                 <button

@@ -1,152 +1,289 @@
-import React, { useState, useEffect } from 'react';
-import { UserPlus, Search, Edit2, Trash2, Shield, User, Mail, Building2, Key, Check, Info, X, Save, AlertCircle, Ban } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+    UserPlus, Search, Edit2, Trash2, Shield, User, Mail, Building2,
+    Key, Check, Info, X, Save, AlertCircle, Ban, ChevronDown,
+    CheckCircle2, XCircle, Sparkles, Lock, Unlock, RefreshCw,
+    Eye, EyeOff, Crown, Users, ChefHat, CreditCard, ConciergeBell,
+    BarChart3, Briefcase
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 
-// Helper to generate UUID if needed (though DB should handle it)
-const generateUUID = () => {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
+// ─── Plantillas de Roles ────────────────────────────────────────────────────
+const ROLE_TEMPLATES = {
+    admin: {
+        label: 'Administrador',
+        description: 'Acceso total al sistema. Sin restricciones.',
+        icon: Crown,
+        color: 'blue',
+        gradient: 'from-blue-500 to-indigo-600',
+        permissions: {
+            restaurante: { create: true, read: true, update: true, delete: true },
+            hotel: { create: true, read: true, update: true, delete: true },
+            financiero: { create: true, read: true, update: true, delete: true },
+            usuarios: { create: true, read: true, update: true, delete: true },
+            sedes: { create: true, read: true, update: true, delete: true },
+            marketing: { create: true, read: true, update: true, delete: true },
+            qr_tools: { create: true, read: true, update: true, delete: true },
+            operaciones: { create: true, read: true, update: true, delete: true },
+        }
+    },
+    gerente: {
+        label: 'Gerente',
+        description: 'Gestión operativa. Sin eliminar cuentas de usuario.',
+        icon: Briefcase,
+        color: 'purple',
+        gradient: 'from-purple-500 to-violet-600',
+        permissions: {
+            restaurante: { create: true, read: true, update: true, delete: false },
+            hotel: { create: true, read: true, update: true, delete: false },
+            financiero: { create: true, read: true, update: false, delete: false },
+            usuarios: { create: false, read: true, update: true, delete: false },
+            sedes: { create: false, read: true, update: true, delete: false },
+            marketing: { create: true, read: true, update: true, delete: false },
+            qr_tools: { create: true, read: true, update: true, delete: false },
+            operaciones: { create: false, read: true, update: false, delete: false },
+        }
+    },
+    cajero: {
+        label: 'Cajero / POS',
+        description: 'Gestión de pedidos y turnos de caja.',
+        icon: CreditCard,
+        color: 'orange',
+        gradient: 'from-orange-400 to-amber-500',
+        permissions: {
+            restaurante: { create: true, read: true, update: true, delete: false },
+            hotel: { create: false, read: false, update: false, delete: false },
+            financiero: { create: false, read: false, update: false, delete: false },
+            usuarios: { create: false, read: false, update: false, delete: false },
+            sedes: { create: false, read: false, update: false, delete: false },
+            marketing: { create: false, read: false, update: false, delete: false },
+            qr_tools: { create: false, read: false, update: false, delete: false },
+            operaciones: { create: false, read: false, update: false, delete: false },
+        }
+    },
+    mesero: {
+        label: 'Mesero / Sala',
+        description: 'Ver y actualizar estado de pedidos de mesas.',
+        icon: ConciergeBell,
+        color: 'teal',
+        gradient: 'from-teal-400 to-cyan-500',
+        permissions: {
+            restaurante: { create: true, read: true, update: true, delete: false },
+            hotel: { create: false, read: false, update: false, delete: false },
+            financiero: { create: false, read: false, update: false, delete: false },
+            usuarios: { create: false, read: false, update: false, delete: false },
+            sedes: { create: false, read: false, update: false, delete: false },
+            marketing: { create: false, read: false, update: false, delete: false },
+            qr_tools: { create: false, read: false, update: false, delete: false },
+            operaciones: { create: false, read: false, update: false, delete: false },
+        }
+    },
+    cocina: {
+        label: 'Cocina / Chef',
+        description: 'Solo visualización del board de cocina.',
+        icon: ChefHat,
+        color: 'red',
+        gradient: 'from-red-400 to-rose-500',
+        permissions: {
+            restaurante: { create: false, read: true, update: true, delete: false },
+            hotel: { create: false, read: false, update: false, delete: false },
+            financiero: { create: false, read: false, update: false, delete: false },
+            usuarios: { create: false, read: false, update: false, delete: false },
+            sedes: { create: false, read: false, update: false, delete: false },
+            marketing: { create: false, read: false, update: false, delete: false },
+            qr_tools: { create: false, read: false, update: false, delete: false },
+            operaciones: { create: false, read: false, update: false, delete: false },
+        }
+    },
+    recepcion: {
+        label: 'Recepción Hotel',
+        description: 'Gestión de reservas y habitaciones del hotel.',
+        icon: Building2,
+        color: 'sky',
+        gradient: 'from-sky-400 to-blue-500',
+        permissions: {
+            restaurante: { create: false, read: true, update: false, delete: false },
+            hotel: { create: true, read: true, update: true, delete: false },
+            financiero: { create: false, read: false, update: false, delete: false },
+            usuarios: { create: false, read: false, update: false, delete: false },
+            sedes: { create: false, read: false, update: false, delete: false },
+            marketing: { create: false, read: false, update: false, delete: false },
+            qr_tools: { create: false, read: false, update: false, delete: false },
+            operaciones: { create: false, read: false, update: false, delete: false },
+        }
+    },
+    analista: {
+        label: 'Analista / BI',
+        description: 'Solo lectura de reportes y analíticas.',
+        icon: BarChart3,
+        color: 'emerald',
+        gradient: 'from-emerald-400 to-green-500',
+        permissions: {
+            restaurante: { create: false, read: true, update: false, delete: false },
+            hotel: { create: false, read: true, update: false, delete: false },
+            financiero: { create: false, read: true, update: false, delete: false },
+            usuarios: { create: false, read: false, update: false, delete: false },
+            sedes: { create: false, read: true, update: false, delete: false },
+            marketing: { create: false, read: true, update: false, delete: false },
+            qr_tools: { create: false, read: false, update: false, delete: false },
+            operaciones: { create: false, read: true, update: false, delete: false },
+        }
+    },
 };
 
+// ─── Labels de módulos ────────────────────────────────────────────────────────
+const MODULE_LABELS = {
+    restaurante: { label: 'Restaurante', emoji: '🍽️' },
+    hotel: { label: 'Hotel', emoji: '🏨' },
+    financiero: { label: 'Finanzas', emoji: '💰' },
+    usuarios: { label: 'Usuarios', emoji: '👥' },
+    sedes: { label: 'Sucursales', emoji: '🏢' },
+    marketing: { label: 'Marketing', emoji: '📣' },
+    qr_tools: { label: 'QR Tools', emoji: '📱' },
+    operaciones: { label: 'Operaciones', emoji: '🔐' },
+};
+
+const INITIAL_PERMISSIONS = Object.fromEntries(
+    Object.keys(MODULE_LABELS).map(k => [k, { create: false, read: false, update: false, delete: false }])
+);
+
+// ─── Colores de Badge por Rol ─────────────────────────────────────────────────
+const ROLE_BADGE_STYLES = {
+    admin: 'bg-blue-50 text-blue-700 border-blue-100',
+    gerente: 'bg-purple-50 text-purple-700 border-purple-100',
+    cajero: 'bg-orange-50 text-orange-700 border-orange-100',
+    mesero: 'bg-teal-50 text-teal-700 border-teal-100',
+    cocina: 'bg-red-50 text-red-700 border-red-100',
+    recepcion: 'bg-sky-50 text-sky-700 border-sky-100',
+    analista: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+};
+
+// ─── Componente Principal ─────────────────────────────────────────────────────
 const UserManagement = () => {
-    const { user } = useAuth();
+    const { user: currentUser } = useAuth();
+
     const [users, setUsers] = useState([]);
     const [branches, setBranches] = useState([]);
-    const [rolesList, setRolesList] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRole, setFilterRole] = useState('all');
     const [filterBranch, setFilterBranch] = useState('all');
+    const [filterStatus, setFilterStatus] = useState('all');
+
     const [showModal, setShowModal] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [showPassModal, setShowPassModal] = useState(false);
     const [selectedUserForPass, setSelectedUserForPass] = useState(null);
-
-    const INITIAL_PERMISSIONS = {
-        restaurante: { create: true, read: true, update: true, delete: false },
-        hotel: { create: false, read: false, update: false, delete: false }, // Nuevo: Gestión Hotel
-        financiero: { create: false, read: false, update: false, delete: false },
-        usuarios: { create: false, read: false, update: false, delete: false },
-        sedes: { create: false, read: false, update: false, delete: false },
-        marketing: { create: false, read: false, update: false, delete: false }, // Nuevo: Marketing AI
-        qr_tools: { create: false, read: false, update: false, delete: false }, // Nuevo: Códigos QR
-        operaciones: { create: false, read: false, update: false, delete: false }, // Nuevo: Seguridad/Logs
-    };
+    const [showPassword, setShowPassword] = useState(false);
+    const [activeTab, setActiveTab] = useState('info'); // 'info' | 'permisos'
+    const [selectedRoleTemplate, setSelectedRoleTemplate] = useState(null);
 
     const [formUser, setFormUser] = useState({
         full_name: '',
         email: '',
-        password: '', // Nota: No se guardará en profiles, solo para creación Auth futura
+        password: '',
         role: 'cajero',
         branch_id: '',
-        permissions: INITIAL_PERMISSIONS,
-        organization_id: user.organization_id // Nuevo: Heredar organización del admin
+        permissions: JSON.parse(JSON.stringify(INITIAL_PERMISSIONS)),
     });
 
-    const [isPassUpdated, setIsPassUpdated] = useState(false);
-
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            const [profilesRes, branchesRes, rolesRes] = await Promise.all([
-                supabase.from('profiles').select('*, branch:branches(name)'),
-                supabase.from('branches').select('id, name').order('name'),
-                supabase.from('roles').select('*').order('name')
-            ]);
-
-            setUsers(profilesRes.data || []);
-            setBranches(branchesRes.data || []);
-            setRolesList(rolesRes.data || []);
-        } catch (error) {
-            console.error("Error cargando datos:", error);
-        } finally {
-            setLoading(false);
-        }
+    const [toast, setToast] = useState(null);
+    const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3500);
     };
 
-    // Protección de Ruta
-    if (user && user.role !== 'admin' && user.role !== 'gerente') {
+    // ─── Protección de Ruta ──────────────────────────────────────────────────────
+    if (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'gerente') {
         return (
             <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in zoom-in duration-300">
-                <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center shadow-inner">
+                <div className="w-24 h-24 bg-red-50 text-red-400 rounded-full flex items-center justify-center shadow-inner">
                     <Ban size={48} />
                 </div>
                 <div>
                     <h2 className="text-2xl font-black text-secondary">Acceso Restringido</h2>
                     <p className="text-gray-400 font-medium mt-2 max-w-sm mx-auto">
-                        Su perfil de <strong>{user.role}</strong> no tiene permisos para gestionar usuarios.
+                        Su perfil de <strong>{currentUser.role}</strong> no tiene permisos para gestionar usuarios.
                     </p>
                 </div>
             </div>
         );
     }
 
+    // ─── Data Fetching ───────────────────────────────────────────────────────────
+    const fetchData = useCallback(async () => {
+        setLoading(true);
+        try {
+            const [profilesRes, branchesRes] = await Promise.all([
+                supabase.from('profiles').select('*, branch:branches(name)').order('created_at', { ascending: false }),
+                supabase.from('branches').select('id, name').order('name'),
+            ]);
+            setUsers(profilesRes.data || []);
+            setBranches(branchesRes.data || []);
+        } catch (error) {
+            console.error('Error cargando datos:', error);
+            showToast('Error cargando datos del sistema', 'error');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { fetchData(); }, [fetchData]);
+
+    // Realtime: escuchar cambios en profiles para actualizar la lista en tiempo real
+    useEffect(() => {
+        const channel = supabase
+            .channel('user-management-profiles')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+                fetchData(); // Re-cargar lista cuando otro admin hace cambios
+            })
+            .subscribe();
+        return () => supabase.removeChannel(channel);
+    }, [fetchData]);
+
+    // ─── Handlers de Formulario ──────────────────────────────────────────────────
     const handleOpenCreate = () => {
         setEditingUser(null);
+        setActiveTab('info');
+        setSelectedRoleTemplate(null);
         setFormUser({
             full_name: '',
             email: '',
             password: '',
             role: 'cajero',
             branch_id: branches[0]?.id || '',
-            permissions: JSON.parse(JSON.stringify(INITIAL_PERMISSIONS))
+            permissions: JSON.parse(JSON.stringify(INITIAL_PERMISSIONS)),
         });
         setShowModal(true);
     };
 
-    const handleOpenEdit = (user) => {
-        setEditingUser(user);
+    const handleOpenEdit = (userToEdit) => {
+        setEditingUser(userToEdit);
+        setActiveTab('info');
+        setSelectedRoleTemplate(userToEdit.role);
         setFormUser({
-            full_name: user.full_name || user.name, // Support both fields just in case
-            email: user.email || '', // Profiles might not have email if not synced
+            full_name: userToEdit.full_name || userToEdit.name,
+            email: userToEdit.email || '',
             password: '',
-            role: user.role,
-            branch_id: user.branch_id || branches[0]?.id,
-            // Fusionar permisos existentes con los nuevos (para que aparezcan los nuevos módulos en usuarios antiguos)
-            permissions: { ...INITIAL_PERMISSIONS, ...(user.permissions || {}) }
+            role: userToEdit.role,
+            branch_id: userToEdit.branch_id || branches[0]?.id || '',
+            permissions: { ...JSON.parse(JSON.stringify(INITIAL_PERMISSIONS)), ...(userToEdit.permissions || {}) },
         });
         setShowModal(true);
     };
 
-    const handleRoleChange = (e) => {
-        const selectedRoleName = e.target.value;
-        const roleObj = rolesList.find(r => r.name === selectedRoleName);
-
-        let newPermissions = { ...INITIAL_PERMISSIONS };
-        if (roleObj && roleObj.permissions) {
-            // Merge or replace based on logic. For now, replace entire structure if format matches, or merge deeply.
-            // Simplified: If role has "all": true, enable everything.
-            if (roleObj.permissions.all) {
-                Object.keys(newPermissions).forEach(k => {
-                    newPermissions[k] = { create: true, read: true, update: true, delete: true };
-                });
-            } else {
-                // Apply specific overrides
-                Object.keys(roleObj.permissions).forEach(k => {
-                    if (newPermissions[k]) {
-                        // If boolean true, enable fully
-                        if (roleObj.permissions[k] === true) {
-                            newPermissions[k] = { create: true, read: true, update: true, delete: true };
-                        } else if (typeof roleObj.permissions[k] === 'object') {
-                            newPermissions[k] = { ...newPermissions[k], ...roleObj.permissions[k] };
-                        }
-                    }
-                });
-            }
-        }
-
+    // Aplicar plantilla de rol automáticamente
+    const applyRoleTemplate = (roleKey) => {
+        const template = ROLE_TEMPLATES[roleKey];
+        if (!template) return;
+        setSelectedRoleTemplate(roleKey);
         setFormUser(prev => ({
             ...prev,
-            role: selectedRoleName,
-            permissions: newPermissions
+            role: roleKey,
+            permissions: JSON.parse(JSON.stringify(template.permissions)),
         }));
     };
 
@@ -157,436 +294,665 @@ const UserManagement = () => {
                 ...prev.permissions,
                 [module]: {
                     ...prev.permissions[module],
-                    [action]: !prev.permissions[module][action]
-                }
-            }
+                    [action]: !prev.permissions[module][action],
+                },
+            },
         }));
     };
 
+    // Toggle rápido: activar/desactivar todo el módulo
+    const toggleModuleAll = (module) => {
+        const current = formUser.permissions[module];
+        const allOn = Object.values(current).every(Boolean);
+        setFormUser(prev => ({
+            ...prev,
+            permissions: {
+                ...prev.permissions,
+                [module]: Object.fromEntries(Object.keys(current).map(k => [k, !allOn])),
+            },
+        }));
+    };
+
+    // ─── Guardar Usuario ─────────────────────────────────────────────────────────
     const handleSaveUser = async (e) => {
         e.preventDefault();
+        setIsSaving(true);
+
         try {
             const profileData = {
                 full_name: formUser.full_name,
                 role: formUser.role,
-                branch_id: formUser.branch_id,
+                branch_id: formUser.branch_id || null,
                 permissions: formUser.permissions,
                 active: true,
-                organization_id: user.organization_id // Nuevo: Asegurar que el usuario pertenece a la misma organización
-                // Si tuviéramos email en perfil, lo guardamos
-                // email: formUser.email 
+                organization_id: currentUser.organization_id || null,
+                email: formUser.email,
             };
 
             if (editingUser) {
-                // Update Profile
+                // ── ACTUALIZAR USUARIO EXISTENTE ──
                 const { error } = await supabase
                     .from('profiles')
                     .update(profileData)
                     .eq('id', editingUser.id);
 
                 if (error) throw error;
+                showToast(`✅ Usuario ${formUser.full_name} actualizado correctamente`);
+
             } else {
-                // Create New User Logic
-                // IMPORTANTE: Aquí deberíamos llamar a una Edge Function para crear el usuario en Auth
-                // O usar supabase.auth.signUp() si es auto-registro. 
-                // Como workaround, insertamos en perfiles con un ID generado para tener el registro "Staff".
-                // En un sistema real, el trigger de Auth crearía este perfil.
+                // ── CREAR NUEVO USUARIO ──
+                // 1. Crear cuenta en Supabase Auth
+                const { data: authData, error: authError } = await supabase.auth.signUp({
+                    email: formUser.email,
+                    password: formUser.password,
+                    options: {
+                        data: {
+                            full_name: formUser.full_name,
+                            role: formUser.role,
+                        },
+                    },
+                });
 
-                // Opción A: Intentar Crear Auth User (Solo funciona si 'Enable Email Signup' está on y no requiere confirmación para login inmediato)
-                // const { data: authData, error: authError } = await supabase.auth.signUp({
-                //    email: formUser.email,
-                //    password: formUser.password,
-                //    options: { data: { full_name: formUser.full_name } }
-                // });
-                // if (authError) console.warn("No se pudo crear Auth:", authError);
+                if (authError) {
+                    // Si falla Auth (ej. email ya existe), guardamos solo el perfil
+                    console.warn('Auth signUp falló, insertando solo perfil:', authError.message);
 
-                // Opción B: Insertar solo perfil (Staff sin login o login manejado externamente)
-                const mockId = generateUUID(); // En producción usar authData.user.id
+                    // Intentar insertar solo perfil con mock ID
+                    const mockId = crypto.randomUUID?.() || `usr-${Date.now()}`;
+                    const { error: profileError } = await supabase
+                        .from('profiles')
+                        .insert([{ ...profileData, id: mockId }]);
 
-                const { error } = await supabase
-                    .from('profiles')
-                    .insert([{ ...profileData, id: mockId, email: formUser.email }]);
+                    if (profileError) throw profileError;
+                    showToast(`⚠️ Perfil creado (sin login Auth). ${authError.message}`, 'warning');
 
-                if (error) throw error;
+                } else {
+                    // Auth OK: actualizar el perfil que el trigger creó automáticamente
+                    const userId = authData.user?.id;
+                    if (userId) {
+                        await supabase
+                            .from('profiles')
+                            .upsert([{ ...profileData, id: userId }]);
+                    }
+                    showToast(`✅ Usuario ${formUser.full_name} creado. Se envió email de confirmación.`);
+                }
             }
+
             setShowModal(false);
             fetchData();
+
         } catch (error) {
-            alert("Error guardando usuario: " + error.message);
+            console.error('Error guardando usuario:', error);
+            showToast('❌ Error: ' + error.message, 'error');
+        } finally {
+            setIsSaving(false);
         }
     };
 
-    const handleDeleteUser = async (id) => {
-        if (window.confirm('¿Está seguro de eliminar este usuario?')) {
-            const { error } = await supabase.from('profiles').delete().eq('id', id);
-            if (error) alert("Error: " + error.message);
-            else fetchData();
-        }
-    };
-
-    const handleUpdatePassword = () => {
-        // Placeholder: Client-side password update for OTHER users is restricted. 
-        // We need an Admin function or "Send Password Reset Email".
-        alert("Función disponible solo vía 'Recuperar Contraseña' o acceso Admin API.");
-        setShowPassModal(false);
-    };
-
-    const filteredUsers = users.filter(u => {
-        const matchesSearch = (u.full_name || u.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (u.email || '').toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesRole = filterRole === 'all' || u.role === filterRole;
-        const matchesBranch = filterBranch === 'all' || (u.branch_id === filterBranch) || (!u.branch_id && filterBranch === 'global');
-
-        return matchesSearch && matchesRole && matchesBranch;
-    });
-
-    const sendInvite = (user) => {
-        const subject = "Bienvenido a RestoBot - Tus Credenciales";
-        const body = `Hola ${user.full_name},\n\nTe hemos creado una cuenta en RestoBot.\n\nUsuario: ${user.email}\nContraseña Temporal: (Solicita al administrador)\n\nIngresa aquí: ${window.location.origin}`;
-        window.open(`mailto:${user.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
-    };
-
-    const toggleUserStatus = async (user) => {
-        if (!confirm(`¿${user.active ? 'Desactivar' : 'Activar'} acceso para ${user.full_name}?`)) return;
+    const handleDeleteUser = async (id, name) => {
+        if (!window.confirm(`¿Está seguro de eliminar a "${name}"? Esta acción no se puede deshacer.`)) return;
         try {
-            const { error } = await supabase.from('profiles').update({ active: !user.active }).eq('id', user.id);
+            const { error } = await supabase.from('profiles').delete().eq('id', id);
             if (error) throw error;
+            showToast(`🗑️ Usuario eliminado correctamente`);
+            fetchData();
+        } catch (error) {
+            showToast('❌ Error eliminando usuario: ' + error.message, 'error');
+        }
+    };
+
+    const toggleUserStatus = async (targetUser) => {
+        const action = targetUser.active ? 'desactivar' : 'activar';
+        if (!window.confirm(`¿${action.charAt(0).toUpperCase() + action.slice(1)} acceso para ${targetUser.full_name}?`)) return;
+        try {
+            const { error } = await supabase.from('profiles').update({ active: !targetUser.active }).eq('id', targetUser.id);
+            if (error) throw error;
+            showToast(targetUser.active ? '🔒 Acceso desactivado' : '🔓 Acceso activado');
             fetchData();
         } catch (e) {
-            alert("Error actualizando estado: " + e.message);
+            showToast('❌ Error: ' + e.message, 'error');
         }
     };
 
+    const sendInvite = (u) => {
+        const subject = 'Bienvenido a RestoBot – Tus Credenciales de Acceso';
+        const body = `Hola ${u.full_name},\n\nTe hemos creado una cuenta en RestoBot.\n\nUsuario: ${u.email}\nURL de acceso: ${window.location.origin}\n\nSi aún no tienes contraseña, solicita el enlace de recuperación.\n\nSaludos,\nEl equipo RestoBot`;
+        window.open(`mailto:${u.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+    };
+
+    // ─── Filtrado ────────────────────────────────────────────────────────────────
+    const filteredUsers = users.filter(u => {
+        const name = (u.full_name || u.name || '').toLowerCase();
+        const email = (u.email || '').toLowerCase();
+        const term = searchTerm.toLowerCase();
+
+        const matchesSearch = name.includes(term) || email.includes(term);
+        const matchesRole = filterRole === 'all' || u.role === filterRole;
+        const matchesBranch = filterBranch === 'all' || u.branch_id === filterBranch;
+        const matchesStatus = filterStatus === 'all'
+            ? true
+            : filterStatus === 'activo'
+                ? u.active !== false
+                : u.active === false;
+
+        return matchesSearch && matchesRole && matchesBranch && matchesStatus;
+    });
+
+    // Contar permisos activos de un usuario
+    const countActivePermissions = (permissions) => {
+        if (!permissions) return 0;
+        return Object.values(permissions).reduce((acc, mod) => {
+            return acc + Object.values(mod).filter(Boolean).length;
+        }, 0);
+    };
+
+    // ─── Render ──────────────────────────────────────────────────────────────────
     return (
         <div className="space-y-6 pb-20 animate-in fade-in duration-500">
-            {/* Header Control & Filters */}
-            <div className="flex flex-col gap-4">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                    <div className="relative w-full md:w-96">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Buscar por nombre, correo o cargo..."
-                            className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm font-medium"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+
+            {/* Toast */}
+            {toast && (
+                <div className={`fixed top-6 right-6 z-[100] px-5 py-3.5 rounded-2xl shadow-2xl text-white font-bold text-sm flex items-center gap-3 animate-in slide-in-from-right-4 duration-300 ${toast.type === 'error' ? 'bg-red-500' : toast.type === 'warning' ? 'bg-amber-500' : 'bg-emerald-500'
+                    }`}>
+                    {toast.type === 'error' ? <XCircle size={18} /> : <CheckCircle2 size={18} />}
+                    {toast.message}
+                </div>
+            )}
+
+            {/* ── Stats Bar ── */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[
+                    { label: 'Total Personal', value: users.length, icon: Users, color: 'blue' },
+                    { label: 'Activos', value: users.filter(u => u.active !== false).length, icon: CheckCircle2, color: 'green' },
+                    { label: 'Inactivos', value: users.filter(u => u.active === false).length, icon: XCircle, color: 'red' },
+                    { label: 'Roles Únicos', value: new Set(users.map(u => u.role)).size, icon: Shield, color: 'purple' },
+                ].map(stat => (
+                    <div key={stat.label} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-${stat.color}-50 text-${stat.color}-500`}>
+                            <stat.icon size={22} />
+                        </div>
+                        <div>
+                            <p className="text-2xl font-black text-secondary">{stat.value}</p>
+                            <p className="text-[10px] font-black uppercase text-gray-400 tracking-wide">{stat.label}</p>
+                        </div>
                     </div>
-                    <div className="flex gap-2 w-full md:w-auto">
-                        <select
-                            className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            value={filterRole}
-                            onChange={(e) => setFilterRole(e.target.value)}
-                        >
-                            <option value="all">Todos los Roles</option>
-                            <option value="admin">Administradores</option>
-                            <option value="gerente">Gerentes</option>
-                            <option value="cajero">Cajeros</option>
-                            <option value="mesero">Meseros</option>
-                            <option value="cocina">Cocina</option>
-                        </select>
-                        <select
-                            className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            value={filterBranch}
-                            onChange={(e) => setFilterBranch(e.target.value)}
-                        >
-                            <option value="all">Todas las Sedes</option>
-                            {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                        </select>
-                    </div>
-                    <button
-                        onClick={handleOpenCreate}
-                        className="flex items-center gap-2 bg-secondary text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-premium hover:brightness-110 active:scale-95 transition-all w-full md:w-auto justify-center"
+                ))}
+            </div>
+
+            {/* ── Filtros ── */}
+            <div className="flex flex-col md:flex-row gap-3">
+                <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                    <input
+                        type="text"
+                        placeholder="Buscar por nombre o correo..."
+                        className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm font-medium"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                    />
+                </div>
+
+                <div className="flex gap-2">
+                    <select
+                        className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        value={filterRole}
+                        onChange={e => setFilterRole(e.target.value)}
                     >
-                        <UserPlus size={18} />
-                        <span className="hidden md:inline">Nuevo Personal</span>
-                        <span className="md:hidden">Crear</span>
+                        <option value="all">Todos los Roles</option>
+                        {Object.entries(ROLE_TEMPLATES).map(([key, t]) => (
+                            <option key={key} value={key}>{t.label}</option>
+                        ))}
+                    </select>
+
+                    <select
+                        className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        value={filterBranch}
+                        onChange={e => setFilterBranch(e.target.value)}
+                    >
+                        <option value="all">Todas las Sedes</option>
+                        {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+
+                    <select
+                        className="bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        value={filterStatus}
+                        onChange={e => setFilterStatus(e.target.value)}
+                    >
+                        <option value="all">Todos</option>
+                        <option value="activo">Activos</option>
+                        <option value="inactivo">Inactivos</option>
+                    </select>
+
+                    <button
+                        onClick={fetchData}
+                        className="p-2.5 bg-white border border-gray-200 rounded-xl text-gray-400 hover:text-secondary hover:bg-gray-50 transition-all"
+                        title="Recargar"
+                    >
+                        <RefreshCw size={16} />
                     </button>
                 </div>
+
+                <button
+                    onClick={handleOpenCreate}
+                    className="flex items-center gap-2 bg-secondary text-white px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-premium hover:brightness-110 active:scale-95 transition-all whitespace-nowrap"
+                >
+                    <UserPlus size={16} />
+                    <span className="hidden sm:inline">Nuevo Personal</span>
+                    <span className="sm:hidden">Crear</span>
+                </button>
             </div>
 
-            {/* User Cards / List */}
-            <div className="bg-white rounded-[2.5rem] shadow-premium border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead>
-                            <tr className="bg-gray-50/50 border-b border-gray-100">
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-wider text-gray-400">Usuario</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-wider text-gray-400">Rol & Acceso</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-wider text-gray-400">Sede</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-wider text-gray-400 text-center">Estado</th>
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-wider text-gray-400 text-right">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {filteredUsers.map((user) => (
-                                <tr key={user.id} className="hover:bg-gray-50/30 transition-colors group">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-sm shadow-sm ${user.active ? 'bg-secondary' : 'bg-gray-300'}`}>
-                                                {(user.full_name || user.name || '?').charAt(0).toUpperCase()}
-                                            </div>
-                                            <div>
-                                                <p className={`font-bold text-sm ${user.active ? 'text-secondary' : 'text-gray-400'}`}>{user.full_name || user.name}</p>
-                                                <p className="text-[10px] text-gray-400 flex items-center gap-1">
-                                                    <Mail size={10} />
-                                                    {user.email || 'Sin email'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-md border inline-flex items-center gap-1 ${user.role === 'gerente' ? 'bg-purple-50 text-purple-600 border-purple-100' :
-                                            user.role === 'admin' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                                'bg-orange-50 text-orange-600 border-orange-100'
-                                            }`}>
-                                            <Shield size={10} />
-                                            {user.role}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-1.5 text-xs font-bold text-gray-600">
-                                            <Building2 size={12} className="text-gray-400" />
-                                            {user.branch?.name || 'Globál / Sin Asignar'}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-center">
-                                        <button
-                                            onClick={() => toggleUserStatus(user)}
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20 ${user.active ? 'bg-emerald-500' : 'bg-gray-200'}`}
-                                        >
-                                            <span className="sr-only">Activar usuario</span>
-                                            <span
-                                                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${user.active ? 'translate-x-5' : 'translate-x-1'}`}
-                                            />
-                                        </button>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-1">
-                                            <button
-                                                onClick={() => sendInvite(user)}
-                                                className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                                                title="Enviar Credenciales por Correo"
-                                            >
-                                                <Mail size={14} />
-                                            </button>
-                                            <button
-                                                onClick={() => { setSelectedUserForPass(user); setShowPassModal(true); setIsPassUpdated(false); }}
-                                                className="p-2 text-gray-400 hover:text-warning hover:bg-warning/10 rounded-lg transition-all"
-                                                title="Cambiar Contraseña"
-                                            >
-                                                <Key size={14} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleOpenEdit(user)}
-                                                className="p-2 text-gray-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
-                                                title="Editar"
-                                            >
-                                                <Edit2 size={14} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteUser(user.id)}
-                                                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                                title="Eliminar"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
-                                    </td>
+            {/* ── Tabla de Usuarios ── */}
+            <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden">
+                {loading ? (
+                    <div className="flex items-center justify-center h-48">
+                        <div className="flex flex-col items-center gap-3">
+                            <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Cargando Personal...</p>
+                        </div>
+                    </div>
+                ) : filteredUsers.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-48 text-gray-300">
+                        <Users size={48} strokeWidth={1} />
+                        <p className="mt-3 font-bold text-sm">No se encontraron usuarios</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-gray-50/80 border-b border-gray-100">
+                                    {['Usuario', 'Rol', 'Sede', 'Permisos', 'Estado', 'Acciones'].map(col => (
+                                        <th key={col} className="px-6 py-4 text-[10px] font-black uppercase tracking-wider text-gray-400 whitespace-nowrap">
+                                            {col}
+                                        </th>
+                                    ))}
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {filteredUsers.map(u => {
+                                    const template = ROLE_TEMPLATES[u.role];
+                                    const RoleIcon = template?.icon || Shield;
+                                    const activePerms = countActivePermissions(u.permissions);
+                                    const totalPerms = Object.keys(MODULE_LABELS).length * 4;
+
+                                    return (
+                                        <tr key={u.id} className={`hover:bg-gray-50/40 transition-colors ${u.active === false ? 'opacity-50' : ''}`}>
+                                            {/* Usuario */}
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-sm shadow-sm bg-gradient-to-br ${template?.gradient || 'from-gray-400 to-gray-500'}`}>
+                                                        {(u.full_name || u.name || '?').charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-sm text-secondary">{u.full_name || u.name}</p>
+                                                        <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                                                            <Mail size={9} />
+                                                            {u.email || 'Sin email'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            {/* Rol */}
+                                            <td className="px-6 py-4">
+                                                <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-lg border inline-flex items-center gap-1.5 ${ROLE_BADGE_STYLES[u.role] || 'bg-gray-50 text-gray-600 border-gray-100'}`}>
+                                                    <RoleIcon size={10} />
+                                                    {template?.label || u.role}
+                                                </span>
+                                            </td>
+
+                                            {/* Sede */}
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-600">
+                                                    <Building2 size={12} className="text-gray-400" />
+                                                    {u.branch?.name || 'Global'}
+                                                </div>
+                                            </td>
+
+                                            {/* Permisos */}
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                        <div
+                                                            className="h-full bg-gradient-to-r from-primary to-rose-400 rounded-full transition-all"
+                                                            style={{ width: `${(activePerms / totalPerms) * 100}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className="text-[10px] font-black text-gray-400">{activePerms}/{totalPerms}</span>
+                                                </div>
+                                            </td>
+
+                                            {/* Estado */}
+                                            <td className="px-6 py-4">
+                                                <button
+                                                    onClick={() => toggleUserStatus(u)}
+                                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${u.active !== false ? 'bg-emerald-500' : 'bg-gray-200'}`}
+                                                    title={u.active !== false ? 'Desactivar acceso' : 'Activar acceso'}
+                                                >
+                                                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${u.active !== false ? 'translate-x-5' : 'translate-x-1'}`} />
+                                                </button>
+                                            </td>
+
+                                            {/* Acciones */}
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-1">
+                                                    <button onClick={() => sendInvite(u)} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="Enviar invitación">
+                                                        <Mail size={14} />
+                                                    </button>
+                                                    <button onClick={() => { setSelectedUserForPass(u); setShowPassModal(true); }} className="p-2 text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all" title="Cambiar contraseña">
+                                                        <Key size={14} />
+                                                    </button>
+                                                    <button onClick={() => handleOpenEdit(u)} className="p-2 text-gray-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all" title="Editar usuario">
+                                                        <Edit2 size={14} />
+                                                    </button>
+                                                    <button onClick={() => handleDeleteUser(u.id, u.full_name || u.name)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all" title="Eliminar">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
 
-            {/* Modal de Creación / Edición */}
+            {/* ══════════════════════════════════════════
+          MODAL: CREAR / EDITAR USUARIO
+      ══════════════════════════════════════════ */}
             {showModal && (
-                <div className="fixed inset-0 bg-secondary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
-                        <div className="p-8 bg-secondary text-white flex justify-between items-center relative overflow-hidden">
+                <div className="fixed inset-0 bg-secondary/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]">
+
+                        {/* Header Modal */}
+                        <div className="p-6 bg-secondary text-white flex justify-between items-center relative overflow-hidden shrink-0">
                             <div className="relative z-10">
-                                <h3 className="text-2xl font-black tracking-tight">{editingUser ? 'Editar Perfil' : 'Alta de Personal'}</h3>
-                                <p className="text-white/60 text-[10px] font-black uppercase tracking-widest mt-1">Configuración de credenciales</p>
+                                <h3 className="text-xl font-black tracking-tight">
+                                    {editingUser ? 'Editar Colaborador' : 'Alta de Personal'}
+                                </h3>
+                                <p className="text-white/50 text-[10px] font-black uppercase tracking-widest mt-0.5">
+                                    {editingUser ? `Modificando: ${editingUser.full_name || editingUser.name}` : 'Nuevo miembro del equipo'}
+                                </p>
                             </div>
                             <button onClick={() => setShowModal(false)} className="relative z-10 p-2 hover:bg-white/10 rounded-full transition-colors">
-                                <X size={24} />
+                                <X size={22} />
                             </button>
-                            <Shield className="absolute -right-6 -bottom-6 text-white/5 w-40 h-40" />
+                            <Shield className="absolute -right-6 -bottom-6 text-white/5 w-36 h-36" />
                         </div>
-                        <form onSubmit={handleSaveUser} className="p-8 space-y-5">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Nombre y Apellidos</label>
-                                <div className="relative">
-                                    <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                                    <input
-                                        required
-                                        type="text"
-                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-bold text-sm"
-                                        placeholder="Ej. Carlos Ruiz"
-                                        value={formUser.full_name}
-                                        onChange={(e) => setFormUser({ ...formUser, full_name: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Email Profesional</label>
-                                <div className="relative">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                                    <input
-                                        required
-                                        type="email"
-                                        className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-bold text-sm"
-                                        placeholder="correo@sucursal.com"
-                                        value={formUser.email}
-                                        onChange={(e) => setFormUser({ ...formUser, email: e.target.value })}
-                                    />
-                                </div>
-                            </div>
-                            {!editingUser && (
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Contraseña Temporal</label>
-                                    <div className="relative">
-                                        <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
-                                        <input
-                                            required
-                                            type="password"
-                                            className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-bold text-sm"
-                                            placeholder="••••••••"
-                                            value={formUser.password}
-                                            onChange={(e) => setFormUser({ ...formUser, password: e.target.value })}
-                                        />
-                                    </div>
-                                    <p className="text-[9px] text-gray-400 pl-2 opacity-70">Nota: Solo se creará el perfil. La cuenta Auth debe crearse por Admin.</p>
-                                </div>
-                            )}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Rol</label>
-                                    <select
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-xs font-black appearance-none"
-                                        value={formUser.role}
-                                        onChange={handleRoleChange}
-                                    >
-                                        <option value="">Seleccionar Rol...</option>
-                                        {rolesList.map(role => (
-                                            <option key={role.id} value={role.code}>{role.name}</option>
-                                        ))}
-                                        {!rolesList.length && (
-                                            <>
-                                                <option value="cajero">Cajero (Default)</option>
-                                                <option value="mesero">Mesero (Default)</option>
-                                                <option value="admin">Administrador (Default)</option>
-                                                <option value="gerente">Gerente (Default)</option>
-                                            </>
+
+                        {/* Tabs */}
+                        <div className="flex border-b border-gray-100 shrink-0">
+                            <button
+                                onClick={() => setActiveTab('info')}
+                                className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'info' ? 'text-primary border-b-2 border-primary' : 'text-gray-400 hover:text-gray-600'}`}
+                            >
+                                📋 Información
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('permisos')}
+                                className={`flex-1 py-3 text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'permisos' ? 'text-primary border-b-2 border-primary' : 'text-gray-400 hover:text-gray-600'}`}
+                            >
+                                🔐 Permisos
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveUser} className="flex flex-col flex-1 overflow-hidden">
+                            <div className="overflow-y-auto flex-1 p-6">
+
+                                {/* ── TAB INFO ── */}
+                                {activeTab === 'info' && (
+                                    <div className="space-y-5">
+                                        {/* Nombre */}
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Nombre Completo</label>
+                                            <div className="relative">
+                                                <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+                                                <input
+                                                    required type="text"
+                                                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-bold text-sm"
+                                                    placeholder="Ej. Carlos Rodríguez"
+                                                    value={formUser.full_name}
+                                                    onChange={e => setFormUser({ ...formUser, full_name: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Email */}
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Email Profesional</label>
+                                            <div className="relative">
+                                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+                                                <input
+                                                    required={!editingUser} type="email"
+                                                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-bold text-sm"
+                                                    placeholder="correo@empresa.com"
+                                                    value={formUser.email}
+                                                    onChange={e => setFormUser({ ...formUser, email: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Contraseña — solo al crear */}
+                                        {!editingUser && (
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Contraseña Inicial</label>
+                                                <div className="relative">
+                                                    <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+                                                    <input
+                                                        required type={showPassword ? 'text' : 'password'}
+                                                        minLength={6}
+                                                        className="w-full pl-11 pr-12 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-bold text-sm"
+                                                        placeholder="Mínimo 6 caracteres"
+                                                        value={formUser.password}
+                                                        onChange={e => setFormUser({ ...formUser, password: e.target.value })}
+                                                    />
+                                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                    </button>
+                                                </div>
+                                                <p className="text-[9px] text-gray-400 pl-1">El usuario recibirá un email de confirmación para activar su cuenta.</p>
+                                            </div>
                                         )}
-                                    </select>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Sede de Trabajo</label>
-                                    <select
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-xs font-black appearance-none"
-                                        value={formUser.branch_id}
-                                        onChange={(e) => setFormUser({ ...formUser, branch_id: e.target.value })}
-                                    >
-                                        {branches.map(b => (
-                                            <option key={b.id} value={b.id}>{b.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
+
+                                        {/* Sede */}
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Sede de Trabajo</label>
+                                            <div className="relative">
+                                                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+                                                <select
+                                                    className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm font-bold appearance-none"
+                                                    value={formUser.branch_id}
+                                                    onChange={e => setFormUser({ ...formUser, branch_id: e.target.value })}
+                                                >
+                                                    <option value="">Sin sede asignada (Global)</option>
+                                                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* ── TAB PERMISOS ── */}
+                                {activeTab === 'permisos' && (
+                                    <div className="space-y-5">
+                                        {/* Plantillas de Roles */}
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <Sparkles size={14} className="text-primary" />
+                                                <h4 className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Plantillas de Rol</h4>
+                                                <span className="text-[9px] text-gray-400 font-medium">— Aplicar permisos predefinidos</span>
+                                            </div>
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                {Object.entries(ROLE_TEMPLATES).map(([key, template]) => {
+                                                    const Icon = template.icon;
+                                                    const isSelected = selectedRoleTemplate === key;
+                                                    return (
+                                                        <button
+                                                            key={key}
+                                                            type="button"
+                                                            onClick={() => applyRoleTemplate(key)}
+                                                            className={`p-3 rounded-2xl border-2 text-left transition-all hover:scale-[1.02] active:scale-95 ${isSelected
+                                                                    ? `border-transparent bg-gradient-to-br ${template.gradient} text-white shadow-lg`
+                                                                    : 'border-gray-100 bg-gray-50 hover:border-gray-200'
+                                                                }`}
+                                                        >
+                                                            <Icon size={18} className={isSelected ? 'text-white mb-1' : 'text-gray-400 mb-1'} />
+                                                            <p className={`text-[10px] font-black uppercase tracking-wide ${isSelected ? 'text-white' : 'text-secondary'}`}>
+                                                                {template.label}
+                                                            </p>
+                                                            <p className={`text-[8px] font-medium mt-0.5 line-clamp-1 ${isSelected ? 'text-white/70' : 'text-gray-400'}`}>
+                                                                {template.description}
+                                                            </p>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Matriz de Permisos Detallada */}
+                                        <div className="space-y-2">
+                                            <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Ajuste Fino de Permisos</h4>
+                                            <div className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
+                                                <table className="w-full text-left">
+                                                    <thead>
+                                                        <tr className="bg-gray-100/60 border-b border-gray-100">
+                                                            <th className="px-4 py-3 text-[9px] font-black uppercase text-gray-400">Módulo</th>
+                                                            <th className="px-2 py-3 text-[9px] font-black uppercase text-center text-blue-400">Ver</th>
+                                                            <th className="px-2 py-3 text-[9px] font-black uppercase text-center text-green-400">Crear</th>
+                                                            <th className="px-2 py-3 text-[9px] font-black uppercase text-center text-amber-400">Editar</th>
+                                                            <th className="px-2 py-3 text-[9px] font-black uppercase text-center text-red-400">Borrar</th>
+                                                            <th className="px-2 py-3 text-[9px] font-black uppercase text-center text-gray-400">Todo</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-100">
+                                                        {Object.entries(formUser.permissions || {}).map(([moduleName, perms]) => {
+                                                            const modInfo = MODULE_LABELS[moduleName] || { label: moduleName, emoji: '📦' };
+                                                            const allOn = Object.values(perms).every(Boolean);
+                                                            return (
+                                                                <tr key={moduleName} className="hover:bg-white/80 transition-colors">
+                                                                    <td className="px-4 py-3">
+                                                                        <span className="text-[11px] font-bold text-secondary flex items-center gap-1.5">
+                                                                            <span>{modInfo.emoji}</span> {modInfo.label}
+                                                                        </span>
+                                                                    </td>
+                                                                    {['read', 'create', 'update', 'delete'].map(action => (
+                                                                        <td key={action} className="px-2 py-2 text-center">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => handlePermissionChange(moduleName, action)}
+                                                                                className={`w-6 h-6 rounded-lg flex items-center justify-center mx-auto transition-all ${perms[action]
+                                                                                        ? 'bg-primary text-white shadow-sm'
+                                                                                        : 'bg-gray-100 text-gray-300 hover:bg-gray-200'
+                                                                                    }`}
+                                                                            >
+                                                                                {perms[action] ? <Check size={12} strokeWidth={3} /> : <X size={12} />}
+                                                                            </button>
+                                                                        </td>
+                                                                    ))}
+                                                                    <td className="px-2 py-2 text-center">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => toggleModuleAll(moduleName)}
+                                                                            className={`w-6 h-6 rounded-lg flex items-center justify-center mx-auto transition-all ${allOn
+                                                                                    ? 'bg-secondary text-white'
+                                                                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                                                                }`}
+                                                                            title={allOn ? 'Deshabilitar todo' : 'Habilitar todo'}
+                                                                        >
+                                                                            {allOn ? <Unlock size={11} /> : <Lock size={11} />}
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
-                            {/* Matriz de Permisos */}
-                            <div className="space-y-3 pt-2">
-                                <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest border-b border-gray-100 pb-2">Matriz de Permisos</h4>
-                                <div className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden">
-                                    <table className="w-full text-left">
-                                        <thead>
-                                            <tr className="bg-gray-100/50">
-                                                <th className="px-4 py-2 text-[8px] font-black uppercase text-gray-400">Módulo</th>
-                                                <th className="px-2 py-2 text-[8px] font-black uppercase text-center text-gray-400" title="Leer/Ver">Ver</th>
-                                                <th className="px-2 py-2 text-[8px] font-black uppercase text-center text-gray-400" title="Crear">Crear</th>
-                                                <th className="px-2 py-2 text-[8px] font-black uppercase text-center text-gray-400" title="Editar">Edit</th>
-                                                <th className="px-2 py-2 text-[8px] font-black uppercase text-center text-gray-400" title="Eliminar">Del</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {Object.entries(formUser.permissions || {}).map(([moduleName, perms]) => (
-                                                <tr key={moduleName}>
-                                                    <td className="px-4 py-3 text-[10px] font-bold capitalize text-secondary">
-                                                        {moduleName}
-                                                    </td>
-                                                    {['read', 'create', 'update', 'delete'].map(action => (
-                                                        <td key={action} className="px-2 py-2 text-center">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={perms[action] || false}
-                                                                onChange={() => handlePermissionChange(moduleName, action)}
-                                                                className="w-4 h-4 rounded-md border-gray-300 text-primary focus:ring-primary/20 cursor-pointer"
-                                                            />
-                                                        </td>
-                                                    ))}
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                            {/* Footer del Modal */}
+                            <div className="p-6 border-t border-gray-100 shrink-0 flex gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowModal(false)}
+                                    className="flex-1 py-3 border border-gray-200 rounded-2xl font-black text-xs uppercase tracking-widest text-gray-400 hover:bg-gray-50 transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSaving}
+                                    className="flex-1 bg-primary text-white py-3 rounded-2xl font-black shadow-xl hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 text-xs uppercase tracking-widest disabled:opacity-60"
+                                >
+                                    {isSaving ? (
+                                        <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Guardando...</>
+                                    ) : (
+                                        <><Save size={16} /> {editingUser ? 'Guardar Cambios' : 'Registrar Colaborador'}</>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════
+          MODAL: CAMBIO DE CONTRASEÑA
+      ══════════════════════════════════════════ */}
+            {showPassModal && (
+                <div className="fixed inset-0 bg-secondary/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 fade-in duration-200">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center">
+                                    <Key size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="font-black text-secondary text-sm">Seguridad de Cuenta</h3>
+                                    <p className="text-[10px] text-gray-400">{selectedUserForPass?.full_name}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowPassModal(false)} className="p-2 hover:bg-gray-50 rounded-full transition-colors">
+                                <X size={18} className="text-gray-400" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl flex gap-3">
+                                <AlertCircle size={18} className="text-blue-500 shrink-0 mt-0.5" />
+                                <div className="text-xs text-blue-700 font-medium leading-relaxed">
+                                    <p className="font-black mb-1">Opciones para cambiar contraseña:</p>
+                                    <ul className="list-disc list-inside space-y-1 text-blue-600">
+                                        <li>El usuario puede usar "Olvidé mi contraseña" en el login</li>
+                                        <li>Usar el Dashboard de Supabase → Authentication → Users</li>
+                                        <li>Implementar Edge Function con privilegios Admin</li>
+                                    </ul>
                                 </div>
                             </div>
                             <button
-                                type="submit"
-                                className="w-full bg-primary text-white py-4 rounded-2xl font-black shadow-xl hover:brightness-110 active:scale-95 transition-all mt-4 flex items-center justify-center gap-2 text-xs uppercase tracking-widest"
+                                onClick={() => {
+                                    window.open('https://supabase.com/dashboard', '_blank');
+                                    setShowPassModal(false);
+                                }}
+                                className="w-full py-3 bg-secondary text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-2"
                             >
-                                <Save size={18} />
-                                {editingUser ? 'Actualizar Datos' : 'Registrar Colaborador'}
+                                <Shield size={14} /> Abrir Admin de Supabase
                             </button>
-                        </form>
-                    </div >
-                </div >
-            )}
-
-            {/* Modal de Cambio de Contraseña (Seguridad) */}
-            {
-                showPassModal && (
-                    <div className="fixed inset-0 bg-secondary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in fade-in duration-200">
-                            {isPassUpdated ? (
-                                <div className="p-12 text-center space-y-6 animate-in zoom-in duration-300">
-                                    <div className="w-20 h-20 bg-success/10 text-success rounded-full flex items-center justify-center mx-auto shadow-inner">
-                                        <Check size={40} strokeWidth={3} className="animate-in slide-in-from-bottom-2" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-black text-secondary">¡Cambio Exitoso!</h3>
-                                        <p className="text-sm font-medium text-gray-400 mt-2">La contraseña ha sido actualizada correctamente.</p>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="p-8 text-center space-y-4">
-                                    <div className="w-16 h-16 bg-warning/10 text-warning rounded-full flex items-center justify-center mx-auto mb-2">
-                                        <Key size={32} />
-                                    </div>
-                                    <h3 className="text-xl font-black text-secondary">Control de Seguridad</h3>
-                                    <p className="text-xs text-gray-400 font-medium">Establecer nueva contraseña para <br /><span className="text-secondary font-black">{selectedUserForPass?.name || selectedUserForPass?.full_name}</span></p>
-
-                                    <div className="bg-blue-50 p-3 rounded-xl flex gap-3 text-left">
-                                        <AlertCircle size={18} className="text-blue-500 shrink-0" />
-                                        <p className="text-[10px] text-blue-600 font-medium leading-normal">
-                                            Por seguridad, el cambio de contraseña para otros usuarios debe realizarse desde el Panel de Administración de Supabase o mediante el flujo de recuperación de contraseña por email.
-                                        </p>
-                                    </div>
-
-                                    <div className="flex gap-3 pt-6">
-
-                                        <button onClick={() => setShowPassModal(false)} className="px-6 py-3.5 bg-gray-100 text-gray-400 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 transition-all w-full">
-                                            Entendido
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            <button
+                                onClick={() => setShowPassModal(false)}
+                                className="w-full py-2.5 text-gray-400 font-bold text-xs hover:text-secondary transition-colors"
+                            >
+                                Cerrar
+                            </button>
                         </div>
                     </div>
-                )
-            }
-        </div >
+                </div>
+            )}
+        </div>
     );
 };
 

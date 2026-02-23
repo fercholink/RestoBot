@@ -11,13 +11,16 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
     ],
     server: {
-      proxy: {
-        '/webhook': {
-          target: env.VITE_N8N_URL,
-          changeOrigin: true,
-          secure: false,
+      // Solo configurar proxy si la URL de n8n está definida
+      ...(env.VITE_N8N_URL ? {
+        proxy: {
+          '/webhook': {
+            target: env.VITE_N8N_URL,
+            changeOrigin: true,
+            secure: false,
+          }
         }
-      }
+      } : {}),
     },
     preview: {
       host: '0.0.0.0',
@@ -25,3 +28,7 @@ export default defineConfig(({ mode }) => {
     }
   }
 })
+
+
+
+
