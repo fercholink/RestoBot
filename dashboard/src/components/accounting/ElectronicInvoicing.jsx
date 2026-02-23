@@ -320,7 +320,7 @@ const ElectronicInvoicing = () => {
                 title: 'Recepción de documentos',
                 description: 'Emite eventos de acuse para facturas a crédito.',
                 icon: Inbox,
-                disabled: true
+                disabled: false
             }
         ];
 
@@ -374,6 +374,34 @@ const ElectronicInvoicing = () => {
                 </div>
                 <div className="flex-1 overflow-y-hidden">
                     <SupportDocuments />
+                </div>
+            </div>
+        );
+    }
+
+    if (view === 'reception') {
+        return (
+            <div className="h-full flex flex-col fade-in">
+                {/* Nav / Atrás */}
+                <div className="mb-4">
+                    <button
+                        onClick={() => setView('menu')}
+                        className="flex items-center gap-2 text-xs font-black text-gray-400 hover:text-secondary uppercase tracking-widest transition-colors w-fit"
+                    >
+                        <ChevronLeft size={16} /> Volver al menú
+                    </button>
+                </div>
+                <div className="flex-1 overflow-y-hidden bg-white rounded-3xl border border-gray-100 p-8 flex flex-col items-center justify-center text-center">
+                    <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mb-6">
+                        <Inbox size={32} />
+                    </div>
+                    <h2 className="text-2xl font-black text-secondary mb-3">Recepción de Documentos</h2>
+                    <p className="text-gray-500 max-w-md mb-8">
+                        Aquí podrás recepcionar facturas electrónicas a crédito y emitir los diferentes acuses de ley exigidos por la DIAN (Acuse de recibo, Recibo de bienes/servicios y Aceptación).
+                    </p>
+                    <div className="inline-block px-6 py-3 bg-gray-50 text-gray-600 rounded-xl font-bold text-sm tracking-wide uppercase shadow-sm">
+                        Módulo en desarrollo 🚀
+                    </div>
                 </div>
             </div>
         );
