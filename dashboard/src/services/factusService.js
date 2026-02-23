@@ -305,6 +305,129 @@ const factusService = {
             environment: _tokenCache.environment,
             expiresInMinutes: Math.floor(remainingMs / 60_000)
         };
+    },
+
+    // ============================================================
+    // 5. NÓMINA ELECTRÓNICA
+    // ============================================================
+
+    emitPayroll: async (payrollData) => {
+        const { baseUrl } = await _getBaseUrl();
+        const token = await factusService.getToken();
+
+        const response = await _fetchWithTimeout(`${baseUrl}/v1/electronic-payroll`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(payrollData)
+        });
+
+        let data;
+        try { data = await response.json(); }
+        catch { throw new Error(`Factus respondió con un formato inesperado (HTTP ${response.status})`); }
+
+        if (!response.ok) {
+            throw new Error(_parseFactusError(data, response.status));
+        }
+
+        return data;
+    },
+
+    // ============================================================
+    // 6. NOTAS DE CRÉDITO
+    // ============================================================
+
+    createCreditNote: async (creditNoteData) => {
+        const { baseUrl } = await _getBaseUrl();
+        const token = await factusService.getToken();
+
+        const response = await _fetchWithTimeout(`${baseUrl}/v1/bills/credit-notes`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(creditNoteData)
+        });
+
+        let data;
+        try { data = await response.json(); }
+        catch { throw new Error(`Factus respondió con un formato inesperado en Nota Crédito (HTTP ${response.status})`); }
+
+        if (!response.ok) {
+            throw new Error(_parseFactusError(data, response.status));
+        }
+
+        return data;
+    },
+
+    // ============================================================
+    // 7. DOCUMENTOS SOPORTE
+    // ============================================================
+
+    createSupportDocument: async (supportDocData) => {
+        const { baseUrl } = await _getBaseUrl();
+        const token = await factusService.getToken();
+
+        // En Factus, el documento soporte se envía al mismo endpoint de validación de facturas
+        // pero con un rango de numeración cuyo document_id es 11
+        const response = await _fetchWithTimeout(`${baseUrl}/v1/bills/validate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                ...supportDocData,
+                type_document_id: 11 // Asegurar que sea Documento Soporte
+            })
+        });
+
+        let data;
+        try { data = await response.json(); }
+        catch { throw new Error(`Factus respondió con un formato inesperado (HTTP ${response.status})`); }
+
+        if (!response.ok) {
+            throw new Error(_parseFactusError(data, response.status));
+        }
+
+        return data;
+    },
+
+    // ============================================================
+    // 8. EVENTOS RADIAN (RECEPCIÓN DE FACTURAS)
+    // ============================================================
+
+    emitEvent: async (eventData) => {
+        const { baseUrl } = await _getBaseUrl();
+        const token = await factusService.getToken();
+
+        // Generalmente /v1/bills/events o endpoint documentado específico
+        // eventData debe incluir: event_code (030, 032, 033), etc.
+        const response = await _fetchWithTimeout(`${baseUrl}/v1/bills/events`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(eventData)
+        });
+
+        let data;
+        try { data = await response.json(); }
+        catch { throw new Error(`Factus respondió con un formato inesperado (HTTP ${response.status})`); }
+
+        if (!response.ok) {
+            throw new Error(_parseFactusError(data, response.status));
+        }
+
+        return data;
     }
 };
 

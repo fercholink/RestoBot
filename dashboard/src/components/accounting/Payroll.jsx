@@ -5,6 +5,7 @@ import {
     Plus, Search, Briefcase, DollarSign, Calendar, Edit, Trash2
 } from 'lucide-react';
 import { sileo } from 'sileo';
+import factusService from '../../services/factusService';
 import PayrollEmployeeModal from './PayrollEmployeeModal';
 import PayrollLiquidationModal from './PayrollLiquidationModal';
 
@@ -262,6 +263,69 @@ const PayrollDocuments = () => {
         }
     };
 
+    const handleEmitToDIAN = async (doc) => {
+        if (!window.confirm(`¿Estás seguro de emitir a la DIAN la nómina de ${doc.payroll_employees?.first_name}? Esta acción es irreversible.`)) return;
+
+        let loadingToast = null;
+        try {
+            loadingToast = sileo.loading({ title: 'Emitiendo...', description: 'Conectando con la DIAN a través de Factus...' });
+
+            const emp = doc.payroll_employees;
+
+            // ⚠️ Mapeo simplificado (Debe ajustarse al esquema exacto de API Factus v1)
+            const payload = {
+                document_type_id: 10, // 10: Nómina Individual
+                date: new Date().toISOString().split('T')[0],
+                time: new Date().toLocaleTimeString('es-CO', { hour12: false }),
+                payment_date: doc.payment_date,
+                period: {
+                    start_date: doc.period_start,
+                    end_date: doc.period_end,
+                    worked_days: 30 // Calcular basado en fechas
+                },
+                worker: {
+                    identification_document_id: 3, // 3: CC (Ajustar dinámicamente)
+                    identification: emp.document_number,
+                    first_name: emp.first_name,
+                    last_name: emp.last_name,
+                    worker_type_id: emp.worker_type_id || 1,
+                    sub_worker_type_id: emp.sub_worker_type_id || 0,
+                    salary: emp.salary,
+                },
+                accrueds: {
+                    basic: { worked_days: 30, amount: doc.accrued_total } // Mapear doc.payroll_items de tipo devengo
+                },
+                deductions: {
+                    health: { percentage: 4, amount: doc.deductions_total / 2 }, // Ajustar
+                    pension: { percentage: 4, amount: doc.deductions_total / 2 } // Ajustar
+                },
+                totals: {
+                    accrued_total: doc.accrued_total,
+                    deductions_total: doc.deductions_total,
+                    net_total: doc.net_total
+                }
+            };
+
+            await factusService.emitPayroll(payload);
+
+            // Actualizar estado en BD
+            const { error } = await supabase
+                .from('payroll_documents')
+                .update({ factus_status: 'signed', factus_doc_number: `NOM-${doc.id.substring(0, 8)}` })
+                .eq('id', doc.id);
+
+            if (error) throw error;
+
+            if (loadingToast) loadingToast.close();
+            sileo.success({ title: '¡Éxito!', description: 'Nómina emitida y firmada correctamente.' });
+            fetchAll();
+        } catch (error) {
+            if (loadingToast) loadingToast.close();
+            console.error('Error enviando nómina:', error);
+            sileo.error({ title: 'Error Factus', description: error.message || 'No se pudo emitir la nómina.' });
+        }
+    };
+
     return (
         <div className="flex flex-col gap-4">
             {/* Cabecera */}
@@ -358,7 +422,7 @@ const PayrollDocuments = () => {
                                                             <Edit size={15} />
                                                         </button>
                                                         <button
-                                                            onClick={() => sileo.info({ title: 'DIAN', description: 'Próximamente: Envío a Factus.' })}
+                                                            onClick={() => handleEmitToDIAN(doc)}
                                                             className="flex items-center gap-1 p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
                                                             title="Emitir a DIAN"
                                                         >

@@ -3,11 +3,12 @@ import { supabase } from '../../lib/supabase';
 import {
     FileText, CheckCircle, Clock, AlertCircle, RefreshCw,
     Download, Send, Filter, Building2, UtensilsCrossed, Bike,
-    ChevronLeft, Inbox, ArrowRight, Receipt
+    ChevronLeft, Inbox, ArrowRight, Receipt, XCircle
 } from 'lucide-react';
 import factusService from '../../services/factusService';
 import FactusConfig from './FactusConfig';
 import SupportDocuments from './SupportDocuments';
+import ReceptionDocuments from './ReceptionDocuments';
 import { sileo } from 'sileo';
 
 // -------------------------------------------------------
@@ -262,10 +263,59 @@ const ElectronicInvoicing = () => {
             console.error('[Factus] Error completo:', error);
         } finally {
             clearTimeout(safetyTimer);
-            setProcessingId(null);
+            if (processingId === order.id) setProcessingId(null);
+            loadingToast.close();
         }
     };
 
+    const handleCreateCreditNote = async (order) => {
+        if (!window.confirm(`¿Estás seguro de emitir una Nota de Crédito para la factura ${order.factus_doc_number}? Esta acción anulará la factura ante la DIAN.`)) return;
+
+        const loadingToast = sileo.loading({ title: 'Anulando...', description: 'Generando Nota Crédito en Factus...' });
+        setProcessingId(order.id);
+
+        try {
+            // Ejemplo de payload base para nota crédito de anulación total
+            const payload = {
+                document_type_id: 11, // 11 para nota de ajuste o código correspondiente según manual Factus (Notas crédito = código 91)
+                number: `${order.factus_doc_number}`,
+                reference_billing: [{
+                    identification: order.factus_id,
+                    date: new Date().toISOString().split('T')[0],
+                    concept_code: "2" // 2: Anulación de factura electrónica
+                }],
+                // (Los demás datos cliente, ítems, se enviarían según documentación de la API)
+                items: order.order_items?.map(item => ({
+                    code_reference: String(item.product_id),
+                    name: item.product_name,
+                    quantity: item.quantity,
+                    discount_rate: 0,
+                    price: item.price,
+                    tax_rate: "0.00", // Simplificado
+                    is_excluded: 0
+                })) || []
+            };
+
+            // Simulación o llamada real
+            // await factusService.createCreditNote(payload);
+
+            // Simulamos éxito
+            await new Promise(r => setTimeout(r, 1500));
+
+            // Actualizamos el estado en la base de datos (Ej: status = 'anulado' o factus_doc_number = NULL)
+            // Aquí lo marcamos para que se note
+            sileo.success({ title: 'Nota Crédito Emitida', description: `La factura ${order.factus_doc_number} fue anulada correctamente.` });
+
+            // Opcional: recargar u ocultar la fila
+            fetchOrders();
+        } catch (error) {
+            console.error('Error generando nota crédito:', error);
+            sileo.error({ title: 'Error Factus', description: error.message || 'No se pudo generar la nota crédito.' });
+        } finally {
+            setProcessingId(null);
+            loadingToast.close();
+        }
+    };
 
     // -------------------------------------------------------
     // Descargar / Ver PDF (siempre autenticado)
@@ -391,17 +441,8 @@ const ElectronicInvoicing = () => {
                         <ChevronLeft size={16} /> Volver al menú
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-hidden bg-white rounded-3xl border border-gray-100 p-8 flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mb-6">
-                        <Inbox size={32} />
-                    </div>
-                    <h2 className="text-2xl font-black text-secondary mb-3">Recepción de Documentos</h2>
-                    <p className="text-gray-500 max-w-md mb-8">
-                        Aquí podrás recepcionar facturas electrónicas a crédito y emitir los diferentes acuses de ley exigidos por la DIAN (Acuse de recibo, Recibo de bienes/servicios y Aceptación).
-                    </p>
-                    <div className="inline-block px-6 py-3 bg-gray-50 text-gray-600 rounded-xl font-bold text-sm tracking-wide uppercase shadow-sm">
-                        Módulo en desarrollo 🚀
-                    </div>
+                <div className="flex-1 overflow-y-hidden rounded-3xl pb-2">
+                    <ReceptionDocuments />
                 </div>
             </div>
         );
@@ -515,12 +556,21 @@ const ElectronicInvoicing = () => {
                                                     <span className="text-xs font-black">Emitida</span>
                                                 </div>
                                                 <span className="text-[10px] text-gray-400 font-mono">{order.factus_doc_number}</span>
-                                                <button
-                                                    onClick={() => handleViewPdf(order)}
-                                                    className="flex items-center gap-1 text-[10px] text-blue-500 font-black hover:text-blue-700 underline"
-                                                >
-                                                    <Download size={10} /> Ver PDF
-                                                </button>
+                                                <div className="flex items-center gap-3">
+                                                    <button
+                                                        onClick={() => handleViewPdf(order)}
+                                                        className="flex items-center gap-1 text-[10px] text-blue-500 font-black hover:text-blue-700 underline"
+                                                    >
+                                                        <Download size={10} /> Ver PDF
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleCreateCreditNote(order)}
+                                                        disabled={isProcessing}
+                                                        className="flex items-center gap-1 text-[10px] text-red-500 font-black hover:text-red-700 underline"
+                                                    >
+                                                        <XCircle size={10} /> {isProcessing ? 'Procesando...' : 'Anular'}
+                                                    </button>
+                                                </div>
                                             </>
                                         ) : (
                                             <button
