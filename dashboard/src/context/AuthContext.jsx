@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { getDefaultPermissions, VALID_ROLES } from '../config/roles';
 
 const AuthContext = createContext(null);
 
@@ -20,7 +21,7 @@ export const AuthProvider = ({ children }) => {
 
             if (data && !error) {
                 profileData = data;
-                console.log("Auth: Perfil cargado desde BD", data.role);
+                console.log(`[Auth] ✅ Perfil cargado — rol: ${data.role}`);
             } else if (error) {
                 console.warn("Auth: profiles devolvió error, usando JWT claims como fallback.", error.message);
             }
@@ -31,27 +32,15 @@ export const AuthProvider = ({ children }) => {
         const metadata = sessionUser.user_metadata || {};
         const appMeta = sessionUser.app_metadata || {};
 
-        // Fallback de rol: profiles → app_metadata → user_metadata → 'cajero'
-        const resolvedRole = profileData.role
-            || appMeta.role
-            || metadata.role
-            || 'cajero';
+        // Resolver rol con validación — garantiza un rol siempre válido
+        const rawRole = profileData.role || appMeta.role || metadata.role || 'cajero';
+        const resolvedRole = VALID_ROLES.includes(rawRole) ? rawRole : 'cajero';
 
-        // Fallback de permisos para rol admin/gerente si no vienen de BD
-        const defaultAdminPermissions = {
-            restaurante: { create: true, read: true, update: true, delete: true },
-            hotel: { create: true, read: true, update: true, delete: true },
-            financiero: { create: true, read: true, update: true, delete: true },
-            usuarios: { create: true, read: true, update: true, delete: true },
-            sedes: { create: true, read: true, update: true, delete: true },
-            marketing: { create: true, read: true, update: true, delete: true },
-            qr_tools: { create: true, read: true, update: true, delete: true },
-            operaciones: { create: true, read: true, update: true, delete: true },
-        };
+        // Resolver permisos: BD (personalizados) → default del rol
+        const resolvedPermissions = profileData.permissions || getDefaultPermissions(resolvedRole);
 
-        const resolvedPermissions = profileData.permissions
-            || metadata.permissions
-            || (resolvedRole === 'admin' || resolvedRole === 'gerente' ? defaultAdminPermissions : {});
+        console.log(`[Auth] ✅ Usuario listo — rol: ${resolvedRole}`);
+
 
         return {
             ...sessionUser,

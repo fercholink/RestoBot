@@ -3,6 +3,7 @@ import { updateOrderStatus } from './api';
 import { useAuth } from './context/AuthContext';
 import { useRealtime } from './context/RealtimeContext';
 import { supabase } from './lib/supabase';
+import { getPollingInterval } from './config/roles';
 import LoginPage from './pages/LoginPage';
 import Sidebar from './components/Sidebar';
 import NewOrderModal from './components/NewOrderModal';
@@ -120,22 +121,16 @@ function App() {
     }
   }, [ordersVersion]);
 
-  // POLLING DE RESPALDO: refresca pedidos automáticamente cada N segundos
-  // Garantiza sincronización aunque el Realtime de Supabase falle
+  // POLLING: refresca pedidos automáticamente según el rol
+  // Admin=8s, Gerente=8s, Cajero=6s, Cocina=5s, Analista=30s
   useEffect(() => {
     if (!user) return;
-
-    // Admin/Gerente: cada 8 segundos para ver todo en tiempo real
-    // Cajero/otros: cada 12 segundos (menos carga de red)
-    const interval = (user.role === 'admin' || user.role === 'gerente') ? 8000 : 12000;
-
+    const interval = getPollingInterval(user.role);
     const pollInterval = setInterval(() => {
       fetchOrders();
     }, interval);
-
     return () => clearInterval(pollInterval);
   }, [user?.role]);
-
 
   // Escuchar eventos de actualización de turno (emitidos por ShiftManagement)
   useEffect(() => {
