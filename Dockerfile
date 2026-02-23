@@ -20,3 +20,4 @@ RUN npm install -g serve
 COPY --from=build /app/dashboard/dist ./dist
 EXPOSE 3000
 CMD ["serve", "-s", "dist", "-l", "3000"]
+# BUST CACHE 02/23/2026 10:11:50
