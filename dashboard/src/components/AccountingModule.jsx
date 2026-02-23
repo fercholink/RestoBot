@@ -8,6 +8,7 @@ import ElectronicInvoicing from './accounting/ElectronicInvoicing';
 import TenantAccountingConfig from './accounting/TenantAccountingConfig';
 import ThirdPartiesDirectory from './accounting/ThirdPartiesDirectory';
 import Payroll from './accounting/Payroll';
+import LegalReports from './accounting/LegalReports';
 import { supabase } from '../lib/supabase';
 
 // ─── Helpers de tipo de pedido ───────────────────────────────────────────────
@@ -72,7 +73,7 @@ const AccountingModule = ({ activeSubTab = 'summary', setActiveSubTab }) => {
                 .lte('created_at', todayEnd.toISOString());
 
             const formattedCharges = (chargesData || []).map(c => ({
-                id: `cargohab-${c.id}`,
+                id: `cargohab - ${c.id} `,
                 customer_name: c.bookings?.guests?.full_name || 'Huésped Hotel',
                 table_number: c.description || 'Cargo Extra',
                 type: 'cargohab',
@@ -93,9 +94,9 @@ const AccountingModule = ({ activeSubTab = 'summary', setActiveSubTab }) => {
             const formattedExpenses = (expensesData || []).map(e => {
                 const exTotal = (e.accounting_entry_items || []).reduce((sum, item) => sum + (item.credit || 0), 0);
                 return {
-                    id: `egreso-${e.id}`,
+                    id: `egreso - ${e.id} `,
                     customer_name: 'PROVEEDORES / GASTOS',
-                    table_number: e.reference ? `Ref: ${e.reference}` : 'Gasto Manual',
+                    table_number: e.reference ? `Ref: ${e.reference} ` : 'Gasto Manual',
                     type: 'gasto',
                     total: -Math.abs(exTotal), // Negative to indicate outflow
                     is_paid: true,
@@ -158,10 +159,10 @@ const AccountingModule = ({ activeSubTab = 'summary', setActiveSubTab }) => {
                         <button
                             key={item.id}
                             onClick={() => setActiveSubTab(item.id)}
-                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeSubTab === item.id
-                                ? 'bg-secondary text-white shadow-lg scale-[1.02]'
-                                : 'text-accent hover:bg-white/50'
-                                }`}
+                            className={`flex items - center gap - 2 px - 5 py - 2 rounded - xl text - [10px] font - black uppercase tracking - widest transition - all whitespace - nowrap ${activeSubTab === item.id
+                                    ? 'bg-secondary text-white shadow-lg scale-[1.02]'
+                                    : 'text-accent hover:bg-white/50'
+                                } `}
                         >
                             <item.icon size={14} />
                             <span className="hidden lg:inline">{item.label}</span>
@@ -232,10 +233,10 @@ const AccountingModule = ({ activeSubTab = 'summary', setActiveSubTab }) => {
                             </div>
 
                             {/* Sin facturar */}
-                            <div className={`bg-white p-6 rounded-3xl border shadow-sm transition-colors ${stats.pendingToInvoice > 0
-                                ? 'border-orange-200 border-l-4 border-l-orange-400'
-                                : 'border-gray-100'
-                                }`}>
+                            <div className={`bg - white p - 6 rounded - 3xl border shadow - sm transition - colors ${stats.pendingToInvoice > 0
+                                    ? 'border-orange-200 border-l-4 border-l-orange-400'
+                                    : 'border-gray-100'
+                                } `}>
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="p-3 rounded-2xl bg-orange-100 text-orange-500"><AlertCircle size={20} /></div>
                                     {stats.pendingToInvoice > 0 && (
@@ -313,18 +314,18 @@ const AccountingModule = ({ activeSubTab = 'summary', setActiveSubTab }) => {
                                                         {/* Body: Customer, Type, value */}
                                                         <div className="mb-2">
                                                             <p className="text-sm font-black text-secondary leading-tight line-clamp-2">{order.customer_name || 'Sin nombre'}</p>
-                                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">{order.table_number || `#${order.id}`}</p>
+                                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">{order.table_number || `#${order.id} `}</p>
                                                         </div>
                                                     </div>
 
                                                     {/* Footer */}
                                                     <div className="flex justify-between items-end mt-4 pt-4 border-t border-gray-100/80">
-                                                        <span className={`text-[10px] font-black uppercase tracking-wider ${tInfo.color}`}>
+                                                        <span className={`text - [10px] font - black uppercase tracking - wider ${tInfo.color} `}>
                                                             {tInfo.label}
                                                         </span>
-                                                        <span className={`text-lg font-black leading-none ${order.type === 'gasto' ? 'text-rose-500' :
-                                                            order.is_paid ? 'text-emerald-600' : 'text-gray-400'
-                                                            }`}>
+                                                        <span className={`text - lg font - black leading - none ${order.type === 'gasto' ? 'text-rose-500' :
+                                                                order.is_paid ? 'text-emerald-600' : 'text-gray-400'
+                                                            } `}>
                                                             {order.type === 'gasto' ? '-' : ''}${Math.abs(amount).toLocaleString('es-CO')}
                                                         </span>
                                                     </div>
@@ -371,26 +372,7 @@ const AccountingModule = ({ activeSubTab = 'summary', setActiveSubTab }) => {
                 {activeSubTab === 'payroll' && <Payroll />}
 
                 {/* ══════════ INFORMES ══════════ */}
-                {activeSubTab === 'reports' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {[
-                            { title: 'Estado de Resultados (P&G)', desc: 'Utilidad y pérdida por periodo contable.' },
-                            { title: 'Balance General', desc: 'Situación patrimonial de la empresa.' },
-                            { title: 'Información Exógena', desc: 'Reporte para medios magnéticos DIAN.' },
-                            { title: 'Libro Mayor y Balances', desc: 'Cuentas detalladas por PUC colombiano.' },
-                        ].map((report, idx) => (
-                            <div key={idx} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
-                                <div className="flex-1">
-                                    <h4 className="text-sm font-black text-secondary uppercase tracking-tight mb-1">{report.title}</h4>
-                                    <p className="text-xs text-accent font-medium">{report.desc}</p>
-                                </div>
-                                <button className="p-3 bg-gray-50 text-accent rounded-2xl group-hover:bg-secondary group-hover:text-white transition-all">
-                                    <FileSpreadsheet size={20} />
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                {activeSubTab === 'reports' && <LegalReports />}
 
             </div>
         </div>
