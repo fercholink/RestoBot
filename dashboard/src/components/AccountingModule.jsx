@@ -159,10 +159,10 @@ const AccountingModule = ({ activeSubTab = 'summary', setActiveSubTab }) => {
                         <button
                             key={item.id}
                             onClick={() => setActiveSubTab(item.id)}
-                            className={`flex items - center gap - 2 px - 5 py - 2 rounded - xl text - [10px] font - black uppercase tracking - widest transition - all whitespace - nowrap ${activeSubTab === item.id
-                                    ? 'bg-secondary text-white shadow-lg scale-[1.02]'
-                                    : 'text-accent hover:bg-white/50'
-                                } `}
+                            className={`flex items-center gap-2 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeSubTab === item.id
+                                ? 'bg-secondary text-white shadow-lg scale-[1.02]'
+                                : 'text-accent hover:bg-white/50'
+                                }`}
                         >
                             <item.icon size={14} />
                             <span className="hidden lg:inline">{item.label}</span>
@@ -234,8 +234,8 @@ const AccountingModule = ({ activeSubTab = 'summary', setActiveSubTab }) => {
 
                             {/* Sin facturar */}
                             <div className={`bg - white p - 6 rounded - 3xl border shadow - sm transition - colors ${stats.pendingToInvoice > 0
-                                    ? 'border-orange-200 border-l-4 border-l-orange-400'
-                                    : 'border-gray-100'
+                                ? 'border-orange-200 border-l-4 border-l-orange-400'
+                                : 'border-gray-100'
                                 } `}>
                                 <div className="flex justify-between items-start mb-4">
                                     <div className="p-3 rounded-2xl bg-orange-100 text-orange-500"><AlertCircle size={20} /></div>
@@ -324,7 +324,7 @@ const AccountingModule = ({ activeSubTab = 'summary', setActiveSubTab }) => {
                                                             {tInfo.label}
                                                         </span>
                                                         <span className={`text - lg font - black leading - none ${order.type === 'gasto' ? 'text-rose-500' :
-                                                                order.is_paid ? 'text-emerald-600' : 'text-gray-400'
+                                                            order.is_paid ? 'text-emerald-600' : 'text-gray-400'
                                                             } `}>
                                                             {order.type === 'gasto' ? '-' : ''}${Math.abs(amount).toLocaleString('es-CO')}
                                                         </span>

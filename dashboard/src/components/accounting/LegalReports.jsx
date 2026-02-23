@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { FileText, Calendar, Download, Search, RefreshCw, Calculator, FileSpreadsheet } from 'lucide-react';
 import { sileo } from 'sileo';
-import * as XLSX from 'xlsx'; // Asumimos que esta u otra lib xlsx pueda no estar, usaremos un CSV simple por ahora
 
 const LegalReports = () => {
     const [reportType, setReportType] = useState('trial_balance'); // trial_balance | income_statement
@@ -239,7 +238,7 @@ const LegalReports = () => {
                                         <td className="p-4 text-sm font-medium text-gray-500 text-right">${row.debit.toLocaleString('es-CO')}</td>
                                         <td className="p-4 text-sm font-medium text-gray-500 text-right">${row.credit.toLocaleString('es-CO')}</td>
                                         <td className={`p-4 text-sm font-black text-right ${reportType === 'trial_balance' ? 'text-secondary' :
-                                                (row.nature === 'C' ? 'text-emerald-600' : 'text-rose-500')
+                                            (row.nature === 'C' ? 'text-emerald-600' : 'text-rose-500')
                                             }`}>
                                             ${row.netBalance.toLocaleString('es-CO')}
                                         </td>
