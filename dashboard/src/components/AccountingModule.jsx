@@ -25,8 +25,7 @@ const getOrderType = (order) => {
 };
 
 // ─── Componente principal ─────────────────────────────────────────────────────
-const AccountingModule = () => {
-    const [activeSubTab, setActiveSubTab] = useState('summary');
+const AccountingModule = ({ activeSubTab = 'summary', setActiveSubTab }) => {
     const [stats, setStats] = useState({
         totalIncome: 0,
         invoicesEmitted: 0,

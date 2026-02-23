@@ -71,6 +71,7 @@ function App() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeRestaurantSubTab, setActiveRestaurantSubTab] = useState(user?.role === 'cajero' ? 'turnos' : 'board');
   const [activeHotelSubTab, setActiveHotelSubTab] = useState('habitaciones');
+  const [activeAccountingSubTab, setActiveAccountingSubTab] = useState('summary');
   const [paymentModal, setPaymentModal] = useState({ isOpen: false, orderId: null, totalPrice: 0 });
   const [showNotifications, setShowNotifications] = useState(false);
   const [printData, setPrintData] = useState({ order: null, type: 'comanda' });
@@ -585,6 +586,8 @@ function App() {
           setActiveRestaurantSubTab={setActiveRestaurantSubTab}
           activeHotelSubTab={activeHotelSubTab}
           setActiveHotelSubTab={setActiveHotelSubTab}
+          activeAccountingSubTab={activeAccountingSubTab}
+          setActiveAccountingSubTab={setActiveAccountingSubTab}
         />
 
         <main className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} p-3 md:p-8 pt-20 lg:pt-8 w-full overflow-hidden`}>
@@ -710,7 +713,7 @@ function App() {
           )}
           {activeTab === 'analytics' && <AnalyticsPro />}
           {activeTab === 'hotels' && <HotelManagement activeSubTab={activeHotelSubTab} />}
-          {activeTab === 'contabilidad' && <AccountingModule orders={orders} />}
+          {activeTab === 'contabilidad' && <AccountingModule orders={orders} activeSubTab={activeAccountingSubTab} setActiveSubTab={setActiveAccountingSubTab} />}
           {activeTab === 'users' && <UserManagement />}
           {activeTab === 'sedes' && <BranchManagement />}
           {activeTab === 'marketing' && <MarketingModule />}

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import factusService from '../../services/factusService';
 import FactusConfig from './FactusConfig';
+import SupportDocuments from './SupportDocuments';
 import { sileo } from 'sileo';
 
 // -------------------------------------------------------
@@ -312,7 +313,7 @@ const ElectronicInvoicing = () => {
                 title: 'Documentos soporte y notas de ajuste',
                 description: 'Emite documentos soporte y notas de ajuste de forma automática y segura.',
                 icon: Receipt,
-                disabled: true
+                disabled: false
             },
             {
                 id: 'reception',
@@ -354,6 +355,25 @@ const ElectronicInvoicing = () => {
                             )}
                         </div>
                     ))}
+                </div>
+            </div>
+        );
+    }
+
+    if (view === 'support') {
+        return (
+            <div className="h-full flex flex-col fade-in">
+                {/* Nav / Atrás */}
+                <div className="mb-4">
+                    <button
+                        onClick={() => setView('menu')}
+                        className="flex items-center gap-2 text-xs font-black text-gray-400 hover:text-secondary uppercase tracking-widest transition-colors w-fit"
+                    >
+                        <ChevronLeft size={16} /> Volver al menú
+                    </button>
+                </div>
+                <div className="flex-1 overflow-y-hidden">
+                    <SupportDocuments />
                 </div>
             </div>
         );

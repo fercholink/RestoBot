@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { LayoutPanelLeft, Users, Utensils, Settings, Menu, X, LogOut, ChevronLeft, ChevronRight, Building2, Wallet, ShieldAlert, Zap, Megaphone, QrCode } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeRestaurantSubTab, setActiveRestaurantSubTab, activeHotelSubTab, setActiveHotelSubTab }) => {
+const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeRestaurantSubTab, setActiveRestaurantSubTab, activeHotelSubTab, setActiveHotelSubTab, activeAccountingSubTab, setActiveAccountingSubTab }) => {
     const [isOpen, setIsOpen] = useState(false);
     const { user, logout } = useAuth();
 
@@ -22,6 +22,15 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
         { id: 'canales', label: '📩 Canales OTA', roles: ['admin', 'gerente'] },
         { id: 'historial', label: 'Historial', roles: ['admin', 'gerente'] },
         { id: 'floors', label: 'Pisos y Zonas', roles: ['admin', 'gerente'] },
+    ].filter(item => item.roles.includes(user?.role || 'cajero'));
+
+    // Definimos subitems para Contabilidad
+    const accountingSubItems = [
+        { id: 'summary', label: 'Resumen Diario', roles: ['admin', 'gerente'] },
+        { id: 'invoicing', label: 'Facturación DIAN', roles: ['admin', 'gerente'] },
+        { id: 'payroll', label: 'Nómina Electrónica', roles: ['admin', 'gerente'] },
+        { id: 'third_parties', label: 'Directorio DIAN', roles: ['admin', 'gerente'] },
+        { id: 'reports', label: 'Informes Legales', roles: ['admin', 'gerente'] },
     ].filter(item => item.roles.includes(user?.role || 'cajero'));
 
     const hasPermission = (moduleName) => {
@@ -47,7 +56,7 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
             module: 'restaurante'
         },
         { id: 'hotels', label: 'Gestión Hotel', icon: Building2, roles: ['gerente', 'admin'], hasSubmenu: true, module: 'hotel' },
-        { id: 'contabilidad', label: 'Contabilidad', icon: Wallet, roles: ['gerente', 'admin'], module: 'financiero' },
+        { id: 'contabilidad', label: 'Contabilidad', icon: Wallet, roles: ['gerente', 'admin'], hasSubmenu: true, module: 'financiero' },
         { id: 'sedes', label: 'Sucursales', icon: Building2, roles: ['gerente'], module: 'sedes' },
         { id: 'users', label: 'Personal', icon: Users, roles: ['admin', 'gerente'], module: 'usuarios' },
         { id: 'marketing', label: 'Marketing AI', icon: Megaphone, roles: ['admin', 'gerente'] },
@@ -181,6 +190,24 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
                                             }`}
                                     >
                                         <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'hotels' && activeHotelSubTab === sub.id ? 'bg-primary' : 'bg-gray-600'}`} />
+                                        {sub.label}
+                                    </button>
+                                ))}
+                                {item.id === 'contabilidad' && accountingSubItems.map(sub => (
+                                    <button
+                                        key={sub.id}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveTab('contabilidad');
+                                            setActiveAccountingSubTab && setActiveAccountingSubTab(sub.id);
+                                            setIsOpen(false);
+                                        }}
+                                        className={`w-full flex items-center gap-3 pl-16 pr-6 py-3 transition-all text-xs font-bold ${activeTab === 'contabilidad' && activeAccountingSubTab === sub.id
+                                            ? 'text-white bg-white/5'
+                                            : 'text-gray-500 hover:text-gray-300'
+                                            }`}
+                                    >
+                                        <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'contabilidad' && activeAccountingSubTab === sub.id ? 'bg-primary' : 'bg-gray-600'}`} />
                                         {sub.label}
                                     </button>
                                 ))}
