@@ -11,9 +11,18 @@ DECLARE
     v_amount DECIMAL;
     v_tax_amount DECIMAL;
 BEGIN
-    -- Asegurar que se dispare sólo cuando el pedido cambia a 'pagado' o 'is_paid' pasa a true
-    IF (NEW.status = 'pagado' AND OLD.status != 'pagado') OR 
-       (NEW.is_paid = TRUE AND OLD.is_paid = FALSE) THEN
+    -- Asegurar que se dispare en INSERT (si ya viene pagado) 
+    -- o en UPDATE (si cambia a pagado)
+    IF (TG_OP = 'INSERT' AND (NEW.status = 'pagado' OR NEW.is_paid = TRUE)) OR
+       (TG_OP = 'UPDATE' AND ((NEW.status = 'pagado' AND OLD.status != 'pagado') OR 
+                              (NEW.is_paid = TRUE AND OLD.is_paid = FALSE))) THEN
+        
+        -- Si es un cargo a habitación del restaurante, no lo contabilizamos aquí, 
+        -- se contabilizará globalmente al hacer el Check-Out del hotel.
+        -- NOTA: Los checkouts reales del hotel SÍ deben contabilizarse (tienen 'Checkout' en notas).
+        IF NEW.table_number LIKE 'HAB-%' AND COALESCE(NEW.notes, '') NOT LIKE 'Checkout Habitación%' THEN
+            RETURN NEW;
+        END IF;
         
         -- Monto total de la venta
         v_amount := COALESCE(NEW.total, NEW.total_price, 0);
@@ -93,6 +102,6 @@ $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS trigger_order_paid_accounting ON public.orders;
 
 CREATE TRIGGER trigger_order_paid_accounting
-AFTER UPDATE ON public.orders
+AFTER INSERT OR UPDATE ON public.orders
 FOR EACH ROW
 EXECUTE FUNCTION trg_order_paid_accounting();

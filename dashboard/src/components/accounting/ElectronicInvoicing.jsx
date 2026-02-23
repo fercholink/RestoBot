@@ -93,8 +93,8 @@ const ElectronicInvoicing = () => {
                 query = query.not('factus_doc_number', 'is', null);
             }
 
-            // Filtrar y excluir cargos a habitación, ya que se facturan en el checkout del huésped
-            query = query.or('table_number.not.ilike.HAB-%,table_number.is.null');
+            // Filtrar y excluir cargos a habitación DEL RESTAURANTE (los checkout de hotel SÍ deben verse)
+            query = query.or('table_number.not.ilike.HAB-%,table_number.is.null,notes.ilike.Checkout%');
 
             const { data, error } = await query;
             if (error) throw error;
