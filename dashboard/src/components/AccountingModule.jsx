@@ -7,6 +7,7 @@ import {
 import ElectronicInvoicing from './accounting/ElectronicInvoicing';
 import TenantAccountingConfig from './accounting/TenantAccountingConfig';
 import ThirdPartiesDirectory from './accounting/ThirdPartiesDirectory';
+import Payroll from './accounting/Payroll';
 import { supabase } from '../lib/supabase';
 
 // ─── Helpers de tipo de pedido ───────────────────────────────────────────────
@@ -368,25 +369,7 @@ const AccountingModule = () => {
                 {activeSubTab === 'third_parties' && <ThirdPartiesDirectory />}
 
                 {/* ══════════ NÓMINA ══════════ */}
-                {activeSubTab === 'payroll' && (
-                    <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
-                        <div className="p-5 rounded-full bg-primary/5 text-primary mb-6 animate-bounce">
-                            <Briefcase size={48} />
-                        </div>
-                        <h3 className="text-xl font-black text-secondary mb-2">Nómina Electrónica</h3>
-                        <p className="text-sm font-medium text-accent max-w-md text-center mb-8 px-6">
-                            Liquidación automática bajo estándares legales. Generación de desprendibles y envío XML a la DIAN.
-                        </p>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-2xl px-8">
-                            {['Empleados', 'Prestaciones', 'Aportes SS', 'XML Firmados'].map(tag => (
-                                <div key={tag} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 text-center">
-                                    <div className="text-xs font-black text-secondary uppercase">{tag}</div>
-                                    <div className="text-[10px] font-bold text-accent">Configurable</div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                {activeSubTab === 'payroll' && <Payroll />}
 
                 {/* ══════════ INFORMES ══════════ */}
                 {activeSubTab === 'reports' && (
