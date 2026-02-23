@@ -74,6 +74,7 @@ INSERT INTO public.accounting_accounts (code, name, nature, is_movement) VALUES
 ('4', 'INGRESOS', 'credit', false),
 ('41', 'OPERACIONALES', 'credit', false),
 ('4135', 'COMERCIO AL POR MAYOR Y AL POR MENOR', 'credit', true),
+('4140', 'HOTELES Y RESTAURANTES', 'credit', true),
 ('4145', 'TRANSPORTE, ALMACENAMIENTO Y COMUNICACIONES', 'credit', true),
 ('4155', 'ACTIVIDADES INMOBILIARIAS', 'credit', true),
 ('4175', 'SERVICIOS SOCIALES Y DE SALUD', 'credit', true), -- Para consultas médicas

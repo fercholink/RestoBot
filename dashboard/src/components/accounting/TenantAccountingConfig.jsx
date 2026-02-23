@@ -191,14 +191,142 @@ const TenantAccountingConfig = () => {
 
     return (
         <div className="max-w-4xl mx-auto py-8 fade-in">
-            <div className="mb-8">
-                <h2 className="text-2xl font-black text-secondary flex items-center gap-3">
-                    <Building2 className="text-emerald-500" />
-                    Estructura Contable (Core Colombiano)
-                </h2>
-                <p className="text-sm text-gray-500 font-medium mt-2">
-                    Clasificación empresarial requerida por la DIAN (Decreto 957) y NIIF para la generación de reportes y plantillas contables.
-                </p>
+            <div className="mb-8 flex justify-between items-center">
+                <div>
+                    <h2 className="text-2xl font-black text-secondary flex items-center gap-3">
+                        <Building2 className="text-emerald-500" />
+                        Estructura Contable (Core Colombiano)
+                    </h2>
+                    <p className="text-sm text-gray-500 font-medium mt-2">
+                        Clasificación empresarial requerida por la DIAN (Decreto 957) y NIIF para la generación de reportes y plantillas contables.
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    onClick={async () => {
+                        const loadingToast = sileo.loading({ title: 'Cargando...', description: 'Instalando PUC en la base de datos...' });
+                        try {
+                            const accounts = [
+                                { code: '1', name: 'ACTIVO', nature: 'debit', is_movement: false },
+                                { code: '11', name: 'DISPONIBLE', nature: 'debit', is_movement: false },
+                                { code: '1105', name: 'CAJA', nature: 'debit', is_movement: false },
+                                { code: '110505', name: 'CAJA GENERAL', nature: 'debit', is_movement: true },
+                                { code: '110510', name: 'CAJAS MENORES', nature: 'debit', is_movement: true },
+                                { code: '1110', name: 'BANCOS', nature: 'debit', is_movement: false },
+                                { code: '111005', name: 'MONEDA NACIONAL', nature: 'debit', is_movement: true },
+                                { code: '1120', name: 'CUENTAS DE AHORRO', nature: 'debit', is_movement: false },
+                                { code: '112005', name: 'BANCOS Y CORPORACIONES', nature: 'debit', is_movement: true },
+
+                                { code: '13', name: 'DEUDORES', nature: 'debit', is_movement: false },
+                                { code: '1305', name: 'CLIENTES', nature: 'debit', is_movement: false },
+                                { code: '130505', name: 'NACIONALES', nature: 'debit', is_movement: true },
+                                { code: '1355', name: 'ANTICIPO DE IMPUESTOS', nature: 'debit', is_movement: false },
+                                { code: '135515', name: 'RETENCIÓN EN LA FUENTE', nature: 'debit', is_movement: true },
+                                { code: '135517', name: 'IMPUESTO A LAS VENTAS RETENIDO', nature: 'debit', is_movement: true },
+                                { code: '135518', name: 'IMPUESTO DE INDUSTRIA Y COMERCIO RETENIDO', nature: 'debit', is_movement: true },
+
+                                { code: '14', name: 'INVENTARIOS', nature: 'debit', is_movement: false },
+                                { code: '1435', name: 'MERCANCÍAS NO FABRICADAS POR LA EMPRESA', nature: 'debit', is_movement: true },
+                                { code: '1445', name: 'ENVASES Y EMPAQUES', nature: 'debit', is_movement: true },
+
+                                { code: '15', name: 'PROPIEDAD PLANTA Y EQUIPO', nature: 'debit', is_movement: false },
+                                { code: '1524', name: 'EQUIPO DE OFICINA', nature: 'debit', is_movement: true },
+                                { code: '1528', name: 'EQUIPO DE COMPUTACIÓN Y COMUNICACIÓN', nature: 'debit', is_movement: true },
+                                { code: '1540', name: 'FLOTA Y EQUIPO DE TRANSPORTE', nature: 'debit', is_movement: true },
+
+                                { code: '2', name: 'PASIVO', nature: 'credit', is_movement: false },
+                                { code: '21', name: 'OBLIGACIONES FINANCIERAS', nature: 'credit', is_movement: false },
+                                { code: '2105', name: 'BANCOS NACIONALES', nature: 'credit', is_movement: true },
+
+                                { code: '22', name: 'PROVEEDORES', nature: 'credit', is_movement: false },
+                                { code: '2205', name: 'NACIONALES', nature: 'credit', is_movement: true },
+
+                                { code: '23', name: 'CUENTAS POR PAGAR', nature: 'credit', is_movement: false },
+                                { code: '2335', name: 'COSTOS Y GASTOS POR PAGAR', nature: 'credit', is_movement: true },
+                                { code: '2365', name: 'RETENCIÓN EN LA FUENTE', nature: 'credit', is_movement: false },
+                                { code: '236505', name: 'SALARIOS Y PAGOS LABORALES', nature: 'credit', is_movement: true },
+                                { code: '236515', name: 'HONORARIOS', nature: 'credit', is_movement: true },
+                                { code: '236525', name: 'SERVICIOS', nature: 'credit', is_movement: true },
+                                { code: '236540', name: 'COMPRAS', nature: 'credit', is_movement: true },
+                                { code: '2367', name: 'IMPUESTO A LAS VENTAS RETENIDO', nature: 'credit', is_movement: true },
+                                { code: '2368', name: 'IMPUESTO DE INDUSTRIA Y COMERCIO RETENIDO', nature: 'credit', is_movement: true },
+
+                                { code: '24', name: 'IMPUESTOS, GRAVAMENES Y TASAS', nature: 'credit', is_movement: false },
+                                { code: '2408', name: 'IMPUESTO SOBRE LAS VENTAS POR PAGAR (IVA)', nature: 'credit', is_movement: false },
+                                { code: '240801', name: 'IVA GENERADO EN VENTAS', nature: 'credit', is_movement: true },
+                                { code: '240802', name: 'IVA DESCONTABLE COMPRAS', nature: 'debit', is_movement: true },
+
+                                { code: '25', name: 'OBLIGACIONES LABORALES', nature: 'credit', is_movement: false },
+                                { code: '2505', name: 'SALARIOS POR PAGAR', nature: 'credit', is_movement: true },
+                                { code: '2510', name: 'CESANTÍAS CONSOLIDADAS', nature: 'credit', is_movement: true },
+                                { code: '2515', name: 'INTERESES SOBRE CESANTÍAS', nature: 'credit', is_movement: true },
+                                { code: '2520', name: 'PRIMA DE SERVICIOS', nature: 'credit', is_movement: true },
+                                { code: '2525', name: 'VACACIONES CONSOLIDADAS', nature: 'credit', is_movement: true },
+
+                                { code: '3', name: 'PATRIMONIO', nature: 'credit', is_movement: false },
+                                { code: '31', name: 'CAPITAL SOCIAL', nature: 'credit', is_movement: false },
+                                { code: '3115', name: 'APORTES SOCIALES', nature: 'credit', is_movement: true },
+                                { code: '36', name: 'RESULTADOS DEL EJERCICIO', nature: 'credit', is_movement: false },
+                                { code: '3605', name: 'UTILIDAD DEL EJERCICIO', nature: 'credit', is_movement: true },
+                                { code: '3610', name: 'PÉRDIDA DEL EJERCICIO', nature: 'debit', is_movement: true },
+
+                                { code: '4', name: 'INGRESOS', nature: 'credit', is_movement: false },
+                                { code: '41', name: 'OPERACIONALES', nature: 'credit', is_movement: false },
+                                { code: '4135', name: 'COMERCIO AL POR MAYOR Y AL POR MENOR', nature: 'credit', is_movement: true },
+                                { code: '4140', name: 'HOTELES Y RESTAURANTES', nature: 'credit', is_movement: true },
+                                { code: '4145', name: 'TRANSPORTE, ALMACENAMIENTO Y COMUNICACIONES', nature: 'credit', is_movement: true },
+                                { code: '4155', name: 'ACTIVIDADES INMOBILIARIAS', nature: 'credit', is_movement: true },
+                                { code: '4175', name: 'SERVICIOS SOCIALES Y DE SALUD', nature: 'credit', is_movement: true },
+                                { code: '42', name: 'NO OPERACIONALES', nature: 'credit', is_movement: false },
+                                { code: '4210', name: 'FINANCIEROS', nature: 'credit', is_movement: true },
+
+                                { code: '5', name: 'GASTOS', nature: 'debit', is_movement: false },
+                                { code: '51', name: 'OPERACIONALES DE ADMINISTRACIÓN', nature: 'debit', is_movement: false },
+                                { code: '5105', name: 'GASTOS DE PERSONAL', nature: 'debit', is_movement: false },
+                                { code: '510506', name: 'SUELDOS', nature: 'debit', is_movement: true },
+                                { code: '510515', name: 'HORAS EXTRAS Y RECARGOS', nature: 'debit', is_movement: true },
+                                { code: '510527', name: 'AUXILIO DE TRANSPORTE', nature: 'debit', is_movement: true },
+                                { code: '5110', name: 'HONORARIOS', nature: 'debit', is_movement: true },
+                                { code: '5115', name: 'IMPUESTOS', nature: 'debit', is_movement: true },
+                                { code: '5120', name: 'ARRENDAMIENTOS', nature: 'debit', is_movement: true },
+                                { code: '5135', name: 'SERVICIOS', nature: 'debit', is_movement: true },
+                                { code: '5145', name: 'MANTENIMIENTO Y REPARACIONES', nature: 'debit', is_movement: true },
+                                { code: '5150', name: 'ADECUACIÓN E INSTALACIÓN', nature: 'debit', is_movement: true },
+                                { code: '5195', name: 'DIVERSOS', nature: 'debit', is_movement: true },
+
+                                { code: '52', name: 'OPERACIONALES DE VENTAS', nature: 'debit', is_movement: false },
+                                { code: '5205', name: 'GASTOS DE PERSONAL VENTAS', nature: 'debit', is_movement: true },
+                                { code: '5235', name: 'SERVICIOS VENTAS', nature: 'debit', is_movement: true },
+
+                                { code: '53', name: 'NO OPERACIONALES', nature: 'debit', is_movement: false },
+                                { code: '5305', name: 'FINANCIEROS', nature: 'debit', is_movement: true },
+
+                                { code: '6', name: 'COSTOS DE VENTAS', nature: 'debit', is_movement: false },
+                                { code: '61', name: 'COSTO DE VENTAS Y DE PRESTACIÓN DE SERVICIOS', nature: 'debit', is_movement: false },
+                                { code: '6135', name: 'COMERCIO AL POR MAYOR Y AL POR MENOR', nature: 'debit', is_movement: true },
+                                { code: '6145', name: 'TRANSPORTE, ALMACENAMIENTO Y COMUNICACIONES', nature: 'debit', is_movement: true },
+                                { code: '6155', name: 'ACTIVIDADES INMOBILIARIAS', nature: 'debit', is_movement: true },
+                                { code: '6175', name: 'SERVICIOS DE SALUD', nature: 'debit', is_movement: true }
+                            ];
+                            for (let acc of accounts) {
+                                await supabase.from('accounting_accounts').upsert({
+                                    code: acc.code,
+                                    name: acc.name,
+                                    nature: acc.nature,
+                                    is_movement: acc.is_movement
+                                }, { onConflict: 'code' });
+                            }
+                            sileo.success({ title: 'Éxito', description: 'Plan Único de Cuentas instalado.' });
+                        } catch (e) {
+                            sileo.error({ title: 'Error', description: 'Falló instalación del PUC.' });
+                        } finally {
+                            loadingToast.close();
+                        }
+                    }}
+                    className="p-3 bg-primary text-white text-xs font-bold rounded-xl shadow-md hover:scale-105 transition-transform"
+                >
+                    Instalar PUC Colombia (Semilla)
+                </button>
             </div>
 
             <form onSubmit={handleSave} className="space-y-6">
