@@ -113,12 +113,29 @@ function App() {
     fetchOrders();
   }, []);
 
-  // Re-fetch de pedidos cuando RealtimeContext detecta cambios (desde cualquier cliente)
+  // Re-fetch cuando RealtimeContext detecta cambios (canal Realtime)
   useEffect(() => {
     if (ordersVersion > 0) {
       fetchOrders();
     }
   }, [ordersVersion]);
+
+  // POLLING DE RESPALDO: refresca pedidos automáticamente cada N segundos
+  // Garantiza sincronización aunque el Realtime de Supabase falle
+  useEffect(() => {
+    if (!user) return;
+
+    // Admin/Gerente: cada 8 segundos para ver todo en tiempo real
+    // Cajero/otros: cada 12 segundos (menos carga de red)
+    const interval = (user.role === 'admin' || user.role === 'gerente') ? 8000 : 12000;
+
+    const pollInterval = setInterval(() => {
+      fetchOrders();
+    }, interval);
+
+    return () => clearInterval(pollInterval);
+  }, [user?.role]);
+
 
   // Escuchar eventos de actualización de turno (emitidos por ShiftManagement)
   useEffect(() => {
