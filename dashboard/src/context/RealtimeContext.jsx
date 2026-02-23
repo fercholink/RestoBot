@@ -216,50 +216,62 @@ export const RealtimeProvider = ({ children }) => {
 
         const config = getRoleConfig();
 
+        // Función de suscripción con manejo de errores silencioso
+        const subscribeWithFallback = (channel, name) => {
+            channel.subscribe((status, err) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log(`[Realtime] ✅ Canal "${name}" activo`);
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                    // WebSocket no disponible en esta instancia self-hosted
+                    // El polling automático en App.jsx cubre esta funcionalidad
+                    console.warn(`[Realtime] ⚠️ Canal "${name}" no disponible (self-hosted). Usando polling.`);
+                }
+            });
+            return channel;
+        };
+
         // Canal de PEDIDOS
         if (config.orders) {
-            const ordersChannel = supabase
-                .channel(`realtime-orders-${user.id}`)
-                .on('postgres_changes', {
-                    event: '*',
-                    schema: 'public',
-                    table: 'orders',
-                }, handleOrderChange)
-                .subscribe((status) => {
-                    if (status === 'SUBSCRIBED') {
-                        console.log(`[Realtime] Orders channel suscrito para rol: ${user.role}`);
-                    }
-                });
+            const ordersChannel = subscribeWithFallback(
+                supabase
+                    .channel(`realtime-orders-${user.id}`)
+                    .on('postgres_changes', {
+                        event: '*',
+                        schema: 'public',
+                        table: 'orders',
+                    }, handleOrderChange),
+                'Orders'
+            );
             channelsRef.current.push(ordersChannel);
         }
 
         // Canal de RESERVAS
         if (config.bookings) {
-            const bookingsChannel = supabase
-                .channel(`realtime-bookings-${user.id}`)
-                .on('postgres_changes', {
-                    event: '*',
-                    schema: 'public',
-                    table: 'bookings',
-                }, handleBookingChange)
-                .subscribe((status) => {
-                    if (status === 'SUBSCRIBED') {
-                        console.log(`[Realtime] Bookings channel suscrito para rol: ${user.role}`);
-                    }
-                });
+            const bookingsChannel = subscribeWithFallback(
+                supabase
+                    .channel(`realtime-bookings-${user.id}`)
+                    .on('postgres_changes', {
+                        event: '*',
+                        schema: 'public',
+                        table: 'bookings',
+                    }, handleBookingChange),
+                'Bookings'
+            );
             channelsRef.current.push(bookingsChannel);
         }
 
         // Canal de PERFILES (solo admin/gerente)
         if (config.profiles) {
-            const profilesChannel = supabase
-                .channel(`realtime-profiles-${user.id}`)
-                .on('postgres_changes', {
-                    event: '*',
-                    schema: 'public',
-                    table: 'profiles',
-                }, handleProfileChange)
-                .subscribe();
+            const profilesChannel = subscribeWithFallback(
+                supabase
+                    .channel(`realtime-profiles-${user.id}`)
+                    .on('postgres_changes', {
+                        event: '*',
+                        schema: 'public',
+                        table: 'profiles',
+                    }, handleProfileChange),
+                'Profiles'
+            );
             channelsRef.current.push(profilesChannel);
         }
 
@@ -268,6 +280,7 @@ export const RealtimeProvider = ({ children }) => {
             channelsRef.current = [];
         };
     }, [user?.id, user?.role]); // Re-suscribir si cambia el usuario o su rol
+
 
     const value = {
         notifications,
