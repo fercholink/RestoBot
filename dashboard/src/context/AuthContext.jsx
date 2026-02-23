@@ -12,7 +12,6 @@ export const AuthProvider = ({ children }) => {
 
         let profileData = {};
         try {
-            // Try to fetch profile from 'profiles' table (created via migration)
             const { data, error } = await supabase
                 .from('profiles')
                 .select('*')
@@ -21,25 +20,50 @@ export const AuthProvider = ({ children }) => {
 
             if (data && !error) {
                 profileData = data;
-                console.log("Auth: Perfil cargado desde BD", data);
+                console.log("Auth: Perfil cargado desde BD", data.role);
+            } else if (error) {
+                console.warn("Auth: profiles devolvió error, usando JWT claims como fallback.", error.message);
             }
         } catch (err) {
-            console.warn("Auth: No se pudo cargar perfil de BD (tabla no existe o error), usando metadata.", err);
+            console.warn("Auth: No se pudo cargar perfil de BD, usando metadata.", err.message);
         }
 
-        // Merge Metadata (Fallback) with Profile (Priority)
-        // Profile ID overrides session ID (they should be same)
-        // Role from profile overrides metadata
         const metadata = sessionUser.user_metadata || {};
+        const appMeta = sessionUser.app_metadata || {};
+
+        // Fallback de rol: profiles → app_metadata → user_metadata → 'cajero'
+        const resolvedRole = profileData.role
+            || appMeta.role
+            || metadata.role
+            || 'cajero';
+
+        // Fallback de permisos para rol admin/gerente si no vienen de BD
+        const defaultAdminPermissions = {
+            restaurante: { create: true, read: true, update: true, delete: true },
+            hotel: { create: true, read: true, update: true, delete: true },
+            financiero: { create: true, read: true, update: true, delete: true },
+            usuarios: { create: true, read: true, update: true, delete: true },
+            sedes: { create: true, read: true, update: true, delete: true },
+            marketing: { create: true, read: true, update: true, delete: true },
+            qr_tools: { create: true, read: true, update: true, delete: true },
+            operaciones: { create: true, read: true, update: true, delete: true },
+        };
+
+        const resolvedPermissions = profileData.permissions
+            || metadata.permissions
+            || (resolvedRole === 'admin' || resolvedRole === 'gerente' ? defaultAdminPermissions : {});
 
         return {
             ...sessionUser,
-            ...metadata, // Base metadata
-            ...profileData, // DB Profile overrides (role, branch_id, permissions)
-            branch: { name: 'Sede Principal', id: profileData.branch_id || metadata.branch_id }, // Fallback simplified
+            ...metadata,
+            ...profileData,
+            role: resolvedRole,
+            permissions: resolvedPermissions,
+            branch: { name: profileData.branch_id ? 'Sede' : 'Sede Principal', id: profileData.branch_id || metadata.branch_id },
             name: profileData.full_name || metadata.name || sessionUser.email?.split('@')[0] || 'Usuario'
         };
     };
+
 
     const handleUserSession = async (session) => {
         setLoading(true);
