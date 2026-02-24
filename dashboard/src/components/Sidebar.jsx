@@ -39,11 +39,13 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
             const role = user?.role || 'cajero';
             // Admin y Gerente ven todo por defecto en legacy
             if (role === 'admin' || role === 'gerente') return true;
-            // Cajero, Cocina y Mesero ven módulo restaurante
-            if (['cajero', 'cocina', 'mesero'].includes(role) && moduleName === 'restaurante') return true;
+            // TODOS los roles ven módulo restaurante (pedidos)
+            if (moduleName === 'restaurante') return true;
             return false;
         }
-        // Si hay permisos, devolver el valor de 'read'
+        // Si hay permisos explícitos (Modelo SaaS)
+        // Para restaurante, siempre permitir lectura (es el módulo core)
+        if (moduleName === 'restaurante') return true;
         return user.permissions[moduleName]?.read ?? false;
     };
 
@@ -52,7 +54,8 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
             id: 'restaurante',
             label: 'Gestión Restaurante',
             icon: Utensils,
-            roles: ['admin', 'cajero', 'gerente', 'cocina', 'mesero'],
+            // Visible para TODOS los roles — es el módulo principal
+            roles: ['admin', 'cajero', 'gerente', 'cocina', 'mesero', 'recepcion', 'analista'],
             hasSubmenu: true,
             module: 'restaurante'
         },

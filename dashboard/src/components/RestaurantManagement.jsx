@@ -19,9 +19,14 @@ const RestaurantManagement = ({
     setActiveSubTab: propSetActiveSubTab
 }) => {
     const { user } = useAuth();
-    const isKitchenRole = user?.role === 'cocina';
-    // Cocina siempre va al board, cajero a turnos, resto al board
-    const defaultTab = isKitchenRole ? 'board' : (user?.role === 'cajero' ? 'turnos' : 'board');
+    const role = user?.role || 'cajero';
+    // Solo cajero necesita ver turnos, solo admin/gerente ven gestión de carta
+    const isCajeroRole = role === 'cajero';
+    const isManagerRole = role === 'admin' || role === 'gerente';
+    // Cualquier rol que NO sea cajero ni admin/gerente solo ve el board
+    const boardOnlyRole = !isCajeroRole && !isManagerRole;
+
+    const defaultTab = isCajeroRole ? 'turnos' : 'board';
     // Usar estado local solo si no se proveen props (fallback)
     const [localActiveSubTab, setLocalActiveSubTab] = useState(defaultTab);
 
@@ -30,7 +35,7 @@ const RestaurantManagement = ({
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
     // DEBUG: Confirmar qué llega realmente
-    console.log('RestMan received orders:', orders.length);
+    console.log(`[RestMan] role="${role}", orders: ${orders.length}, boardOnly: ${boardOnlyRole}`);
 
     const [filters, setFilters] = useState({
         status: 'all',
@@ -43,26 +48,28 @@ const RestaurantManagement = ({
 
     React.useEffect(() => {
         const handleOpenShiftModal = () => {
-            if (isKitchenRole) return; // Cocina no abre caja
+            if (boardOnlyRole) return; // Roles sin caja no abren modal
             setActiveSubTab('turnos');
             setShouldAutoOpenShift(true);
-            // Reset after a delay to allow consuming the prop
             setTimeout(() => setShouldAutoOpenShift(false), 2000);
         };
         window.addEventListener('open-shift-modal', handleOpenShiftModal);
         return () => window.removeEventListener('open-shift-modal', handleOpenShiftModal);
-    }, [isKitchenRole]);
+    }, [boardOnlyRole]);
 
-    // Sub-tabs filtradas por rol: cocina solo ve el board
+    // Sub-tabs filtradas por rol
     const allSubMenuItems = [
         { id: 'board', label: 'Monitor de Pedidos', icon: LayoutGrid, description: 'Vista de pedidos en tiempo real' },
         { id: 'menu', label: 'Gestión de Carta', icon: Settings, description: 'Administrar productos y menú' },
         { id: 'turnos', label: 'Cajas y Turnos', icon: Wallet, description: 'Control de turnos y caja' },
     ];
 
-    const subMenuItems = isKitchenRole
+    // boardOnlyRole solo ve board, cajero ve board+turnos, admin/gerente ve todo
+    const subMenuItems = boardOnlyRole
         ? allSubMenuItems.filter(item => item.id === 'board')
-        : allSubMenuItems;
+        : isCajeroRole
+            ? allSubMenuItems.filter(item => item.id !== 'menu')
+            : allSubMenuItems;
 
     // Filtrar pedidos según los filtros activos
     const filteredOrders = useMemo(() => {

@@ -96,18 +96,20 @@ function App() {
   // Ajustar pestaña inicial y UI según el rol
   useEffect(() => {
     if (user) {
-      if (user.role === 'cajero') {
+      const role = user.role;
+      if (role === 'cajero') {
         // Cajero: Sidebar colapsado y pestaña Caja por defecto
         setIsSidebarCollapsed(true);
         setActiveTab('restaurante');
         setActiveRestaurantSubTab('turnos');
-      } else if (user.role === 'cocina' || user.role === 'mesero') {
-        // Cocina/Mesero: Ir directo al board de pedidos, sidebar colapsado
+      } else if (role === 'admin' || role === 'gerente') {
+        // Admin/Gerente: vista normal
+        setActiveTab('restaurante');
+      } else {
+        // TODOS los demás roles (cocina, mesero, etc.): Board directo, sidebar colapsado
         setIsSidebarCollapsed(true);
         setActiveTab('restaurante');
         setActiveRestaurantSubTab('board');
-      } else if (!localStorage.getItem('restobot_active_tab')) {
-        setActiveTab('restaurante');
       }
     }
   }, [user]);
@@ -145,12 +147,11 @@ function App() {
     return () => window.removeEventListener('shift-updated', handleShiftUpdate);
   }, []);
 
-  // Force clear orders when shift closes (only for roles that need shifts — NOT cocina/mesero)
+  // Force clear orders when shift closes — SOLO aplica para cajero
   useEffect(() => {
-    const needsShift = user && user.role !== 'admin' && user.role !== 'gerente'
-      && user.role !== 'cocina' && user.role !== 'mesero';
-    if (!activeShift && needsShift) {
-      console.log('Force clearing orders because activeShift is null for shift-dependent role');
+    const isCajero = user && user.role === 'cajero';
+    if (!activeShift && isCajero) {
+      console.log('[Force-clear] Cajero sin turno → vaciando pedidos');
       setOrders([]);
     }
   }, [activeShift, user]);
@@ -184,47 +185,40 @@ function App() {
         `)
         .order('created_at', { ascending: false });
 
-      // LOGICA DE FILTRADO POR ROL
-      const isManager = user && (user.role === 'admin' || user.role === 'gerente');
-      const isKitchen = user && (user.role === 'cocina' || user.role === 'mesero');
+      // ─── LÓGICA SIMPLIFICADA: Solo CAJERO depende de turno ──
+      // Todos los demás roles ven los pedidos del día libremente
+      const isCajero = user && user.role === 'cajero';
 
-      console.log(`[fetchOrders] role=${user?.role}, isManager=${isManager}, isKitchen=${isKitchen}, shift=${currentShift?.id || 'NONE'}`);
+      console.log(`[fetchOrders] role="${user?.role}", isCajero=${isCajero}, shift=${currentShift?.id || 'NONE'}`);
 
-      if (isManager || isKitchen) {
-        // Admin/Gerente/Cocina/Mesero: Ver todos los pedidos recientes
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        query = query.gte('created_at', today.toISOString());
-        console.log(`[fetchOrders] → Cargando pedidos del día (${user?.role})`);
-      } else if (user) {
-        // Cajero y otros roles: Solo pedidos de SU turno activo
+      if (isCajero) {
+        // CAJERO: requiere turno activo
         if (currentShift) {
           query = query.eq('shift_id', currentShift.id);
-          console.log(`[fetchOrders] → Filtrando por shift_id=${currentShift.id}`);
+          console.log(`[fetchOrders] → Cajero: filtrando por shift_id=${currentShift.id}`);
         } else {
-          // Sin turno = sin pedidos (forzar apertura de caja)
-          console.log(`[fetchOrders] → Sin turno activo, vaciando pedidos`);
+          console.log('[fetchOrders] → Cajero sin turno: vaciando pedidos');
           setOrders([]);
           return;
         }
+      } else {
+        // TODOS LOS DEMÁS (admin, gerente, cocina, mesero, recepcion, etc.)
+        // Ven pedidos del día sin necesidad de turno
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        query = query.gte('created_at', today.toISOString());
+        console.log(`[fetchOrders] → ${user?.role}: cargando pedidos del día`);
       }
 
       const { data, error } = await query;
 
       if (error) {
-        console.error('[fetchOrders] Error en query:', error);
+        console.error('[fetchOrders] Error:', error);
         throw error;
       }
 
-      console.log(`[fetchOrders] ✅ Pedidos cargados: ${data?.length || 0} (rol: ${user?.role})`);
-
-      // FAILSAFE: Cajero sin turno = vaciar
-      if (user && !isManager && !isKitchen && !currentShift) {
-        console.log('FAILSAFE: Clearing orders — no active shift for this user.');
-        setOrders([]);
-      } else {
-        setOrders(data || []);
-      }
+      console.log(`[fetchOrders] ✅ ${data?.length || 0} pedidos (rol: ${user?.role})`);
+      setOrders(data || []);
     } catch (error) {
       console.error("Error fetching orders:", error);
     }
