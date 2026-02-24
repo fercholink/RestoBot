@@ -158,18 +158,33 @@ function App() {
 
   const fetchOrders = async () => {
     try {
-      // 1. Obtener turno activo de ESTE usuario (por user_id)
+      // 1. Obtener turno activo
       let currentShift = null;
+      const isKitchenRole = user?.role === 'cocina' || user?.role === 'mesero';
+
       if (user?.id) {
-        const { data: shiftData } = await supabase
-          .from('shifts')
-          .select('*')
-          .eq('status', 'abierto')
-          .eq('user_id', user.id)
-          .order('start_time', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        currentShift = shiftData;
+        if (isKitchenRole) {
+          // COCINA/MESERO: buscar CUALQUIER turno abierto (de cualquier cajero)
+          const { data: shiftData } = await supabase
+            .from('shifts')
+            .select('*')
+            .eq('status', 'abierto')
+            .order('start_time', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          currentShift = shiftData;
+        } else {
+          // CAJERO/ADMIN/GERENTE: buscar turno propio
+          const { data: shiftData } = await supabase
+            .from('shifts')
+            .select('*')
+            .eq('status', 'abierto')
+            .eq('user_id', user.id)
+            .order('start_time', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          currentShift = shiftData;
+        }
       }
       setActiveShift(currentShift);
 
@@ -648,10 +663,14 @@ function App() {
               {/* Dynamic Header Actions Portal Target */}
               <div id="header-actions-portal" className="flex items-center gap-2 ml-auto mr-4"></div>
 
-              {/* Indicador de Estado de Caja */}
+              {/* Indicador de Estado de Caja/Cocina */}
               <div className={`ml-auto md:ml-4 px-3 py-1.5 rounded-xl flex items-center gap-2 border shadow-sm transition-all ${hasActiveShift ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-rose-50 border-rose-100 text-rose-500'}`}>
                 <div className={`w-2 h-2 rounded-full ${hasActiveShift ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-                <span className="text-[10px] font-black uppercase tracking-widest">{hasActiveShift ? 'Caja Abierta' : 'Caja Cerrada'}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                  {(user?.role === 'cocina' || user?.role === 'mesero')
+                    ? (hasActiveShift ? 'Cocina Abierta' : 'Cocina Cerrada')
+                    : (hasActiveShift ? 'Caja Abierta' : 'Caja Cerrada')}
+                </span>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full md:w-auto">
@@ -661,7 +680,7 @@ function App() {
                 onClose={() => setShowNotifications(prev => !prev)}
               />
 
-              {activeTab === 'restaurante' && (
+              {activeTab === 'restaurante' && user?.role !== 'cocina' && user?.role !== 'mesero' && (
                 <button
                   onClick={handleOpenNewOrder}
                   className="flex-1 md:flex-none flex items-center justify-center gap-1.5 md:gap-2 bg-primary text-white px-3 py-2.5 md:px-5 rounded-xl shadow-[0_4px_14px_0_rgba(255,71,87,0.3)] hover:brightness-110 active:scale-95 transition-all font-bold text-xs md:text-sm whitespace-nowrap"
@@ -670,7 +689,7 @@ function App() {
                   Nuevo <span className="hidden sm:inline">Pedido</span>
                 </button>
               )}
-              {activeTab === 'restaurante' && (
+              {activeTab === 'restaurante' && user?.role !== 'cocina' && user?.role !== 'mesero' && (
                 <button className="flex items-center gap-2 bg-white px-3 py-2.5 md:px-4 rounded-xl border border-gray-200 shadow-sm text-xs md:text-sm font-bold text-secondary hover:bg-gray-50 transition-colors">
                   <Filter size={18} />
                   <span className="hidden sm:inline">Filtros</span>

@@ -141,15 +141,17 @@ const RestaurantManagement = ({
                                     <h1 className="text-2xl font-black text-secondary tracking-tight">MONITOR DE PEDIDOS</h1>
                                     <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Gestión en tiempo real</p>
                                 </div>
-                                <button
-                                    onClick={() => setShowPaidModal(true)}
-                                    className="flex items-center gap-2 bg-white px-5 py-2.5 rounded-2xl shadow-sm border border-gray-200 text-xs font-black uppercase tracking-widest text-secondary hover:bg-gray-50 hover:shadow-md transition-all group"
-                                >
-                                    <div className="bg-success/10 p-1.5 rounded-lg group-hover:bg-success/20 transition-colors">
-                                        <DollarSign size={16} className="text-success" />
-                                    </div>
-                                    <span>Ver Pagados</span>
-                                </button>
+                                {role !== 'cocina' && role !== 'mesero' && (
+                                    <button
+                                        onClick={() => setShowPaidModal(true)}
+                                        className="flex items-center gap-2 bg-white px-5 py-2.5 rounded-2xl shadow-sm border border-gray-200 text-xs font-black uppercase tracking-widest text-secondary hover:bg-gray-50 hover:shadow-md transition-all group"
+                                    >
+                                        <div className="bg-success/10 p-1.5 rounded-lg group-hover:bg-success/20 transition-colors">
+                                            <DollarSign size={16} className="text-success" />
+                                        </div>
+                                        <span>Ver Pagados</span>
+                                    </button>
+                                )}
                             </div>
 
                             <div className="flex gap-4 w-full items-start">
