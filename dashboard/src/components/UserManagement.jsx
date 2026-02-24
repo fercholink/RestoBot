@@ -527,7 +527,8 @@ const UserManagement = () => {
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse">
+                                {/* Desktop Table */}
+                                <table className="w-full text-left border-collapse hidden md:table">
                                     <thead>
                                         <tr className="bg-gray-50/80 border-b border-gray-100">
                                             {['Usuario', 'Rol', 'Sede', 'Permisos', 'Estado', 'Acciones'].map(col => (
@@ -547,7 +548,6 @@ const UserManagement = () => {
 
                                             return (
                                                 <tr key={u.id} className={`hover:bg-gray-50/40 transition-colors ${u.active === false ? 'opacity-50' : ''}`}>
-                                                    {/* Usuario */}
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-sm shadow-sm" style={{ backgroundColor: roleColor }}>
@@ -562,24 +562,18 @@ const UserManagement = () => {
                                                             </div>
                                                         </div>
                                                     </td>
-
-                                                    {/* Rol */}
                                                     <td className="px-6 py-4">
                                                         <span className="text-[9px] font-black uppercase px-2.5 py-1 rounded-lg border inline-flex items-center gap-1.5" style={{ backgroundColor: `${roleColor}15`, color: roleColor, borderColor: `${roleColor}30` }}>
                                                             <RoleIcon size={10} />
                                                             {template?.label || u.role}
                                                         </span>
                                                     </td>
-
-                                                    {/* Sede */}
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-1.5 text-xs font-bold text-gray-600">
                                                             <Building2 size={12} className="text-gray-400" />
                                                             {u.branch?.name || 'Global'}
                                                         </div>
                                                     </td>
-
-                                                    {/* Permisos */}
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-2">
                                                             <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
@@ -591,8 +585,6 @@ const UserManagement = () => {
                                                             <span className="text-[10px] font-black text-gray-400">{activePerms}/{totalPerms}</span>
                                                         </div>
                                                     </td>
-
-                                                    {/* Estado */}
                                                     <td className="px-6 py-4">
                                                         <button
                                                             onClick={() => toggleUserStatus(u)}
@@ -602,8 +594,6 @@ const UserManagement = () => {
                                                             <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${u.active !== false ? 'translate-x-5' : 'translate-x-1'}`} />
                                                         </button>
                                                     </td>
-
-                                                    {/* Acciones */}
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-1">
                                                             <button onClick={() => sendInvite(u)} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="Enviar invitación">
@@ -625,6 +615,82 @@ const UserManagement = () => {
                                         })}
                                     </tbody>
                                 </table>
+
+                                {/* Mobile Card List */}
+                                <div className="md:hidden divide-y divide-gray-50">
+                                    {filteredUsers.map(u => {
+                                        const template = ROLE_TEMPLATES[u.role];
+                                        const roleColor = template?.color || '#6b7280';
+                                        const RoleIcon = template?.icon || Shield;
+                                        const activePerms = countActivePermissions(u.permissions);
+                                        const totalPerms = Object.keys(MODULE_LABELS).length * 4;
+
+                                        return (
+                                            <div key={u.id} className={`p-5 space-y-4 ${u.active === false ? 'bg-gray-50/50' : ''}`}>
+                                                <div className="flex justify-between items-start">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white text-lg shadow-md" style={{ backgroundColor: roleColor }}>
+                                                            {(u.full_name || u.name || '?').charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-black text-secondary">{u.full_name || u.name}</p>
+                                                            <p className="text-[10px] text-gray-400 flex items-center gap-1 font-bold">
+                                                                <Mail size={10} /> {u.email || 'Sin email'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => toggleUserStatus(u)}
+                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${u.active !== false ? 'bg-emerald-500' : 'bg-gray-200'}`}
+                                                    >
+                                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${u.active !== false ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                    </button>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4 bg-gray-50/50 p-3 rounded-2xl border border-gray-100">
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Rol y Sede</p>
+                                                        <div className="space-y-1.5">
+                                                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border inline-flex items-center gap-1" style={{ backgroundColor: `${roleColor}15`, color: roleColor, borderColor: `${roleColor}30` }}>
+                                                                <RoleIcon size={9} /> {template?.label || u.role}
+                                                            </span>
+                                                            <p className="text-[10px] font-bold text-gray-600 flex items-center gap-1">
+                                                                <Building2 size={10} /> {u.branch?.name || 'Sede Principal'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Permisos</p>
+                                                        <div className="flex flex-col items-end gap-1.5">
+                                                            <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className="h-full bg-gradient-to-r from-primary to-rose-400 rounded-full"
+                                                                    style={{ width: `${(activePerms / totalPerms) * 100}%` }}
+                                                                />
+                                                            </div>
+                                                            <span className="text-[10px] font-black text-secondary">{activePerms}/{totalPerms}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex gap-2 pt-1">
+                                                    <button onClick={() => sendInvite(u)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-white border border-gray-100 rounded-xl text-gray-500 text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                                        <Mail size={12} /> Invitar
+                                                    </button>
+                                                    <button onClick={() => { setSelectedUserForPass(u); setShowPassModal(true); }} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-white border border-gray-100 rounded-xl text-amber-500 text-[10px] font-black uppercase tracking-widest shadow-sm">
+                                                        <Key size={12} /> Pass
+                                                    </button>
+                                                    <button onClick={() => handleOpenEdit(u)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md">
+                                                        <Edit2 size={12} /> Editar
+                                                    </button>
+                                                    <button onClick={() => handleDeleteUser(u.id, u.full_name || u.name)} className="p-2.5 bg-rose-50 text-rose-500 border border-rose-100 rounded-xl">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         )}
                     </div>

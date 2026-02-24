@@ -154,13 +154,13 @@ const RestaurantManagement = ({
                                 )}
                             </div>
 
-                            <div className="flex gap-4 w-full items-start">
+                            <div className="flex flex-col lg:flex-row gap-4 w-full items-start">
                                 {['nuevo', 'fabricacion', 'despachado'].map((status) => (
-                                    <div key={status} className={`${status === 'fabricacion' ? 'flex-[2]' : 'flex-1'} flex flex-col bg-gray-200/40 rounded-3xl p-4 border border-gray-300/20 min-w-0 h-fit transition-all duration-300`}>
-                                        <h2 className="uppercase text-xs font-black tracking-wider text-secondary/60 mb-5 px-2 flex items-center gap-2">
-                                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${status === 'nuevo' ? 'bg-blue-500' : status === 'fabricacion' ? 'bg-warning' : status === 'despachado' ? 'bg-purple-500' : 'bg-success'}`} />
-                                            <span className="truncate">{status}</span>
-                                            <span className="bg-white text-secondary px-2 py-0.5 rounded-md text-[10px] font-black shadow-sm border border-gray-100/50 ml-auto shrink-0">
+                                    <div key={status} className={`${status === 'fabricacion' ? 'lg:flex-[2.5]' : 'lg:flex-1'} w-full flex flex-col bg-gray-200/40 rounded-[2.5rem] p-4 border border-gray-300/10 min-w-0 h-fit transition-all duration-300 shadow-sm hover:shadow-md hover:bg-gray-200/60`}>
+                                        <h2 className="uppercase text-xs font-black tracking-widest text-secondary/70 mb-5 px-3 py-1 flex items-center gap-2">
+                                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-sm ${status === 'nuevo' ? 'bg-blue-500 animate-pulse' : status === 'fabricacion' ? 'bg-warning' : status === 'despachado' ? 'bg-purple-500' : 'bg-success'}`} />
+                                            <span className="truncate tracking-tighter">{status}</span>
+                                            <span className="bg-white/80 backdrop-blur-sm text-secondary px-2.5 py-0.5 rounded-lg text-[10px] font-black shadow-sm border border-gray-100/50 ml-auto shrink-0">
                                                 {filteredOrders.filter(o => o.status === status).length}
                                             </span>
                                         </h2>
@@ -176,10 +176,10 @@ const RestaurantManagement = ({
                                                     const domicilioOrders = ordersInStatus.filter(o => !o.table_number || o.table_number === 'DOMICILIO');
 
                                                     return (
-                                                        <div className="flex h-full gap-2">
+                                                        <div className="flex flex-col xl:flex-row h-full gap-2">
                                                             {/* Columna Izquierda: Mesas */}
-                                                            <div className="flex-1 flex flex-col bg-white/40 rounded-xl p-2 min-w-[200px] h-fit">
-                                                                <div className="flex items-center gap-1 mb-2 text-[9px] font-black text-secondary/70 uppercase tracking-wider pb-1 border-b border-secondary/10">
+                                                            <div className="flex-1 flex flex-col bg-white/40 rounded-2xl p-3 min-w-0 md:min-w-[200px] h-fit shadow-inner">
+                                                                <div className="flex items-center gap-2 mb-3 text-[10px] font-black text-secondary/80 uppercase tracking-widest pb-2 border-b border-secondary/5">
                                                                     <Utensils size={10} /> Mesas
                                                                 </div>
                                                                 <div className="space-y-2">

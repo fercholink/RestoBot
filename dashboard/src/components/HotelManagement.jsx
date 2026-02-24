@@ -1224,7 +1224,8 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                         <History size={18} /> Historial de Reservas
                     </h3>
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left">
+                        {/* Desktop Table */}
+                        <table className="w-full text-left hidden md:table">
                             <thead>
                                 <tr className="border-b border-gray-100 text-xs font-black text-gray-400 uppercase tracking-wider">
                                     <th className="pb-3 pl-2">Huésped</th>
@@ -1263,15 +1264,54 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                                         </td>
                                     </tr>
                                 ))}
-                                {historyBookings.length === 0 && (
-                                    <tr>
-                                        <td colSpan="6" className="py-8 text-center text-gray-400 text-xs italic">
-                                            No hay historial disponible.
-                                        </td>
-                                    </tr>
-                                )}
                             </tbody>
                         </table>
+
+                        {/* Mobile Card List */}
+                        <div className="md:hidden space-y-4">
+                            {historyBookings.map(booking => (
+                                <div key={booking.id} className="p-4 bg-gray-50/50 rounded-2xl border border-gray-100 space-y-3">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="font-black text-secondary text-sm leading-tight">{booking.guest?.full_name || 'Desconocido'}</p>
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">{booking.guest?.phone || 'Sin teléfono'}</p>
+                                        </div>
+                                        <span className="bg-white px-2 py-1 rounded-lg border border-gray-200 text-xs font-black text-secondary">
+                                            Hab. {booking.room?.number}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 py-2 border-y border-gray-100/50 border-dashed">
+                                        <div>
+                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Entrada</p>
+                                            <p className="text-[11px] font-bold text-gray-600">{booking.check_in}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter text-right">Salida</p>
+                                            <p className="text-[11px] font-bold text-gray-600 text-right">{booking.check_out}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center pt-1">
+                                        <span className="text-lg font-black text-secondary">
+                                            ${booking.total_price?.toLocaleString()}
+                                        </span>
+                                        <button
+                                            onClick={() => handlePrintHistory(booking)}
+                                            className="flex items-center gap-2 bg-white px-3 py-2 rounded-xl border border-gray-200 text-[10px] font-black uppercase tracking-widest text-secondary hover:bg-gray-100 transition-all"
+                                        >
+                                            <Printer size={14} />
+                                            Imprimir
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {historyBookings.length === 0 && (
+                            <div className="py-12 text-center">
+                                <History size={40} className="mx-auto text-gray-200 mb-2" />
+                                <p className="text-sm font-black text-gray-300 uppercase tracking-widest">No hay historial disponible</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             ) : null}

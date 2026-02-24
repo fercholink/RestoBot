@@ -517,76 +517,85 @@ const ElectronicInvoicing = () => {
                             const isProcessing = processingId === order.id;
 
                             return (
-                                <div key={order.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between gap-4">
+                                <div key={order.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 group hover:border-gray-200 transition-all">
                                     {/* Left: Info */}
                                     <div className="flex items-center gap-4 flex-1 min-w-0">
-                                        <div className={`p-2.5 rounded-xl flex-shrink-0 ${typeInfo.color}`}>
-                                            <TypeIcon size={16} />
+                                        <div className={`p-3 rounded-2xl flex-shrink-0 ${typeInfo.color} shadow-sm group-hover:scale-110 transition-transform`}>
+                                            <TypeIcon size={20} />
                                         </div>
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 <span className="text-sm font-black text-secondary">Pedido #{order.id}</span>
-                                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${typeInfo.color}`}>
+                                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${typeInfo.color} border border-current opacity-70`}>
                                                     {typeInfo.label}
                                                 </span>
                                             </div>
-                                            <p className="text-xs text-gray-500 font-medium truncate mt-0.5">
-                                                {order.tax_data?.names || order.customer_name || 'Sin cliente'}
+                                            <p className="text-xs text-gray-600 font-bold truncate mt-1">
+                                                {order.tax_data?.names || order.customer_name || 'Consumidor Final'}
                                             </p>
-                                            <p className="text-[10px] text-gray-400">
-                                                {new Date(order.created_at).toLocaleString('es-CO')}
-                                            </p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <p className="text-[10px] text-gray-400 font-medium">
+                                                    {new Date(order.created_at).toLocaleString('es-CO', {
+                                                        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                                                    })}
+                                                </p>
+                                                <span className="w-1 h-1 rounded-full bg-gray-200"></span>
+                                                <p className="text-[10px] text-gray-400 font-black uppercase tracking-tight">{order.payment_method || '—'}</p>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Center: Total */}
-                                    <div className="text-right flex-shrink-0">
-                                        <p className="text-lg font-black text-secondary">
-                                            ${(order.total || order.total_price || 0).toLocaleString('es-CO')}
-                                        </p>
-                                        <p className="text-[10px] text-gray-400 uppercase">{order.payment_method || '—'}</p>
-                                    </div>
+                                    {/* Action Group */}
+                                    <div className="flex items-center justify-between sm:justify-end gap-6 pt-3 sm:pt-0 border-t sm:border-t-0 border-gray-50 mt-1 sm:mt-0">
+                                        {/* Total */}
+                                        <div className="sm:text-right flex-shrink-0">
+                                            <p className="text-xl font-black text-secondary leading-none">
+                                                ${(order.total || order.total_price || 0).toLocaleString('es-CO')}
+                                            </p>
+                                            <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest mt-1">Total Cobrado</p>
+                                        </div>
 
-                                    {/* Right: Actions */}
-                                    <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                                        {subTab === 'history' ? (
-                                            <>
-                                                <div className="flex items-center gap-1 text-emerald-600">
-                                                    <CheckCircle size={14} />
-                                                    <span className="text-xs font-black">Emitida</span>
+                                        {/* Actions */}
+                                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                                            {subTab === 'history' ? (
+                                                <div className="flex flex-col items-end">
+                                                    <div className="flex items-center gap-1.5 text-emerald-600 mb-1">
+                                                        <CheckCircle size={14} />
+                                                        <span className="text-[11px] font-black uppercase tracking-tight">Factura Emitida</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <button
+                                                            onClick={() => handleViewPdf(order)}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-blue-100 transition-colors"
+                                                        >
+                                                            <Download size={12} /> Ver PDF
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleCreateCreditNote(order)}
+                                                            disabled={isProcessing}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 text-rose-500 rounded-lg text-[10px] font-black uppercase tracking-wider hover:bg-rose-100 transition-colors disabled:opacity-50"
+                                                        >
+                                                            <XCircle size={12} /> {isProcessing ? '...' : 'Anular'}
+                                                        </button>
+                                                    </div>
+                                                    <span className="text-[9px] text-gray-300 font-mono mt-2 bg-gray-50 px-2 py-0.5 rounded border border-gray-100">{order.factus_doc_number}</span>
                                                 </div>
-                                                <span className="text-[10px] text-gray-400 font-mono">{order.factus_doc_number}</span>
-                                                <div className="flex items-center gap-3">
-                                                    <button
-                                                        onClick={() => handleViewPdf(order)}
-                                                        className="flex items-center gap-1 text-[10px] text-blue-500 font-black hover:text-blue-700 underline"
-                                                    >
-                                                        <Download size={10} /> Ver PDF
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleCreateCreditNote(order)}
-                                                        disabled={isProcessing}
-                                                        className="flex items-center gap-1 text-[10px] text-red-500 font-black hover:text-red-700 underline"
-                                                    >
-                                                        <XCircle size={10} /> {isProcessing ? 'Procesando...' : 'Anular'}
-                                                    </button>
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <button
-                                                onClick={() => handleEmitInvoice(order)}
-                                                disabled={isProcessing}
-                                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-md ${isProcessing
-                                                    ? 'bg-gray-100 text-gray-400 cursor-wait'
-                                                    : 'bg-secondary text-white hover:bg-secondary/90 hover:scale-105 active:scale-95'
-                                                    }`}
-                                            >
-                                                {isProcessing
-                                                    ? <><Clock size={12} className="animate-spin" /> Emitiendo...</>
-                                                    : <><Send size={12} /> Emitir Factura</>
-                                                }
-                                            </button>
-                                        )}
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleEmitInvoice(order)}
+                                                    disabled={isProcessing}
+                                                    className={`flex items-center gap-2 px-5 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all shadow-md group ${isProcessing
+                                                        ? 'bg-gray-100 text-gray-400 cursor-wait'
+                                                        : 'bg-secondary text-white hover:bg-secondary/95 hover:shadow-lg active:scale-95'
+                                                        }`}
+                                                >
+                                                    {isProcessing
+                                                        ? <><Clock size={14} className="animate-spin text-gray-400" /> Procesando</>
+                                                        : <><Send size={14} className="group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" /> Emitir Factura</>
+                                                    }
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             );

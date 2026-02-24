@@ -404,7 +404,8 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
                 </div>
 
                 <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[800px]">
+                    {/* Desktop Table */}
+                    <table className="w-full text-left border-collapse min-w-[800px] hidden md:table">
                         <thead>
                             <tr className="bg-gray-50 border-b border-gray-100">
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Responsable / Sede</th>
@@ -415,71 +416,134 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 font-medium whitespace-nowrap">
-                            {shifts
-                                .map((shift) => (
-                                    <tr key={shift.id} className="hover:bg-gray-50/50 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-secondary font-black text-xs group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                                                    {safeRender(shift.cashier_name, 'C').split(' ').map(n => n[0]).join('')}
-                                                </div>
-                                                <div>
-                                                    <p className="font-black text-secondary text-sm">{safeRender(shift.cashier_name, 'Cajero')}</p>
-                                                    <p className="text-[10px] text-gray-400 font-bold uppercase">{safeRender(shift.branch_name, 'Sede Principal')}</p>
-                                                </div>
+                            {shifts.map((shift) => (
+                                <tr key={shift.id} className="hover:bg-gray-50/50 transition-colors group">
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-secondary font-black text-xs group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                                                {safeRender(shift.cashier_name, 'C').split(' ').map(n => n[0]).join('')}
                                             </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="space-y-0.5">
-                                                <p className="text-xs text-secondary font-bold">{new Date(shift.start_time).toLocaleDateString()}</p>
-                                                <p className="text-[10px] text-gray-400 font-mono">
-                                                    {new Date(shift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    {shift.end_time ? ` - ${new Date(shift.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ' (Abierto)'}
-                                                </p>
+                                            <div>
+                                                <p className="font-black text-secondary text-sm">{safeRender(shift.cashier_name, 'Cajero')}</p>
+                                                <p className="text-[10px] text-gray-400 font-bold uppercase">{safeRender(shift.branch_name, 'Sede Principal')}</p>
                                             </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="space-y-0.5">
-                                                <p className="text-sm font-black text-secondary">${(shift.final_cash || (shift.status === 'abierto' ? metrics?.expectedInDrawer : 0))?.toLocaleString()}</p>
-                                                <p className="text-[10px] text-gray-400 font-bold uppercase">Digital: ${(shift.digital_sales || 0).toLocaleString()}</p>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex justify-center">
-                                                {shift.status === 'abierto' ? (
-                                                    <span className="bg-blue-50 text-blue-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">En progreso</span>
-                                                ) : (shift.difference || 0) === 0 ? (
-                                                    <span className="bg-success/10 text-success px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 tracking-tighter">
-                                                        <CheckCircle2 size={12} /> Cuadrado
-                                                    </span>
-                                                ) : (
-                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 tracking-tighter ${shift.difference > 0 ? 'bg-orange-50 text-orange-500' : 'bg-red-50 text-red-500'}`}>
-                                                        <AlertCircle size={12} /> {shift.difference > 0 ? 'Sobrante' : 'Faltante'} (${Math.abs(shift.difference).toLocaleString()})
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-primary transition-all"><Send size={16} /></button>
-                                                <button
-                                                    onClick={() => {
-                                                        const shiftToPrint = { ...shift };
-                                                        if (!shift.metrics && shift.status === 'abierto') {
-                                                            shiftToPrint.metrics = getShiftMetrics(shift);
-                                                        }
-                                                        onPrint && onPrint(shiftToPrint, 'cierre_caja');
-                                                    }}
-                                                    className="text-[10px] font-black text-secondary hover:text-primary uppercase tracking-widest border border-gray-100 px-3 py-2 rounded-xl"
-                                                >
-                                                    Reporte
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="space-y-0.5">
+                                            <p className="text-xs text-secondary font-bold">{new Date(shift.start_time).toLocaleDateString()}</p>
+                                            <p className="text-[10px] text-gray-400 font-mono">
+                                                {new Date(shift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {shift.end_time ? ` - ${new Date(shift.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ' (Abierto)'}
+                                            </p>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="space-y-0.5">
+                                            <p className="text-sm font-black text-secondary">${(shift.final_cash || (shift.status === 'abierto' ? metrics?.expectedInDrawer : 0))?.toLocaleString()}</p>
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase">Digital: ${(shift.digital_sales || 0).toLocaleString()}</p>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex justify-center">
+                                            {shift.status === 'abierto' ? (
+                                                <span className="bg-blue-50 text-blue-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">En progreso</span>
+                                            ) : (shift.difference || 0) === 0 ? (
+                                                <span className="bg-success/10 text-success px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 tracking-tighter">
+                                                    <CheckCircle2 size={12} /> Cuadrado
+                                                </span>
+                                            ) : (
+                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 tracking-tighter ${shift.difference > 0 ? 'bg-orange-50 text-orange-500' : 'bg-red-50 text-red-500'}`}>
+                                                    <AlertCircle size={12} /> {shift.difference > 0 ? 'Sobrante' : 'Faltante'} (${Math.abs(shift.difference).toLocaleString()})
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-primary transition-all"><Send size={16} /></button>
+                                            <button
+                                                onClick={() => {
+                                                    const shiftToPrint = { ...shift };
+                                                    if (!shift.metrics && shift.status === 'abierto') {
+                                                        shiftToPrint.metrics = getShiftMetrics(shift);
+                                                    }
+                                                    onPrint && onPrint(shiftToPrint, 'cierre_caja');
+                                                }}
+                                                className="text-[10px] font-black text-secondary hover:text-primary uppercase tracking-widest border border-gray-100 px-3 py-2 rounded-xl"
+                                            >
+                                                Reporte
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
+
+                    {/* Mobile Card List */}
+                    <div className="md:hidden divide-y divide-gray-50 bg-white">
+                        {shifts.map((shift) => (
+                            <div key={shift.id} className="p-4 space-y-4">
+                                <div className="flex justify-between items-start">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-secondary font-black text-xs">
+                                            {safeRender(shift.cashier_name, 'C').split(' ').map(n => n[0]).join('')}
+                                        </div>
+                                        <div>
+                                            <p className="font-black text-secondary text-sm">{safeRender(shift.cashier_name, 'Cajero')}</p>
+                                            <p className="text-[10px] text-gray-400 font-bold uppercase">{safeRender(shift.branch_name, 'Sede Principal')}</p>
+                                        </div>
+                                    </div>
+                                    {shift.status === 'abierto' ? (
+                                        <span className="bg-blue-50 text-blue-500 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter">En progreso</span>
+                                    ) : (shift.difference || 0) === 0 ? (
+                                        <span className="bg-success/10 text-success px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 tracking-tighter">
+                                            <CheckCircle2 size={12} /> Cuadrado
+                                        </span>
+                                    ) : (
+                                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase flex items-center gap-1 tracking-tighter ${shift.difference > 0 ? 'bg-orange-50 text-orange-500' : 'bg-red-50 text-red-500'}`}>
+                                            <AlertCircle size={12} /> {shift.difference > 0 ? 'Sobrante' : 'Faltante'}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4 pt-2">
+                                    <div className="space-y-1">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest underline decoration-gray-100 underline-offset-4 mb-2">Fecha y Hora</p>
+                                        <p className="text-xs text-secondary font-bold">{new Date(shift.start_time).toLocaleDateString()}</p>
+                                        <div className="text-[10px] text-gray-400 font-mono">
+                                            {new Date(shift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {shift.end_time ? ` - ${new Date(shift.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1 text-right">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest underline decoration-gray-100 underline-offset-4 mb-2">Balance Final</p>
+                                        <p className="text-sm font-black text-secondary">${(shift.final_cash || (shift.status === 'abierto' ? metrics?.expectedInDrawer : 0))?.toLocaleString()}</p>
+                                        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tighter">Digital: ${(shift.digital_sales || 0).toLocaleString()}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-2 pt-2">
+                                    <button className="flex-1 py-2.5 bg-gray-50 rounded-xl text-secondary font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 border border-gray-100 shadow-sm active:scale-95 transition-all">
+                                        <Send size={14} /> Enviar
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const shiftToPrint = { ...shift };
+                                            if (!shift.metrics && shift.status === 'abierto') {
+                                                shiftToPrint.metrics = getShiftMetrics(shift);
+                                            }
+                                            onPrint && onPrint(shiftToPrint, 'cierre_caja');
+                                        }}
+                                        className="flex-[2] py-2.5 bg-secondary text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all"
+                                    >
+                                        Reporte de Cierre
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
 

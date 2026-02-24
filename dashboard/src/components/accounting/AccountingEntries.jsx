@@ -91,6 +91,12 @@ const AccountingEntries = () => {
         }
     };
 
+    const filteredEntries = entries.filter(e =>
+        e.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.journal_type?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     return (
         <div className="h-full flex flex-col space-y-6">
             {/* Header */}
@@ -145,7 +151,8 @@ const AccountingEntries = () => {
             {/* Table */}
             <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
                 <div className="overflow-x-auto custom-scrollbar flex-1">
-                    <table className="w-full text-left border-collapse">
+                    {/* Desktop Table */}
+                    <table className="w-full text-left border-collapse hidden md:table">
                         <thead className="bg-gray-50 sticky top-0 z-10">
                             <tr>
                                 <th className="p-4 text-xs font-black text-gray-500 uppercase tracking-wider">Fecha</th>
@@ -159,10 +166,10 @@ const AccountingEntries = () => {
                         <tbody className="divide-y divide-gray-100">
                             {loading ? (
                                 <tr><td colSpan="6" className="p-8 text-center text-gray-400">Cargando asientos...</td></tr>
-                            ) : entries.length === 0 ? (
+                            ) : filteredEntries.length === 0 ? (
                                 <tr><td colSpan="6" className="p-8 text-center text-gray-400">No hay asientos registrados aún.</td></tr>
                             ) : (
-                                entries.map(entry => (
+                                filteredEntries.map(entry => (
                                     <tr key={entry.id} className="hover:bg-gray-50 transition-colors">
                                         <td className="p-4 text-sm font-bold text-secondary">{entry.date}</td>
                                         <td className="p-4">
@@ -197,6 +204,49 @@ const AccountingEntries = () => {
                             )}
                         </tbody>
                     </table>
+
+                    {/* Mobile Card List */}
+                    <div className="md:hidden divide-y divide-gray-100">
+                        {loading ? (
+                            <div className="p-8 text-center text-gray-400">Cargando asientos...</div>
+                        ) : filteredEntries.length === 0 ? (
+                            <div className="p-8 text-center text-gray-400">No hay asientos registrados aún.</div>
+                        ) : (
+                            filteredEntries.map(entry => (
+                                <div key={entry.id} className="p-5 space-y-4 hover:bg-gray-50/50 transition-colors">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <p className="text-sm font-black text-secondary">{entry.date}</p>
+                                            <p className="text-[10px] font-mono text-gray-400 mt-1 uppercase">Ref: {entry.reference || 'S/R'}</p>
+                                        </div>
+                                        <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${entry.status === 'posted' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                            entry.status === 'voided' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                                                'bg-gray-100 text-gray-500 border border-gray-200'
+                                            }`}>
+                                            {entry.status === 'posted' ? 'Asentado' :
+                                                entry.status === 'voided' ? 'Anulado' : 'Borrador'}
+                                        </span>
+                                    </div>
+                                    <div className="bg-gray-50/80 rounded-xl p-3 border border-gray-100">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Concepto</p>
+                                        <p className="text-xs text-gray-600 font-medium leading-relaxed">{entry.description}</p>
+                                    </div>
+                                    <div className="flex justify-between items-center pt-2">
+                                        <span className="px-2 py-1 rounded bg-gray-100 text-gray-600 text-[9px] font-black uppercase tracking-widest border border-gray-200">
+                                            {entry.journal_type}
+                                        </span>
+                                        <button
+                                            onClick={() => handleViewDetails(entry)}
+                                            className="flex items-center gap-2 bg-secondary text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md hover:brightness-110 active:scale-95 transition-all"
+                                        >
+                                            <Eye size={14} />
+                                            Ver Detalles
+                                        </button>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
                 </div>
             </div>
 
