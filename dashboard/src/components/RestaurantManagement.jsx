@@ -19,8 +19,11 @@ const RestaurantManagement = ({
     setActiveSubTab: propSetActiveSubTab
 }) => {
     const { user } = useAuth();
+    const isKitchenRole = user?.role === 'cocina';
+    // Cocina siempre va al board, cajero a turnos, resto al board
+    const defaultTab = isKitchenRole ? 'board' : (user?.role === 'cajero' ? 'turnos' : 'board');
     // Usar estado local solo si no se proveen props (fallback)
-    const [localActiveSubTab, setLocalActiveSubTab] = useState(user?.role === 'cajero' ? 'turnos' : 'board');
+    const [localActiveSubTab, setLocalActiveSubTab] = useState(defaultTab);
 
     const activeSubTab = propActiveSubTab || localActiveSubTab;
     const setActiveSubTab = propSetActiveSubTab || setLocalActiveSubTab;
@@ -40,6 +43,7 @@ const RestaurantManagement = ({
 
     React.useEffect(() => {
         const handleOpenShiftModal = () => {
+            if (isKitchenRole) return; // Cocina no abre caja
             setActiveSubTab('turnos');
             setShouldAutoOpenShift(true);
             // Reset after a delay to allow consuming the prop
@@ -47,13 +51,18 @@ const RestaurantManagement = ({
         };
         window.addEventListener('open-shift-modal', handleOpenShiftModal);
         return () => window.removeEventListener('open-shift-modal', handleOpenShiftModal);
-    }, []);
+    }, [isKitchenRole]);
 
-    const subMenuItems = [
+    // Sub-tabs filtradas por rol: cocina solo ve el board
+    const allSubMenuItems = [
         { id: 'board', label: 'Monitor de Pedidos', icon: LayoutGrid, description: 'Vista de pedidos en tiempo real' },
         { id: 'menu', label: 'Gestión de Carta', icon: Settings, description: 'Administrar productos y menú' },
         { id: 'turnos', label: 'Cajas y Turnos', icon: Wallet, description: 'Control de turnos y caja' },
     ];
+
+    const subMenuItems = isKitchenRole
+        ? allSubMenuItems.filter(item => item.id === 'board')
+        : allSubMenuItems;
 
     // Filtrar pedidos según los filtros activos
     const filteredOrders = useMemo(() => {

@@ -141,10 +141,12 @@ function App() {
     return () => window.removeEventListener('shift-updated', handleShiftUpdate);
   }, []);
 
-  // Force clear orders when shift closes (Redundant safety)
+  // Force clear orders when shift closes (only for roles that need shifts — NOT cocina/mesero)
   useEffect(() => {
-    if (!activeShift && user && user.role !== 'admin' && user.role !== 'gerente') {
-      console.log('Force clearing orders because activeShift is null');
+    const needsShift = user && user.role !== 'admin' && user.role !== 'gerente'
+      && user.role !== 'cocina' && user.role !== 'mesero';
+    if (!activeShift && needsShift) {
+      console.log('Force clearing orders because activeShift is null for shift-dependent role');
       setOrders([]);
     }
   }, [activeShift, user]);
