@@ -112,8 +112,14 @@ export const RealtimeProvider = ({ children }) => {
         const { eventType, new: newRecord, old: oldRecord } = payload;
         const record = newRecord || oldRecord;
 
-        // Filtro específico para rol cocina: solo notifica cuando pasa a "fabricacion"
-        if (role === 'cocina' && newRecord?.status !== 'fabricacion') return;
+        // Filtro para cocina: notificar en INSERT (nuevo pedido) y cuando pasa a "fabricacion"
+        if (role === 'cocina') {
+            if (eventType === 'INSERT') {
+                // Siempre notificar cuando llega un nuevo pedido
+            } else if (eventType === 'UPDATE' && newRecord?.status !== 'fabricacion' && newRecord?.status !== 'nuevo') {
+                return; // Solo notificar cambios relevantes para cocina
+            }
+        }
 
         let title = '';
         let body = '';

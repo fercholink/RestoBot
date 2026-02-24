@@ -151,16 +151,19 @@ function App() {
 
   const fetchOrders = async () => {
     try {
-      // Necesitamos los items también. Supabase permite hacer joins profundos.
-      // 1. Obtener turno activo actual desde Supabase (para filtrar pedidos de la sesión)
-      // Ya no usamos localStorage
-      const { data: shiftData } = await supabase
-        .from('shifts')
-        .select('*')
-        .eq('status', 'abierto')
-        .maybeSingle();
-
-      const currentShift = shiftData;
+      // 1. Obtener turno activo de ESTE usuario (por user_id)
+      let currentShift = null;
+      if (user?.id) {
+        const { data: shiftData } = await supabase
+          .from('shifts')
+          .select('*')
+          .eq('status', 'abierto')
+          .eq('user_id', user.id)
+          .order('start_time', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        currentShift = shiftData;
+      }
       setActiveShift(currentShift);
 
       let query = supabase
@@ -176,35 +179,33 @@ function App() {
         .order('created_at', { ascending: false });
 
       // LOGICA DE FILTRADO POR ROL
-      // LOGICA DE FILTRADO PARA CAJEROS
-      if (user && user.role !== 'admin' && user.role !== 'gerente') {
-        if (currentShift) {
-          // Si hay turno abierto, mostrar solo pedidos de ESTE turno
-          query = query.eq('shift_id', currentShift.id);
-        } else {
-          // Si NO hay turno abierto, no mostrar nada (o mostrar vacío) para obligar apertura
-          // Opcional: Mostrar los del día por si acaso, pero la regla es "Caja cerrada = No pedidos"
-          // Para ser estrictos con la solicitud: "los pedidos del dia se desaparezcan"
-          // Retornamos array vacío si no hay turno.
-          setOrders([]);
-          return;
-        }
-      } else {
-        // Admin/Gerente: Mostrar últimos 30 días
+      const isManager = user && (user.role === 'admin' || user.role === 'gerente');
+      const isKitchen = user && (user.role === 'cocina' || user.role === 'mesero');
+
+      if (isManager || isKitchen) {
+        // Admin/Gerente/Cocina/Mesero: Ver todos los pedidos recientes
+        // Cocina necesita ver TODOS los pedidos para su board, no solo los de un turno
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         query = query.gte('created_at', thirtyDaysAgo.toISOString());
+      } else if (user) {
+        // Cajero y otros roles: Solo pedidos de SU turno activo
+        if (currentShift) {
+          query = query.eq('shift_id', currentShift.id);
+        } else {
+          // Sin turno = sin pedidos (forzar apertura de caja)
+          setOrders([]);
+          return;
+        }
       }
-
 
       const { data, error } = await query;
 
       if (error) throw error;
 
-      // FAILSAFE: Si es cajero y no hay turno, vaciar SIEMPRE
-      // Esto asegura que si la query trajo algo por error, lo ignoremos
-      if (user && user.role !== 'admin' && user.role !== 'gerente' && !currentShift) {
-        console.log('FAILSAFE: Clearing orders because no active shift.');
+      // FAILSAFE: Cajero sin turno = vaciar
+      if (user && !isManager && !isKitchen && !currentShift) {
+        console.log('FAILSAFE: Clearing orders — no active shift for this user.');
         setOrders([]);
       } else {
         setOrders(data || []);

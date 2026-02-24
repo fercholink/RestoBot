@@ -8,9 +8,10 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
     // Estado local para la UI
     const [shifts, setShifts] = useState([]);
     const [loading, setLoading] = useState(true);
-
-    const activeShift = shifts.find(s => s.status === 'abierto');
     const { user } = useAuth();
+
+    // Turno activo: filtrar por user_id del usuario logueado
+    const activeShift = shifts.find(s => s.status === 'abierto' && s.user_id === user?.id);
 
     // Helper para asegurar que renderizamos strings y no objetos (fix error {name})
     const safeRender = (val, fallback = '') => {
@@ -27,37 +28,42 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
     }, []);
 
     const fetchShifts = async () => {
+        if (!user?.id) return;
         try {
-            // 1. Fetch active shift (guaranteed)
-            // 1. Fetch active shift (handle multiple if they exist by taking latest)
-            const { data: activeDataArray, error: activeError } = await supabase
+            const isManager = user.role === 'admin' || user.role === 'gerente';
+
+            // 1. Fetch turno activo de ESTE usuario
+            const { data: myActiveArray, error: myActiveError } = await supabase
                 .from('shifts')
                 .select('*')
                 .eq('status', 'abierto')
-                .order('start_time', { ascending: false });
+                .eq('user_id', user.id)
+                .order('start_time', { ascending: false })
+                .limit(1);
 
-            // Take the most recent open shift if multiple exist
-            const activeData = activeDataArray?.[0] || null;
+            if (myActiveError) throw myActiveError;
+            const myActiveShift = myActiveArray?.[0] || null;
 
-            if (activeError) throw activeError;
-
-            // 2. Fetch history (closed shifts)
-            const { data: historyData, error: historyError } = await supabase
+            // 2. Fetch historial
+            let historyQuery = supabase
                 .from('shifts')
                 .select('*')
-                .neq('status', 'abierto') // Exclude open if we want, or just mix them.
-                // Let's just fetch all recent and merge, but simpler:
                 .order('start_time', { ascending: false })
-                .limit(20);
+                .limit(30);
 
+            // Admin/gerente ven todos, otros solo sus propios turnos
+            if (!isManager) {
+                historyQuery = historyQuery.eq('user_id', user.id);
+            }
+
+            const { data: historyData, error: historyError } = await historyQuery;
             if (historyError) throw historyError;
 
-            // Merge: If active shift exists, place it first or ensure it's in the list
+            // Merge: turno activo siempre primero
             let allShifts = historyData || [];
-            if (activeData) {
-                // Remove if it was present in history fetch (unlikely if we used neq, but safe check)
-                allShifts = allShifts.filter(s => s.id !== activeData.id);
-                allShifts.unshift(activeData);
+            if (myActiveShift) {
+                allShifts = allShifts.filter(s => s.id !== myActiveShift.id);
+                allShifts.unshift(myActiveShift);
             }
 
             setShifts(allShifts);
@@ -153,22 +159,23 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
 
     const handleOpenShift = async () => {
         try {
-            // Guard: Check if shift is already open locally or in DB
+            // Guard: Check if THIS USER already has a shift open
             if (activeShift) {
-                sileo.warning({ title: "Atención", description: "Ya existe un turno abierto." });
+                sileo.warning({ title: "Atención", description: "Ya tienes un turno abierto." });
                 setShowOpenModal(false);
                 return;
             }
 
-            // Double check server-side to prevent race conditions
+            // Double check server-side: ¿ESTE usuario ya tiene turno abierto?
             const { data: existingOpen } = await supabase
                 .from('shifts')
                 .select('id')
                 .eq('status', 'abierto')
+                .eq('user_id', user.id)
                 .maybeSingle();
 
             if (existingOpen) {
-                sileo.info({ title: "Sincronizando", description: "Detectamos un turno abierto en segundo plano." });
+                sileo.info({ title: "Sincronizando", description: "Ya tienes un turno abierto. Recargando..." });
                 await fetchShifts();
                 setShowOpenModal(false);
                 return;
@@ -178,6 +185,7 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
             const branchNameSafe = safeRender(user?.branch, 'Sede Principal');
 
             const { error } = await supabase.from('shifts').insert([{
+                user_id: user.id,   // ← CLAVE: vincular turno al usuario
                 cashier_name: cashierNameSafe,
                 branch_name: branchNameSafe,
                 status: 'abierto',
@@ -188,9 +196,10 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
 
             if (error) throw error;
 
-            // Force immediate UI update locally to prevent lag
+            // Force immediate UI update locally
             const newShiftStub = {
                 id: 'temp_' + Date.now(),
+                user_id: user.id,
                 cashier_name: cashierNameSafe,
                 branch_name: branchNameSafe,
                 status: 'abierto',
@@ -202,11 +211,10 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
 
             await syncShifts();
             setShowOpenModal(false);
-            sileo.success({ title: "Turno Abierto", description: "Caja inicializada correctamente." });
+            sileo.success({ title: "Turno Abierto", description: "Tu caja ha sido inicializada." });
         } catch (error) {
             console.error('Error opening shift:', error);
             sileo.error({ title: "Error", description: 'Error al abrir turno: ' + (error.message || 'Error desconocido') });
-            // If error, try to fetch to see if it was created anyway
             fetchShifts();
         }
     };
@@ -408,7 +416,6 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
                         </thead>
                         <tbody className="divide-y divide-gray-50 font-medium whitespace-nowrap">
                             {shifts
-                                .filter(s => (user?.role === 'admin' || user?.role === 'gerente') ? true : safeRender(s.cashier_name) === safeRender(user?.name)) // Filtro: Cajeros solo ven sus turnos
                                 .map((shift) => (
                                     <tr key={shift.id} className="hover:bg-gray-50/50 transition-colors group">
                                         <td className="px-6 py-4">
