@@ -251,7 +251,6 @@ const UserManagement = () => {
                     // Si falla Auth (ej. email ya existe), guardamos solo el perfil
                     console.warn('Auth signUp falló, insertando solo perfil:', authError.message);
 
-                    // Intentar insertar solo perfil con mock ID
                     const mockId = crypto.randomUUID?.() || `usr-${Date.now()}`;
                     const { error: profileError } = await supabase
                         .from('profiles')
@@ -261,14 +260,52 @@ const UserManagement = () => {
                     showToast(`⚠️ Perfil creado (sin login Auth). ${authError.message}`, 'warning');
 
                 } else {
-                    // Auth OK: actualizar el perfil que el trigger creó automáticamente
+                    // Auth OK — esperar a que el trigger cree el perfil base
                     const userId = authData.user?.id;
                     if (userId) {
-                        await supabase
+                        // Esperar un momento para que el trigger handle_new_user() se ejecute
+                        await new Promise(r => setTimeout(r, 1500));
+
+                        // Forzar UPDATE explícito (no upsert) para sobreescribir lo que el trigger puso
+                        const { error: updateError } = await supabase
                             .from('profiles')
-                            .upsert([{ ...profileData, id: userId }]);
+                            .update({
+                                full_name: formUser.full_name,
+                                role: formUser.role,
+                                permissions: formUser.permissions,
+                                branch_id: formUser.branch_id || null,
+                                active: true,
+                                organization_id: currentUser.organization_id || null,
+                                email: formUser.email,
+                            })
+                            .eq('id', userId);
+
+                        if (updateError) {
+                            console.warn('Update post-trigger falló, intentando upsert:', updateError.message);
+                            // Fallback: upsert en caso de que el trigger no haya creado el row aún
+                            await supabase
+                                .from('profiles')
+                                .upsert([{ ...profileData, id: userId }]);
+                        }
+
+                        // Verificación: confirmar que el rol se guardó correctamente
+                        const { data: verification } = await supabase
+                            .from('profiles')
+                            .select('role, permissions')
+                            .eq('id', userId)
+                            .single();
+
+                        console.log(`[UserMgmt] ✅ Usuario creado — rol guardado: "${verification?.role}", esperado: "${formUser.role}"`);
+
+                        if (verification?.role !== formUser.role) {
+                            console.warn('[UserMgmt] ⚠️ El rol no coincide, reintentando...');
+                            await supabase
+                                .from('profiles')
+                                .update({ role: formUser.role, permissions: formUser.permissions })
+                                .eq('id', userId);
+                        }
                     }
-                    showToast(`✅ Usuario ${formUser.full_name} creado. Se envió email de confirmación.`);
+                    showToast(`✅ Usuario ${formUser.full_name} creado con rol "${formUser.role}".`);
                 }
             }
 
@@ -358,8 +395,8 @@ const UserManagement = () => {
                 <button
                     onClick={() => setMainTab('usuarios')}
                     className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${mainTab === 'usuarios'
-                            ? 'bg-secondary text-white shadow-lg'
-                            : 'text-gray-400 hover:text-secondary hover:bg-gray-50'
+                        ? 'bg-secondary text-white shadow-lg'
+                        : 'text-gray-400 hover:text-secondary hover:bg-gray-50'
                         }`}
                 >
                     <Users size={15} />
@@ -370,8 +407,8 @@ const UserManagement = () => {
                 <button
                     onClick={() => setMainTab('roles')}
                     className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${mainTab === 'roles'
-                            ? 'bg-secondary text-white shadow-lg'
-                            : 'text-gray-400 hover:text-secondary hover:bg-gray-50'
+                        ? 'bg-secondary text-white shadow-lg'
+                        : 'text-gray-400 hover:text-secondary hover:bg-gray-50'
                         }`}
                 >
                     <Shield size={15} />
