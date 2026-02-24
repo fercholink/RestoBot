@@ -97,11 +97,15 @@ function App() {
   useEffect(() => {
     if (user) {
       if (user.role === 'cajero') {
-        // Reglas para Cajero: Sidebar colapsado y pestaña Caja por defecto (si no hay una guardada o forzamos inicio)
+        // Cajero: Sidebar colapsado y pestaña Caja por defecto
         setIsSidebarCollapsed(true);
-        if (!localStorage.getItem('restobot_active_tab') || localStorage.getItem('restobot_active_tab') === 'caja') {
-          setActiveTab('restaurante');
-        }
+        setActiveTab('restaurante');
+        setActiveRestaurantSubTab('turnos');
+      } else if (user.role === 'cocina' || user.role === 'mesero') {
+        // Cocina/Mesero: Ir directo al board de pedidos, sidebar colapsado
+        setIsSidebarCollapsed(true);
+        setActiveTab('restaurante');
+        setActiveRestaurantSubTab('board');
       } else if (!localStorage.getItem('restobot_active_tab')) {
         setActiveTab('restaurante');
       }

@@ -10,8 +10,8 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
 
     // Solo definimos subitems para restaurante por ahora
     const restaurantSubItems = [
-        { id: 'board', label: 'Monitor de Pedidos', roles: ['admin', 'cajero', 'gerente'] },
-        { id: 'menu', label: 'Gestión de Carta', roles: ['admin', 'gerente'] }, // Solo admin/gerente
+        { id: 'board', label: 'Monitor de Pedidos', roles: ['admin', 'cajero', 'gerente', 'cocina', 'mesero'] },
+        { id: 'menu', label: 'Gestión de Carta', roles: ['admin', 'gerente'] },
         { id: 'turnos', label: 'Cajas y Turnos', roles: ['admin', 'cajero', 'gerente'] },
     ].filter(item => item.roles.includes(user?.role || 'cajero'));
 
@@ -37,9 +37,10 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
         // Si no hay permisos definidos (legacy users), usamos el rol como fallback
         if (!user?.permissions) {
             const role = user?.role || 'cajero';
-            // Admin y Gerente ven todo por defecto en legacy. Cajero solo restaurante.
+            // Admin y Gerente ven todo por defecto en legacy
             if (role === 'admin' || role === 'gerente') return true;
-            if (role === 'cajero' && moduleName === 'restaurante') return true;
+            // Cajero, Cocina y Mesero ven módulo restaurante
+            if (['cajero', 'cocina', 'mesero'].includes(role) && moduleName === 'restaurante') return true;
             return false;
         }
         // Si hay permisos, devolver el valor de 'read'
@@ -51,7 +52,7 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
             id: 'restaurante',
             label: 'Gestión Restaurante',
             icon: Utensils,
-            roles: ['admin', 'cajero', 'gerente'],
+            roles: ['admin', 'cajero', 'gerente', 'cocina', 'mesero'],
             hasSubmenu: true,
             module: 'restaurante'
         },
