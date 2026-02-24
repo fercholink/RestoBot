@@ -236,4 +236,14 @@ export const getPollingInterval = (role) => {
     return POLLING_INTERVALS[role] || 12000;
 };
 
+// Base roles — roles dinámicos se validan desde la BD
 export const VALID_ROLES = Object.keys(ROLE_DEFINITIONS);
+
+/**
+ * Verifica si un rol es válido (base o dinámico)
+ * Para roles dinámicos, se acepta cualquier string no vacío
+ */
+export const isValidRole = (role) => {
+    if (!role || typeof role !== 'string') return false;
+    return true; // Aceptar cualquier rol — la BD es la fuente de verdad
+};

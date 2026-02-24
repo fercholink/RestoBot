@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { getDefaultPermissions, VALID_ROLES } from '../config/roles';
+import { getDefaultPermissions, VALID_ROLES, isValidRole } from '../config/roles';
 
 const AuthContext = createContext(null);
 
@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }) => {
 
         // Resolver rol con validación — garantiza un rol siempre válido
         const rawRole = profileData.role || appMeta.role || metadata.role || 'cajero';
-        const resolvedRole = VALID_ROLES.includes(rawRole) ? rawRole : 'cajero';
+        const resolvedRole = isValidRole(rawRole) ? rawRole : 'cajero';
 
         // Resolver permisos: BD (personalizados) → default del rol
         const resolvedPermissions = profileData.permissions || getDefaultPermissions(resolvedRole);
