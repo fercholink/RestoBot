@@ -9,6 +9,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import RoleManagement from './RoleManagement';
+import { DEFAULT_PERMISSIONS, getDefaultPermissions } from '../config/roles';
 
 // ─── Mapa de Iconos para roles ──────────────────────────────────────────────
 const ICON_MAP = {
@@ -59,18 +60,26 @@ const UserManagement = () => {
     const [selectedRoleTemplate, setSelectedRoleTemplate] = useState(null);
 
     // Construir ROLE_TEMPLATES dinámicamente de la BD
+    // Si la BD no tiene permisos para un rol, usa los DEFAULT_PERMISSIONS de roles.js
     const ROLE_TEMPLATES = {};
     const ROLE_BADGE_STYLES = {};
     dbRoles.forEach(r => {
+        // Verificar si permissions es un objeto con contenido real
+        const hasRealPermissions = r.permissions && typeof r.permissions === 'object'
+            && Object.keys(r.permissions).length > 0;
+        const rolePerms = hasRealPermissions
+            ? r.permissions
+            : (DEFAULT_PERMISSIONS[r.name] || getDefaultPermissions(r.name));
+
         ROLE_TEMPLATES[r.name] = {
             label: r.label,
             description: r.description || '',
             icon: ICON_MAP[r.icon] || Shield,
             color: r.color || '#6b7280',
-            gradient: `from-gray-500 to-gray-600`, // fallback
-            permissions: r.permissions || {},
+            gradient: `from-gray-500 to-gray-600`,
+            permissions: rolePerms,
         };
-        ROLE_BADGE_STYLES[r.name] = ''; // Se usa inline style ahora
+        ROLE_BADGE_STYLES[r.name] = '';
     });
 
     const [formUser, setFormUser] = useState({
@@ -213,11 +222,15 @@ const UserManagement = () => {
         setIsSaving(true);
 
         try {
+            // Asegurar que permissions nunca sea {} vacío
+            const hasPerms = formUser.permissions && Object.keys(formUser.permissions).length > 0;
+            const safePermissions = hasPerms ? formUser.permissions : getDefaultPermissions(formUser.role);
+
             const profileData = {
                 full_name: formUser.full_name,
                 role: formUser.role,
                 branch_id: formUser.branch_id || null,
-                permissions: formUser.permissions,
+                permissions: safePermissions,
                 active: true,
                 organization_id: currentUser.organization_id || null,
                 email: formUser.email,

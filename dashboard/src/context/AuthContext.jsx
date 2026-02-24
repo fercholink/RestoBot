@@ -36,10 +36,13 @@ export const AuthProvider = ({ children }) => {
         const rawRole = profileData.role || appMeta.role || metadata.role || 'cajero';
         const resolvedRole = isValidRole(rawRole) ? rawRole : 'cajero';
 
-        // Resolver permisos: BD (personalizados) → default del rol
-        const resolvedPermissions = profileData.permissions || getDefaultPermissions(resolvedRole);
+        // Resolver permisos: BD (si tiene contenido real) → default del rol
+        // IMPORTANTE: {} vacío NO cuenta como permisos válidos
+        const dbPerms = profileData.permissions;
+        const hasRealPermissions = dbPerms && typeof dbPerms === 'object' && Object.keys(dbPerms).length > 0;
+        const resolvedPermissions = hasRealPermissions ? dbPerms : getDefaultPermissions(resolvedRole);
 
-        console.log(`[Auth] ✅ Usuario listo — rol: ${resolvedRole}`);
+        console.log(`[Auth] ✅ Usuario listo — rol: ${resolvedRole}, permisos: ${hasRealPermissions ? 'BD' : 'DEFAULT'}`);
 
 
         return {
