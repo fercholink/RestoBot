@@ -21,6 +21,7 @@ import TicketPrinter from './components/TicketPrinter';
 import MarketingModule from './components/Marketing/MarketingModule';
 import TableQRGenerator from './components/TableQRGenerator';
 import NotificationPanel from './components/NotificationPanel';
+import DigitalCheckIn from './components/DigitalCheckIn';
 import { LayoutGrid, Filter, Plus, Building2, ShieldCheck, Wallet, Activity } from 'lucide-react';
 import { Toaster, sileo } from 'sileo';
 import "./styles/sileo.css";
@@ -76,6 +77,7 @@ function App() {
   const [activeHotelSubTab, setActiveHotelSubTab] = useState('habitaciones');
   const [activeAccountingSubTab, setActiveAccountingSubTab] = useState('summary');
   const [paymentModal, setPaymentModal] = useState({ isOpen: false, orderId: null, totalPrice: 0 });
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [printData, setPrintData] = useState({ order: null, type: 'comanda' });
 
   // Estados de turno movidos arriba
@@ -145,6 +147,17 @@ function App() {
     };
     window.addEventListener('shift-updated', handleShiftUpdate);
     return () => window.removeEventListener('shift-updated', handleShiftUpdate);
+  }, []);
+
+  // Realtime directo en tabla orders (complementa el polling)
+  useEffect(() => {
+    const channel = supabase
+      .channel('app-orders-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        fetchOrders();
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
   }, []);
 
   // Force clear orders when shift closes — SOLO aplica para cajero
@@ -347,15 +360,22 @@ function App() {
 
         // Si todo sale bien, actualizamos el pedido localmente con los datos de pago
         // para asegurarnos que n8n o el update posterior tengan la info completa
+        let prepTime = 0;
+        if (order && order.created_at) {
+          const { differenceInSeconds, parseISO } = require('date-fns');
+          prepTime = Math.max(0, differenceInSeconds(new Date(), parseISO(order.created_at)));
+        }
+
         await supabase
           .from('orders')
           .update({
             payment_method: 'cargo_habitacion',
-            status: 'pagado'
+            status: 'pagado',
+            preparation_time_seconds: prepTime
           })
           .eq('id', orderId);
 
-        alert("✅ Cargo a habitación realizado correctamente.");
+        sileo.success({ title: 'Cargo a Habitación', description: `Pedido #${orderId} cargado a la habitación.` });
       }
 
       // Optimistic UI update
@@ -370,9 +390,19 @@ function App() {
 
       // Fallback: Actualizar directamente en Supabase si n8n falla
       try {
+        let updatePayload = { status: newStatus };
+
+        if (newStatus === 'pagado') {
+          const order = orders.find(o => o.id === orderId);
+          if (order && order.created_at) {
+            const { differenceInSeconds, parseISO } = require('date-fns');
+            updatePayload.preparation_time_seconds = Math.max(0, differenceInSeconds(new Date(), parseISO(order.created_at)));
+          }
+        }
+
         const { error: sbError } = await supabase
           .from('orders')
-          .update({ status: newStatus })
+          .update(updatePayload)
           .eq('id', orderId);
 
         if (sbError) throw sbError;
@@ -385,7 +415,7 @@ function App() {
 
       } catch (fallbackError) {
         console.error("Error fatal: Falló n8n y también Supabase", fallbackError);
-        alert("Error crítico: No se pudo actualizar el estado del pedido.");
+        sileo.error({ title: 'Error crítico', description: 'No se pudo actualizar el estado del pedido.' });
         fetchOrders(); // Revertir UI
       }
     }
@@ -470,67 +500,71 @@ function App() {
 
       // 7. Refrescar y notificar
       await fetchOrders();
-      alert("✅ Pedido actualizado correctamente");
+      sileo.success({ title: 'Pedido actualizado', description: 'El pedido fue modificado correctamente.' });
 
     } catch (error) {
       console.error("Error updating order:", error);
-      alert("❌ Error al actualizar el pedido: " + error.message);
+      sileo.error({ title: 'Error al actualizar', description: error.message });
     }
   };
 
   const handleDeleteOrder = async (orderId) => {
-    if (window.confirm('¿Está seguro de eliminar este pedido permanentemente?')) {
-      try {
-        // 1. Obtener los items del pedido para devolver al inventario
-        const { data: orderItems, error: itemsError } = await supabase
-          .from('order_items')
-          .select('product_id, quantity')
-          .eq('order_id', orderId);
+    // Confirmación doble: primer clic avisa, segundo clic ejecuta
+    if (pendingDeleteId !== orderId) {
+      setPendingDeleteId(orderId);
+      sileo.warning({ title: 'Confirmar eliminación', description: 'Haz clic en "Eliminar" nuevamente para confirmar.' });
+      setTimeout(() => setPendingDeleteId(null), 3000);
+      return;
+    }
+    setPendingDeleteId(null);
 
-        if (itemsError) throw itemsError;
+    try {
+      // 1. Obtener los items del pedido para devolver al inventario
+      const { data: orderItems, error: itemsError } = await supabase
+        .from('order_items')
+        .select('product_id, quantity')
+        .eq('order_id', orderId);
 
-        // 2. Devolver stock (iterar uno por uno para asegurar consistencia simple)
-        if (orderItems && orderItems.length > 0) {
-          for (const item of orderItems) {
-            // Obtener stock actual para sumar
-            const { data: product } = await supabase
+      if (itemsError) throw itemsError;
+
+      // 2. Devolver stock
+      if (orderItems && orderItems.length > 0) {
+        for (const item of orderItems) {
+          const { data: product } = await supabase
+            .from('products')
+            .select('stock')
+            .eq('id', item.product_id)
+            .single();
+
+          if (product) {
+            await supabase
               .from('products')
-              .select('stock')
-              .eq('id', item.product_id)
-              .single();
-
-            if (product) {
-              await supabase
-                .from('products')
-                .update({ stock: product.stock + item.quantity })
-                .eq('id', item.product_id);
-            }
+              .update({ stock: product.stock + item.quantity })
+              .eq('id', item.product_id);
           }
         }
-
-        // 3. Eliminar el pedido (Cascada eliminará los items de la BD, pero ya devolvimos el stock)
-        const { error } = await supabase.from('orders').delete().eq('id', orderId);
-        if (error) throw error;
-
-        // La UI se actualizará via Realtime, pero limpieza optimista:
-        setOrders(prev => prev.filter(o => o.id !== orderId));
-      } catch (error) {
-        console.error("Error eliminando pedido:", error);
-        alert("Error al eliminar pedido: " + error.message);
       }
+
+      // 3. Eliminar el pedido
+      const { error } = await supabase.from('orders').delete().eq('id', orderId);
+      if (error) throw error;
+
+      setOrders(prev => prev.filter(o => o.id !== orderId));
+      sileo.success({ title: 'Pedido eliminado', description: `Pedido #${orderId} eliminado y stock devuelto.` });
+    } catch (error) {
+      console.error("Error eliminando pedido:", error);
+      sileo.error({ title: 'Error al eliminar', description: error.message });
     }
   };
 
   const handlePaymentConfirm = async (orderId, method, reference, taxData = null) => {
     try {
       // Calcular tiempo de preparación final usando date-fns para consistencia
-      // Importamos dinámicamente o usamos lógica robusta similar
       const order = orders.find(o => o.id === orderId);
       let prepTime = 0;
       if (order && order.created_at) {
-        const created = new Date(order.created_at);
-        const now = new Date();
-        prepTime = Math.max(0, Math.floor((now - created) / 1000));
+        const { differenceInSeconds, parseISO } = require('date-fns');
+        prepTime = Math.max(0, differenceInSeconds(new Date(), parseISO(order.created_at)));
       }
 
       const updates = {
@@ -575,7 +609,7 @@ function App() {
 
     } catch (error) {
       console.error("Error procesando pago:", error);
-      alert("Error registrando el pago: " + error.message);
+      sileo.error({ title: 'Error en el pago', description: error.message });
     }
   };
 
@@ -597,6 +631,10 @@ function App() {
     fetchOrders();
   };
 
+  // --- PUBLIC ROUTES (No login required) ---
+  const isPublicCheckIn = window.location.search.includes('id=') && !window.location.pathname.includes('/admin');
+
+  if (isPublicCheckIn) return <DigitalCheckIn />;
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
