@@ -1,52 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
-    FileText, CheckCircle, Clock, AlertCircle, RefreshCw,
-    Download, Send, Filter, Building2, UtensilsCrossed, Bike,
+    FileText, CheckCircle, Clock, RefreshCw,
+    Download, Send, Building2, UtensilsCrossed, Bike,
     ChevronLeft, Inbox, ArrowRight, Receipt, XCircle
 } from 'lucide-react';
 import factusService from '../../services/factusService';
+import { emitInvoiceForOrder } from '../../services/invoiceHelper';
 import FactusConfig from './FactusConfig';
 import SupportDocuments from './SupportDocuments';
 import ReceptionDocuments from './ReceptionDocuments';
 import { sileo } from 'sileo';
-
-// -------------------------------------------------------
-// Helpers de mapeo según API Factus / DIAN
-// -------------------------------------------------------
-
-/**
- * Mapea el tipo de persona al código de Factus/DIAN:
- * legal_organization_id: "1" = Persona Jurídica, "2" = Persona Natural
- *
- * En el modal de pago usamos:
- *   type_person "1" → Natural
- *   type_person "2" → Jurídica
- * (Orden inverso al de Factus)
- */
-const mapPersonType = (taxData) => {
-    if (!taxData?.type_person) return 2; // Default: 2 = Persona Natural
-    // Modal: '1' Natural, '2' Jurídica | Factus: 2 Natural, 1 Jurídica
-    return taxData.type_person === '1' ? 2 : 1;
-};
-
-const mapTributeId = (legalOrg) => {
-    // 18 = Responsable de IVA (Jurídica), 21 = No responsable (Natural)
-    return legalOrg === 1 ? 18 : 21;
-};
-
-const mapDocType = (taxData, legalOrg) => {
-    const raw = taxData?.document_type;
-    if (raw == '13') return 3; // DIAN Cédula -> Factus 3
-    if (raw == '31') return 6; // DIAN NIT -> Factus 6
-    if (raw && /^\d{1,2}$/.test(raw)) return Number(raw);
-    return legalOrg === 1 ? 6 : 3; // 6 = NIT, 3 = Cédula
-};
-
-const mapPaymentMethod = (method) => {
-    const map = { efectivo: '10', transferencia: '31', tarjeta: '31', nequi: '31', daviplata: '31' };
-    return map[method?.toLowerCase()] || '10';
-};
 
 const ORDER_TYPE_LABEL = {
     mesa: { label: 'Mesa', icon: UtensilsCrossed, color: 'text-blue-600 bg-blue-50' },
@@ -107,164 +71,29 @@ const ElectronicInvoicing = () => {
     };
 
     // -------------------------------------------------------
-    // Emitir Factura
+    // Emitir Factura — delega toda la lógica a invoiceHelper
     // -------------------------------------------------------
     const handleEmitInvoice = async (order) => {
         setProcessingId(order.id);
-
-        // Timeout de seguridad: el botón nunca quedará bloqueado más de 20s
-        const safetyTimer = setTimeout(() => {
-            setProcessingId(null);
-            sileo.error({ title: 'Timeout', description: 'Factus no respondió. Verifica tu conexión o las credenciales.' });
-        }, 20_000);
-
+        let loadingToast = null;
         try {
-            console.log('[Factus] Iniciando emisión para orden:', order.id);
+            loadingToast = sileo.loading({ title: 'Emitiendo factura...', description: `Procesando pedido #${order.id} en Factus...` });
 
-            // 0. Verificar credenciales
-            const creds = await factusService.getCredentials();
-            if (!creds?.email || !creds?.client_id) {
-                throw new Error('Credenciales Factus no configuradas. Ve a Facturación → Configuración.');
-            }
-            console.log('[Factus] Credenciales OK, entorno:', creds.environment);
+            const result = await emitInvoiceForOrder(order);
 
-            // 1. Obtener rangos de numeración
-            console.log('[Factus] Obteniendo rangos...');
-            const rangesResp = await factusService.getRanges();
-            // Factus puede devolver { data: [...] } o { data: { data: [...] } } (paginado)
-            const rangesList = Array.isArray(rangesResp?.data)
-                ? rangesResp.data
-                : Array.isArray(rangesResp?.data?.data)
-                    ? rangesResp.data.data
-                    : [];
-            console.log('[Factus] Rangos disponibles:', rangesList.length, rangesList);
-            if (rangesList.length > 0) console.table(rangesList);
-            // Intentar encontrar el rango correcto de "Factura de Venta". Si no, tomar el primero.
-            if (!selectedRange) {
-                const env = creds.environment === 'production' ? 'Producción (factus.com.co)' : 'Sandbox (api-sandbox.factus.com.co)';
-                throw new Error(`No hay rangos de numeración activos en Factus (${env}). Ve a Configuración → Rangos de Numeración en el portal de Factus y crea uno.`);
-            }
-
-            // 1.5 Obtener datos del tercero si viene referenciado
-            let finalTaxData = order.tax_data;
-            if (order.tax_data?.third_party_id) {
-                const { data: tp, error: tpError } = await supabase
-                    .from('third_parties')
-                    .select('*')
-                    .eq('id', order.tax_data.third_party_id)
-                    .single();
-
-                if (tpError || !tp) {
-                    throw new Error('No se pudo cargar la información del tercero para la factura electrónica.');
+            if (result.success) {
+                if (result.warning) {
+                    sileo.warning({ title: `Factura ${result.bill.number} emitida`, description: result.warning });
+                } else {
+                    sileo.success({ title: '✓ Factura Emitida', description: `Documento ${result.bill.number} registrado ante la DIAN.` });
                 }
-
-                // Adapter para mapear ThirdParty a nuestro viejo TaxData para no romper el resto del código
-                // En third_parties document_type es texto ('13', '31'), que mapDocType ya maneja.
-                finalTaxData = {
-                    document_type: tp.document_type || '13',
-                    identification: tp.document_number,
-                    names: tp.business_name || `${tp.first_name || ''} ${tp.last_name || ''}`.trim(),
-                    email: tp.email || 'factura@contabilidad.com',
-                    phone: tp.phone || '0000000000',
-                    dv: tp.verification_digit,
-                    type_person: tp.document_type === '31' ? '2' : '1', // '31' (NIT) -> Jurídica, else Natural
-                    address: tp.address || 'Colombia',
-                };
+                fetchOrders();
+            } else {
+                sileo.error({ title: 'Error al Emitir Factura', description: result.error });
             }
-
-            // 2. Mapear cliente
-            const legalOrg = mapPersonType(finalTaxData);
-            const tributeIdClient = mapTributeId(legalOrg);
-            const docType = mapDocType(finalTaxData, legalOrg);
-            console.log('[Factus] Mapeo cliente → legalOrg:', legalOrg, '| tributeId:', tributeIdClient, '| docType:', docType);
-
-            // 3. Ítems — Ajuste de impuestos (Precios POS ya tienen IVA, Factus lo suma)
-            const rawItems = order.order_items?.length > 0
-                ? order.order_items
-                : [{ product_name: 'Servicio General', quantity: 1, unit_price: order.total || 0 }];
-
-            const items = rawItems.map((item, idx) => {
-                const totalPrice = parseFloat(item.unit_price || item.price || 0);
-                // Si el precio es total, la base es precio / 1.19
-                const basePrice = Math.round((totalPrice / 1.19) * 100) / 100;
-
-                return {
-                    code_reference: `ITM-${item.id || idx + 1}`,
-                    name: (item.product_name || item.name || 'Servicio').slice(0, 250),
-                    quantity: Number(item.quantity) || 1,
-                    discount_rate: 0,
-                    price: basePrice > 0 ? basePrice : 1,
-                    tax_rate: '19.00',
-                    unit_measure_id: 70,     // 70 = Unidad (Numérico)
-                    standard_code_id: 1,      // 1 = EAN (Numérico)
-                    is_excluded: 0,
-                    tribute_id: 1,            // 1 = IVA (Numérico)
-                    withholding_taxes: []
-                };
-            });
-
-            // 4. Payload completo
-            const invoicePayload = {
-                numbering_range_id: Number(selectedRange.id),
-                reference_code: `ORD-${order.id}-${Date.now()}`,
-                observation: `Pedido #${order.id} - POS RestoBot`,
-                payment_form: '1',
-                payment_method_code: mapPaymentMethod(order.payment_method),
-                customer: {
-                    identification: String(finalTaxData?.identification || '222222222222'),
-                    dv: (finalTaxData?.dv !== undefined && finalTaxData?.dv !== null && finalTaxData?.dv !== '')
-                        ? Number(finalTaxData.dv)
-                        : null,
-                    company: legalOrg === 1 ? (finalTaxData?.names || 'Empresa') : null,
-                    trade_name: legalOrg === 1 ? (finalTaxData?.trade_name || finalTaxData?.names || 'Empresa') : null,
-                    names: legalOrg === 2 ? (finalTaxData?.names || order.customer_name || 'Consumidor Final') : null,
-                    address: finalTaxData?.address || 'Colombia',
-                    email: finalTaxData?.email || 'factura@contabilidad.com',
-                    phone: String(order.customer_phone || finalTaxData?.phone || '3000000000'),
-                    legal_organization_id: legalOrg,
-                    tribute_id: tributeIdClient,
-                    identification_document_id: docType
-                },
-                items
-            };
-
-            console.log('[Factus] Payload FINAL (tipos corregidos):', JSON.stringify(invoicePayload, null, 2));
-
-            // 5. Enviar
-            const result = await factusService.createInvoice(invoicePayload);
-            console.log('[Factus] Respuesta:', result);
-            const bill = result?.data?.bill;
-
-            if (!bill?.number) {
-                throw new Error('Respuesta incompleta de Factus: ' + JSON.stringify(result));
-            }
-
-            // 6. Guardar en Supabase
-            const { error: updateError } = await supabase
-                .from('orders')
-                .update({
-                    factus_id: bill.id,
-                    factus_doc_number: bill.number,
-                    factus_status: bill.status,
-                    pdf_url: null
-                })
-                .eq('id', order.id);
-
-            if (updateError) throw updateError;
-
-            clearTimeout(safetyTimer);
-            sileo.success({ title: '✓ Factura Emitida', description: `Documento ${bill.number} registrado ante la DIAN.` });
-            fetchOrders();
-
-        } catch (error) {
-            clearTimeout(safetyTimer);
-            const msg = typeof error.message === 'string' ? error.message : JSON.stringify(error);
-            sileo.error({ title: 'Error al Emitir Factura', description: msg });
-            console.error('[Factus] Error completo:', error);
         } finally {
-            clearTimeout(safetyTimer);
-            if (processingId === order.id) setProcessingId(null);
-            loadingToast.close();
+            try { loadingToast?.close(); } catch { /* ignore */ }
+            setProcessingId(null);
         }
     };
 

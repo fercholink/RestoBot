@@ -17,12 +17,22 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
 
     // Definimos subitems para Hotel
     const hotelSubItems = [
-        { id: 'habitaciones', label: 'Habitaciones', roles: ['admin', 'gerente'] },
-        { id: 'calendario', label: 'Calendario', roles: ['admin', 'gerente'] },
-        { id: 'canales', label: '📩 Canales OTA', roles: ['admin', 'gerente'] },
-        { id: 'historial', label: 'Historial', roles: ['admin', 'gerente'] },
+        { id: 'habitaciones', label: 'Habitaciones', roles: ['admin', 'gerente', 'recepcion'] },
+        { id: 'cinta', label: '📊 Cinta de Reservas', roles: ['admin', 'gerente', 'recepcion'] },
+        { id: 'calendario', label: 'Calendario', roles: ['admin', 'gerente', 'recepcion'] },
+        { id: 'limpieza', label: '🧹 Amas de Llaves', roles: ['admin', 'gerente', 'recepcion', 'limpieza'] },
+        { id: 'crm', label: '👤 CRM Huéspedes', roles: ['admin', 'gerente', 'recepcion'] },
+        { id: 'analitica', label: '📈 Analítica Pro', roles: ['admin', 'gerente'] },
+        { id: 'canales', label: '📩 Canales OTA', roles: ['admin', 'gerente', 'recepcion'] },
+        { id: 'historial', label: 'Historial', roles: ['admin', 'gerente', 'recepcion'] },
         { id: 'floors', label: 'Pisos y Zonas', roles: ['admin', 'gerente'] },
-    ].filter(item => item.roles.includes(user?.role || 'cajero'));
+    ].filter(item => {
+        // Fallback simple si no hay roles definidos en el item, permitir admin/gerente
+        if (!item.roles) return true;
+        const userRole = user?.role || 'cajero';
+        if (userRole === 'admin' || userRole === 'gerente') return true;
+        return item.roles.includes(userRole);
+    });
 
     // Definimos subitems para Contabilidad
     const accountingSubItems = [

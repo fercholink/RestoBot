@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Minus, ShoppingCart, Check, Trash2, PlusCircle, MinusCircle, AlertCircle, ChevronRight, MapPin, Loader2, Search } from 'lucide-react';
+import { X, Plus, Minus, ShoppingCart, Check, Trash2, PlusCircle, MinusCircle, AlertCircle, ChevronRight, MapPin, Loader2, Search, Tag } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { sileo } from 'sileo';
 
 const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrder, orders = [], shiftId }) => {
     const { user } = useAuth();
@@ -24,6 +25,8 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
         method: 'efectivo'
     });
     const [cart, setCart] = useState([]);
+    const [discount, setDiscount] = useState(0);
+    const [discountReason, setDiscountReason] = useState('');
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
@@ -134,6 +137,8 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
         setTableId('');
         setSelectedBookingRooms('');
         setCart([]);
+        setDiscount(0);
+        setDiscountReason('');
         setDeliveryDetails({
             housingType: 'casa',
             city: 'Montería',
@@ -161,7 +166,7 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
         const inCart = cart.filter(item => item.id === product.id).reduce((sum, item) => sum + item.quantity, 0);
 
         if (currentStock <= inCart) {
-            alert('⚠️ No hay más unidades disponibles de este producto.');
+            sileo.warning({ title: 'Sin stock', description: 'No hay más unidades disponibles de este producto.' });
             return;
         }
 
@@ -196,7 +201,7 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
         const inCart = cart.filter(item => item.id === product.id).reduce((sum, item) => sum + item.quantity, 0);
 
         if (currentStock <= inCart) {
-            alert('⚠️ No hay más unidades disponibles de este producto.');
+            sileo.warning({ title: 'Sin stock', description: 'No hay más unidades disponibles de este producto.' });
             return;
         }
 
@@ -248,36 +253,47 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
         }));
     };
 
-    const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const discountAmount = Math.min(Math.max(Number(discount) || 0, 0), subtotal);
+    const total = subtotal - discountAmount;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (cart.length === 0) return alert('El carrito está vacío');
+        if (cart.length === 0) {
+            sileo.warning({ title: 'Carrito vacío', description: 'Agrega al menos un producto para continuar.' });
+            return;
+        }
 
         if (orderType === 'domicilio') {
             if (!deliveryDetails.address || !deliveryDetails.neighborhood) {
-                return alert('Por favor completa la Dirección y el Barrio.');
+                sileo.error({ title: 'Datos incompletos', description: 'Completa la Dirección y el Barrio.' });
+                return;
             }
         }
 
         if (orderType === 'mesa') {
-            if (!tableId) return alert('Por favor ingresa el número de mesa');
+            if (!tableId) {
+                sileo.error({ title: 'Mesa requerida', description: 'Ingresa el número de mesa.' });
+                return;
+            }
 
             // Validar si la mesa ya tiene un pedido activo
             const existingOrder = orders.find(o =>
                 (o.table_number === tableId) &&
                 o.status !== 'pagado' &&
                 o.status !== 'cancelado' &&
-                (!editingOrder || o.id !== editingOrder.id) // Ignorar el pedido actual si estamos editando
+                (!editingOrder || o.id !== editingOrder.id)
             );
 
             if (existingOrder) {
-                return alert(`⚠️ La Mesa ${tableId} ya tiene un pedido activo (Pedido #${existingOrder.id}). Debe cerrarlo o pagarlo antes de abrir uno nuevo.`);
+                sileo.warning({ title: `Mesa ${tableId} ocupada`, description: `Pedido #${existingOrder.id} activo. Ciérralo antes de abrir uno nuevo.` });
+                return;
             }
         }
 
         if (orderType === 'habitacion' && !selectedBookingRooms) {
-            return alert('Por favor seleccione la habitación');
+            sileo.error({ title: 'Habitación requerida', description: 'Selecciona la habitación para Room Service.' });
+            return;
         }
 
         setSubmitting(true);
@@ -321,6 +337,8 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                     customer_name: finalCustomerName,
                     table_number: finalTableNumber,
                     total: total,
+                    discount: discountAmount > 0 ? discountAmount : null,
+                    discount_reason: discountAmount > 0 ? discountReason : null,
                     payment_method: initialPayment.isPaid ? initialPayment.method : 'pendiente',
                     is_paid: initialPayment.isPaid,
                     payment_reference: initialPayment.isPaid ? initialPayment.reference : null,
@@ -332,13 +350,13 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                         booking_id: orderType === 'habitacion' ? selectedBookingRooms : null,
                         updated_by: user?.id
                     },
-                    items: cart // Enviamos el carrito nuevo completo
+                    items: cart
                 });
 
                 onClose();
             } catch (error) {
                 console.error("Error updating order:", error);
-                alert("Error al actualizar el pedido: " + error.message);
+                sileo.error({ title: 'Error al actualizar', description: error.message });
             } finally {
                 setSubmitting(false);
             }
@@ -389,6 +407,8 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                     table_number: finalTableNumber,
                     status: 'nuevo',
                     total: total,
+                    discount: discountAmount > 0 ? discountAmount : null,
+                    discount_reason: discountAmount > 0 ? discountReason : null,
                     payment_method: paymentMethod,
                     is_paid: isPaid,
                     payment_reference: paymentRef,
@@ -404,7 +424,7 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                     },
                     shift_id: shiftId,
                     branch_id: user?.branch_id,
-                    tax_data: null, // Explicitly set null to avoid issues
+                    tax_data: null,
                     created_at: new Date().toISOString()
                 }])
                 .select()
@@ -450,13 +470,34 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                 if (chargeError) console.error("Error creating room charge:", chargeError);
             }
 
-            onAddOrder();
+            // Feedback de éxito
+            if (isPaid) {
+                sileo.success({ title: 'Pedido creado y pagado', description: `Pedido #${orderData.id} registrado. Generando recibo...` });
+            }
+
+            // Si fue creado como pre-pagado, pasar los datos para imprimir recibo
+            if (isPaid) {
+                const orderForPrint = {
+                    ...orderData,
+                    items: cart.map(item => ({
+                        product_name: item.name,
+                        product_id: item.id,
+                        quantity: item.quantity,
+                        price: item.price,
+                        unit_price: item.price,
+                        customizations: item.customizations
+                    }))
+                };
+                onAddOrder(orderForPrint);
+            } else {
+                onAddOrder(null);
+            }
             resetForm();
             onClose();
 
         } catch (error) {
             console.error("Error creating order:", error);
-            alert("Error al crear el pedido: " + error.message);
+            sileo.error({ title: 'Error al crear pedido', description: error.message });
         } finally {
             setSubmitting(false);
         }
@@ -793,7 +834,42 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
 
                             {/* Total y Acción */}
                             <div className="p-5 border-t border-gray-100 bg-white shadow-[0_-4px_30px_rgba(0,0,0,0.03)] z-10">
-                                <div className="flex justify-between items-end mb-4">
+                                {/* Descuento */}
+                                <div className="mb-3 space-y-1.5">
+                                    <div className="flex items-center gap-2">
+                                        <Tag size={12} className="text-orange-400" />
+                                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Descuento</span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            max={subtotal}
+                                            value={discount || ''}
+                                            onChange={(e) => setDiscount(e.target.value)}
+                                            placeholder="$ 0"
+                                            className="w-24 bg-orange-50 ring-1 ring-orange-200 rounded-lg px-2 py-1.5 text-xs font-black text-orange-700 outline-none focus:ring-orange-400"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={discountReason}
+                                            onChange={(e) => setDiscountReason(e.target.value)}
+                                            placeholder="Motivo (opcional)"
+                                            className="flex-1 bg-gray-50 ring-1 ring-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none focus:ring-primary"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-end mb-1">
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subtotal</span>
+                                    <span className="text-sm font-bold text-gray-400">${subtotal.toLocaleString()}</span>
+                                </div>
+                                {discountAmount > 0 && (
+                                    <div className="flex justify-between items-end mb-1">
+                                        <span className="text-[10px] font-black text-orange-400 uppercase tracking-widest">Descuento</span>
+                                        <span className="text-sm font-black text-orange-500">-${discountAmount.toLocaleString()}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-end mb-4 pt-1 border-t border-gray-100">
                                     <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Total a Pagar</span>
                                     <span className="text-2xl font-black text-secondary tracking-tight">${total.toLocaleString()}</span>
                                 </div>

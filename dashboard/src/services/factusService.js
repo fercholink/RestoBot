@@ -192,6 +192,7 @@ const factusService = {
         catch { throw new Error(`Factus respondió con un formato inesperado (HTTP ${response.status})`); }
 
         if (!response.ok) {
+            console.error('[Factus] createInvoice - Error HTTP', response.status, '- Respuesta:', JSON.stringify(data, null, 2));
             throw new Error(_parseFactusError(data, response.status));
         }
 

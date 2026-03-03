@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Utensils, Settings, Wallet, LayoutGrid, Filter, Calendar, MapPin, Home, TrendingUp, Clock, DollarSign, Package, ChevronLeft, ChevronRight, X, Eye, EyeOff, Truck } from 'lucide-react';
 import OrderCard from './OrderCard';
@@ -45,6 +45,36 @@ const RestaurantManagement = ({
     const [showPaidTotal, setShowPaidTotal] = useState(false);
     const [shouldAutoOpenShift, setShouldAutoOpenShift] = useState(false);
     const [showPaidModal, setShowPaidModal] = useState(false);
+
+    // Notificación de sonido para rol cocina cuando llegan pedidos nuevos
+    const prevOrderCountRef = useRef(null);
+    useEffect(() => {
+        if (role !== 'cocina') return;
+        const newCount = orders.filter(o => o.status === 'nuevo').length;
+        if (prevOrderCountRef.current !== null && newCount > prevOrderCountRef.current) {
+            try {
+                // eslint-disable-next-line
+                const AudioCtx = window.AudioContext || (/** @type {any} */ (window)).webkitAudioContext;
+                const ctx = new AudioCtx();
+                const playBeep = (freq, start, dur) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = freq;
+                    osc.type = 'sine';
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime + start);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+                    osc.start(ctx.currentTime + start);
+                    osc.stop(ctx.currentTime + start + dur);
+                };
+                playBeep(880, 0,    0.12);
+                playBeep(1100, 0.15, 0.12);
+                playBeep(880, 0.3,  0.18);
+            } catch (e) { /* AudioContext no disponible */ }
+        }
+        prevOrderCountRef.current = newCount;
+    }, [orders, role]);
 
     React.useEffect(() => {
         const handleOpenShiftModal = () => {

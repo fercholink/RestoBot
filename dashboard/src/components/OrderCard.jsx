@@ -1,6 +1,6 @@
 import React from 'react';
-import { Package, MapPin, User, Clock, CheckCircle2, Truck, Rocket, CreditCard, Utensils, X, Plus, Edit2, Trash2, Printer, MessageCircle, Hotel } from 'lucide-react';
-import { format, differenceInSeconds, parseISO } from 'date-fns';
+import { Package, MapPin, User, Clock, CheckCircle2, Truck, Rocket, CreditCard, Utensils, X, Plus, Edit2, Trash2, Printer, MessageCircle, Hotel, AlertTriangle } from 'lucide-react';
+import { format, differenceInSeconds, differenceInMinutes, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const statusIcons = {
@@ -13,6 +13,7 @@ const statusIcons = {
 const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact = false, isMinimal = false }) => {
     const [isExpanded, setIsExpanded] = React.useState(false);
     const [elapsed, setElapsed] = React.useState('');
+    const [urgencyMinutes, setUrgencyMinutes] = React.useState(0);
 
     React.useEffect(() => {
         // El tiempo solo se detiene definitivamente cuando el pedido está pagado
@@ -39,12 +40,12 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
                 const created = parseISO(order.created_at);
 
                 let diff = differenceInSeconds(now, created);
-
                 if (diff < 0) diff = 0;
 
                 const mins = Math.floor(diff / 60);
                 const secs = diff % 60;
                 setElapsed(`${mins}m ${secs.toString().padStart(2, '0')}s`);
+                setUrgencyMinutes(mins);
             } catch (e) {
                 console.error("Timer error:", e);
                 setElapsed("--:--");
@@ -141,8 +142,27 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
         );
     }
 
+    // Urgency only for active (non-paid) orders
+    const isActive = order.status !== 'pagado' && order.status !== 'cancelado';
+    const urgencyClass = isActive && urgencyMinutes >= 20
+        ? 'border-red-400 border-2 shadow-red-100'
+        : isActive && urgencyMinutes >= 10
+        ? 'border-amber-400 border-2 shadow-amber-100'
+        : 'border-white';
+
     return (
-        <div className="bg-white rounded-2xl p-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white hover:border-primary/20 transition-all mb-3 group ring-1 ring-black/5 relative">
+        <div className={`bg-white rounded-2xl p-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-primary/20 transition-all mb-3 group ring-1 ring-black/5 relative ${urgencyClass} ${isActive && urgencyMinutes >= 20 ? 'animate-pulse-border' : ''}`}>
+            {/* Badge de urgencia */}
+            {isActive && urgencyMinutes >= 20 && (
+                <div className="absolute -top-2 left-3 flex items-center gap-1 bg-red-500 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-sm z-10">
+                    <AlertTriangle size={9} /> URGENTE
+                </div>
+            )}
+            {isActive && urgencyMinutes >= 10 && urgencyMinutes < 20 && (
+                <div className="absolute -top-2 left-3 flex items-center gap-1 bg-amber-400 text-white text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shadow-sm z-10">
+                    <AlertTriangle size={9} /> DEMORADO
+                </div>
+            )}
             {/* Boton para colapsar si está pagado o forzado compacto */}
             {(order.status === 'pagado' || isCompact) && (
                 <button

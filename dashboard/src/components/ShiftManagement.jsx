@@ -69,7 +69,7 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
             setShifts(allShifts);
         } catch (error) {
             console.error('Error fetching shifts:', error);
-            alert('Error cargando turnos: ' + error.message);
+            sileo.error({ title: 'Error cargando turnos', description: error.message });
         } finally {
             setLoading(false);
         }

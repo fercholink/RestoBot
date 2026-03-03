@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Printer, Bed, Calendar, Key, Users, History, Settings, Bell, Star, MapPin, Search, Plus, Loader, Trash2, Edit, Tv, Wifi, Wind, ChevronLeft, ChevronRight, Building, Check, Hash, LayoutList, Columns, Inbox, AlertCircle } from 'lucide-react';
+import { Printer, Bed, Calendar, Key, Users, History, Settings, Bell, Star, MapPin, Search, Plus, Loader, Trash2, Edit, Tv, Wifi, Wind, ChevronLeft, ChevronRight, Building, Check, Hash, LayoutList, Columns, Inbox, AlertCircle, Wrench, Filter, X, DollarSign } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { sileo } from 'sileo';
+import { emitInvoiceForOrder } from '../services/invoiceHelper';
 import NewReservationModal from './NewReservationModal';
 import RoomModal from './RoomModal';
 import ReservationDetailsModal from './ReservationDetailsModal';
@@ -9,6 +11,10 @@ import PaymentModal from './PaymentModal';
 import TicketPrinter from './TicketPrinter';
 import FloorManager from './FloorManager';
 import ChannelInbox from './ChannelInbox';
+import TapeChart from './TapeChart';
+import HousekeepingApp from './HousekeepingApp';
+import HotelAnalytics from './HotelAnalytics';
+import GuestCRM from './GuestCRM';
 
 // Helper Component for Cleaning Timer
 const CleaningTimer = ({ startTime }) => {
@@ -79,6 +85,10 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
     const [editingRoom, setEditingRoom] = useState(null);
     const [lastReceipt, setLastReceipt] = useState(null);
     const [historyBookings, setHistoryBookings] = useState([]);
+
+    // Búsqueda y filtro de habitaciones
+    const [roomSearch, setRoomSearch] = useState('');
+    const [roomStatusFilter, setRoomStatusFilter] = useState('all');
 
     // ... (resto del código sin cambios hasta handleQuickCheckout)
 
@@ -228,8 +238,7 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
 
         } catch (error) {
             console.error('Error loading branch data:', error);
-            alert("⚠️ ERROR CRÍTICO CARGANDO DATOS:\n\n" + (error.message || JSON.stringify(error)));
-            // sileo.error({ title: "Error de Carga", description: error.message });
+            sileo.error({ title: 'Error de Carga', description: error.message || JSON.stringify(error) });
         } finally {
             setLoading(false);
         }
@@ -277,6 +286,11 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
 
     // Calcula el estado actual de una habitación basado en la fecha seleccionada
     const getRoomCurrentStatus = (room) => {
+        // 0. Mantenimiento prevalece sobre todo (campo directo o housekeeping_status)
+        if (room.status === 'mantenimiento' || room.housekeeping_status === 'mantenimiento') {
+            return { status: 'mantenimiento', booking: null };
+        }
+
         // 1. Si está en limpieza hoy, prevalece (si la fecha seleccionada es HOY)
         const isToday = currentDate.toDateString() === new Date().toDateString();
         if (isToday && room.status === 'limpieza') {
@@ -332,7 +346,7 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
         setLoading(true);
         try {
             // Validar solapamiento de fechas
-            const { data: conflicts, error: conflictError } = await supabase
+            const { data: conflicts } = await supabase
                 .from('bookings')
                 .select('id')
                 .eq('room_id', reservationData.room_id)
@@ -340,16 +354,11 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                 .neq('status', 'checkout')
                 .or(`and(check_in.lte.${reservationData.check_out},check_out.gte.${reservationData.check_in})`);
 
-            // Nota: La consulta OR de arriba es simplificada, para validación robusta postgreSQL range types son mejores.
-            // Pero para MVP, confiamos en la lógica de cliente o backend simple.
-
-            /*
             if (conflicts && conflicts.length > 0) {
-                alert("Ya existe una reserva para esta habitación en las fechas seleccionadas.");
+                sileo.error({ title: 'Conflicto de fechas', description: 'Ya existe una reserva para esta habitación en las fechas seleccionadas.' });
                 setLoading(false);
                 return;
             }
-            */
 
             const { error } = await supabase
                 .from('bookings')
@@ -367,7 +376,7 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
 
         } catch (error) {
             console.error("Error creando reserva:", error);
-            alert("Error al crear reserva: " + error.message);
+            sileo.error({ title: 'Error al crear reserva', description: error.message });
         } finally {
             setLoading(false);
         }
@@ -387,7 +396,7 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
             await loadBranchData();
         } catch (error) {
             console.error("Error actualizando reserva:", error);
-            alert("Error: " + error.message);
+            sileo.error({ title: 'Error al actualizar reserva', description: error.message });
         } finally {
             setLoading(false);
         }
@@ -422,12 +431,15 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
 
             // 2. Liberar habitación (Poner en limpieza) y guardar hora de inicio
             // Usamos la columna features para guardar el timestamp sin migración
+            const currentRoom = rooms.find(r => r.id === booking.room_id);
+            const currentFeatures = currentRoom?.features || {};
+
             const { error: roomError } = await supabase
                 .from('rooms')
                 .update({
                     status: 'limpieza',
                     features: {
-                        ...booking.room?.features,
+                        ...currentFeatures,
                         cleaning_start: new Date().toISOString()
                     }
                 })
@@ -473,10 +485,20 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
 
             if (orderError) {
                 console.error("Error creating shadow order:", orderError);
-                // Avisar pero no bloquear el checkout
-                alert(`⚠️ Checkout realizado, pero no se pudo registrar en contabilidad:\n${orderError.message}\n\nRevisa la consola para más detalles.`);
+                sileo.error({ title: 'Advertencia Contabilidad', description: `Checkout realizado, pero no se registró en contabilidad: ${orderError.message}` });
             } else {
                 console.log('[Hotel] Shadow order creado:', orderData.id);
+
+                // Auto-factura electrónica: si el huésped proporcionó datos fiscales, emitir DIAN automáticamente
+                if (taxData?.identification) {
+                    sileo.info({ title: 'Generando factura DIAN...', description: 'Emitiendo factura electrónica en Factus.' });
+                    const invoiceResult = await emitInvoiceForOrder({ ...orderData, tax_data: taxData });
+                    if (invoiceResult.success) {
+                        sileo.success({ title: '✓ Factura Electrónica Emitida', description: `Documento ${invoiceResult.bill.number} registrado ante la DIAN.` });
+                    } else {
+                        sileo.error({ title: 'Error Factura Electrónica', description: invoiceResult.error + ' — Puedes emitirla manualmente en Contabilidad → Facturación DIAN.' });
+                    }
+                }
 
                 // Crear Items del Pedido (Alojamiento + Extras)
                 const orderItems = [];
@@ -598,7 +620,7 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
             setSelectedBooking(null); // Close modal
         } catch (error) {
             console.error("Error en checkout:", error);
-            alert("Error al procesar salida: " + error.message);
+            sileo.error({ title: 'Error en Checkout', description: error.message });
             await loadBranchData();
         } finally {
             setLoading(false);
@@ -606,8 +628,6 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
     };
 
     const handleCheckIn = async (booking) => {
-        if (!confirm(`¿Confirmar ingreso (Check-In) para ${booking.guest?.full_name || 'el huésped'}?`)) return;
-
         setLoading(true);
         try {
             const { error } = await supabase
@@ -616,27 +636,62 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                 .eq('id', booking.id);
             if (error) throw error;
 
+            sileo.success({ title: 'Check-In realizado', description: `${booking.guest?.full_name || 'Huésped'} ha ingresado.` });
             await loadBranchData();
         } catch (error) {
             console.error("Error en check-in:", error);
-            alert("Error al procesar ingreso: " + error.message);
+            sileo.error({ title: 'Error en Check-In', description: error.message });
         } finally {
             setLoading(false);
         }
     };
 
     const handleFinishCleaning = async (room) => {
-        if (!confirm(`¿La habitación ${room.number} está limpia y lista para usar?`)) return;
         setLoading(true);
         try {
             const { error } = await supabase
                 .from('rooms')
-                .update({ status: 'disponible' })
+                .update({ status: 'disponible', housekeeping_status: 'limpio' })
                 .eq('id', room.id);
             if (error) throw error;
+            sileo.success({ title: 'Limpieza finalizada', description: `Hab. ${room.number} disponible.` });
             await loadBranchData();
         } catch (error) {
-            alert("Error: " + error.message);
+            sileo.error({ title: 'Error', description: error.message });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSetMaintenance = async (room) => {
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('rooms')
+                .update({ status: 'mantenimiento', housekeeping_status: 'mantenimiento' })
+                .eq('id', room.id);
+            if (error) throw error;
+            sileo.success({ title: 'Mantenimiento activado', description: `Hab. ${room.number} en mantenimiento.` });
+            await loadBranchData();
+        } catch (error) {
+            sileo.error({ title: 'Error', description: error.message });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEndMaintenance = async (room) => {
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('rooms')
+                .update({ status: 'disponible', housekeeping_status: 'limpio' })
+                .eq('id', room.id);
+            if (error) throw error;
+            sileo.success({ title: 'Mantenimiento finalizado', description: `Hab. ${room.number} disponible.` });
+            await loadBranchData();
+        } catch (error) {
+            sileo.error({ title: 'Error', description: error.message });
         } finally {
             setLoading(false);
         }
@@ -728,7 +783,7 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
 
         } catch (error) {
             console.error("Error al imprimir histórico:", error);
-            alert("Error: " + error.message);
+            sileo.error({ title: 'Error al imprimir', description: error.message });
         } finally {
             setLoading(false);
         }
@@ -741,10 +796,23 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
     // Agrupar habitaciones por piso (Floor)
     // Estructura: Floors explícitos de la DB + Habitaciones huérfanas
     const getFloorGroups = () => {
+        const applyFilters = (r) => {
+            if (roomSearch) {
+                const q = roomSearch.toLowerCase();
+                if (!r.number?.toString().toLowerCase().includes(q) &&
+                    !r.type?.toLowerCase().includes(q)) return false;
+            }
+            if (roomStatusFilter !== 'all') {
+                const { status } = getRoomCurrentStatus(r);
+                if (status !== roomStatusFilter) return false;
+            }
+            return true;
+        };
+
         const groups = floors.map(floor => ({
             id: floor.id,
             name: floor.name || `Piso ${floor.floor_number}`,
-            rooms: rooms.filter(r => r.floor_id === floor.id)
+            rooms: rooms.filter(r => r.floor_id === floor.id && applyFilters(r))
         }));
 
         // Calculate stats for each group
@@ -759,7 +827,7 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
         });
 
         // Buscar habitaciones sin piso asignado (Huérfanas)
-        const orphanRooms = rooms.filter(r => !r.floor_id);
+        const orphanRooms = rooms.filter(r => !r.floor_id && applyFilters(r));
         if (orphanRooms.length > 0) {
             groups.push({
                 id: 'orphan',
@@ -849,6 +917,52 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                         </button>
                     </div>
 
+                    {/* Search + Status Filter (solo tab habitaciones) */}
+                    {activeSubTab === 'habitaciones' && (
+                        <>
+                            {/* Search */}
+                            <div className="relative">
+                                <Search size={11} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar hab..."
+                                    value={roomSearch}
+                                    onChange={e => setRoomSearch(e.target.value)}
+                                    className="pl-7 pr-6 py-1.5 bg-white border border-gray-200 rounded-xl text-[10px] font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20 w-28 shadow-sm"
+                                />
+                                {roomSearch && (
+                                    <button onClick={() => setRoomSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500">
+                                        <X size={10} />
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Status Filter */}
+                            <div className="flex items-center gap-0.5 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
+                                {[
+                                    { val: 'all', label: 'Todo' },
+                                    { val: 'disponible', label: 'D', cls: 'text-emerald-600 hover:bg-emerald-50' },
+                                    { val: 'reservada', label: 'R', cls: 'text-orange-600 hover:bg-orange-50' },
+                                    { val: 'ocupada', label: 'O', cls: 'text-primary hover:bg-primary/10' },
+                                    { val: 'limpieza', label: 'L', cls: 'text-yellow-600 hover:bg-yellow-50' },
+                                    { val: 'mantenimiento', label: 'M', cls: 'text-violet-600 hover:bg-violet-50' },
+                                ].map(({ val, label, cls = '' }) => (
+                                    <button
+                                        key={val}
+                                        onClick={() => setRoomStatusFilter(val)}
+                                        className={`px-2 py-1 rounded-lg text-[9px] font-black transition-all ${roomStatusFilter === val
+                                                ? 'bg-secondary text-white shadow-sm'
+                                                : `text-gray-400 ${cls}`
+                                            }`}
+                                        title={val}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
+
                     {/* New Room Button */}
                     <button
                         onClick={() => { setEditingRoom(null); setIsRoomModalOpen(true); }}
@@ -903,6 +1017,7 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                                                 {group.stats.reservada > 0 && <span className="px-1.5 py-0.5 rounded-md bg-orange-100 text-orange-700 text-[9px] font-bold" title="Reservadas">{group.stats.reservada} R</span>}
                                                 {group.stats.ocupada > 0 && <span className="px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 text-[9px] font-bold" title="Ocupadas">{group.stats.ocupada} O</span>}
                                                 {group.stats.limpieza > 0 && <span className="px-1.5 py-0.5 rounded-md bg-yellow-100 text-yellow-700 text-[9px] font-bold" title="Limpieza">{group.stats.limpieza} L</span>}
+                                                {group.stats.mantenimiento > 0 && <span className="px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-700 text-[9px] font-bold animate-pulse" title="Mantenimiento">{group.stats.mantenimiento} M</span>}
                                             </div>
                                         </div>
                                     </div>
@@ -922,16 +1037,22 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                                                 <div key={room.id} className="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all relative group flex flex-col justify-between overflow-hidden">
 
                                                     {/* Header Card: Status & Edit */}
-                                                    <div className={`p-1.5 flex justify-between items-start ${status === 'ocupada' ? 'bg-primary/5' : status === 'reservada' ? 'bg-orange-50' : status === 'limpieza' ? 'bg-yellow-50' : 'bg-gray-50/50'}`}>
+                                                    <div className={`p-1.5 flex justify-between items-start ${status === 'ocupada' ? 'bg-primary/5' :
+                                                            status === 'reservada' ? 'bg-orange-50' :
+                                                                status === 'limpieza' ? 'bg-yellow-50' :
+                                                                    status === 'mantenimiento' ? 'bg-violet-50' :
+                                                                        'bg-gray-50/50'}`}>
                                                         <div className={`p-1 rounded-lg shadow-sm ${status === 'ocupada' ? 'bg-primary text-white' :
-                                                            status === 'reservada' ? 'bg-orange-500 text-white' :
-                                                                status === 'limpieza' ? 'bg-yellow-400 text-white' :
-                                                                    'bg-emerald-500 text-white'
+                                                                status === 'reservada' ? 'bg-orange-500 text-white' :
+                                                                    status === 'limpieza' ? 'bg-yellow-400 text-white' :
+                                                                        status === 'mantenimiento' ? 'bg-violet-500 text-white' :
+                                                                            'bg-emerald-500 text-white'
                                                             }`}>
                                                             {status === 'limpieza' ? <Wind size={12} className="animate-spin-slow" /> :
                                                                 status === 'ocupada' ? <Users size={12} /> :
                                                                     status === 'reservada' ? <Calendar size={12} /> :
-                                                                        <Key size={12} />}
+                                                                        status === 'mantenimiento' ? <Wrench size={12} /> :
+                                                                            <Key size={12} />}
                                                         </div>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); setEditingRoom(room); setIsRoomModalOpen(true); }}
@@ -945,7 +1066,12 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                                                     {/* Body: Info */}
                                                     <div className="px-2 py-1 text-center">
                                                         <h4 className="text-sm font-black text-secondary tracking-tight">#{room.number}</h4>
-                                                        <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-1 truncate">{room.type}</p>
+                                                        <p className="text-[8px] font-bold text-gray-400 uppercase tracking-wider truncate">{room.type}</p>
+                                                        {room.base_price > 0 && (
+                                                            <p className="text-[9px] font-black text-secondary mb-1 flex items-center justify-center gap-0.5">
+                                                                <DollarSign size={8} className="text-gray-400" />{room.base_price.toLocaleString()}
+                                                            </p>
+                                                        )}
 
                                                         {/* Amenities Row */}
                                                         <div className="flex justify-center gap-1 mb-1 flex-wrap min-h-[16px]">
@@ -979,35 +1105,61 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                                                     {/* Footer: Actions */}
                                                     <div className="p-1.5 bg-gray-50/50 border-t border-gray-100 flex flex-col gap-1">
                                                         {status === 'disponible' ? (
-                                                            <div className="grid grid-cols-2 gap-1">
+                                                            <div className="flex flex-col gap-1">
+                                                                <div className="grid grid-cols-2 gap-1">
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setPreSelectedBooking({ roomId: room.id, checkIn: new Date().toISOString().split('T')[0], status: 'ocupada' });
+                                                                            setIsNewReservationModalOpen(true);
+                                                                        }}
+                                                                        className="bg-secondary text-white py-1 rounded text-[8px] font-black uppercase hover:bg-secondary/90 shadow-sm"
+                                                                        title="Check-In Rápido"
+                                                                    >
+                                                                        IN
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setPreSelectedBooking({ roomId: room.id, checkIn: new Date().toISOString().split('T')[0] });
+                                                                            setIsNewReservationModalOpen(true);
+                                                                        }}
+                                                                        className="bg-white text-secondary border border-gray-200 py-1 rounded text-[8px] font-black uppercase hover:bg-gray-50 shadow-sm"
+                                                                        title="Reservar"
+                                                                    >
+                                                                        RES
+                                                                    </button>
+                                                                </div>
                                                                 <button
-                                                                    onClick={() => {
-                                                                        setPreSelectedBooking({ roomId: room.id, checkIn: new Date().toISOString().split('T')[0], status: 'ocupada' });
-                                                                        setIsNewReservationModalOpen(true);
-                                                                    }}
-                                                                    className="bg-secondary text-white py-1 rounded text-[8px] font-black uppercase hover:bg-secondary/90 shadow-sm"
-                                                                    title="Check-In Rápido"
+                                                                    onClick={() => handleSetMaintenance(room)}
+                                                                    className="w-full bg-violet-50 text-violet-600 border border-violet-200 py-1 rounded text-[8px] font-black uppercase hover:bg-violet-100 flex items-center justify-center gap-1"
+                                                                    title="Poner en Mantenimiento"
                                                                 >
-                                                                    IN
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setPreSelectedBooking({ roomId: room.id, checkIn: new Date().toISOString().split('T')[0] });
-                                                                        setIsNewReservationModalOpen(true);
-                                                                    }}
-                                                                    className="bg-white text-secondary border border-gray-200 py-1 rounded text-[8px] font-black uppercase hover:bg-gray-50 shadow-sm"
-                                                                    title="Reservar"
-                                                                >
-                                                                    RES
+                                                                    <Wrench size={8} /> MANT
                                                                 </button>
                                                             </div>
-                                                        ) : status === 'limpieza' ? (
+                                                        ) : status === 'mantenimiento' ? (
                                                             <button
-                                                                onClick={() => handleFinishCleaning(room)}
-                                                                className="w-full bg-yellow-400 text-white py-1 rounded text-[8px] font-black uppercase hover:bg-yellow-500 shadow-sm flex items-center justify-center gap-1"
+                                                                onClick={() => handleEndMaintenance(room)}
+                                                                className="w-full bg-violet-500 text-white py-1 rounded text-[8px] font-black uppercase hover:bg-violet-600 shadow-sm flex items-center justify-center gap-1"
+                                                                title="Marcar como Disponible"
                                                             >
-                                                                <Check size={10} /> OK
+                                                                <Check size={10} /> LISTO
                                                             </button>
+                                                        ) : status === 'limpieza' ? (
+                                                            <div className="grid grid-cols-2 gap-1">
+                                                                <button
+                                                                    onClick={() => handleFinishCleaning(room)}
+                                                                    className="bg-yellow-400 text-white py-1 rounded text-[8px] font-black uppercase hover:bg-yellow-500 shadow-sm flex items-center justify-center gap-1"
+                                                                >
+                                                                    <Check size={10} /> OK
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleSetMaintenance(room)}
+                                                                    className="bg-violet-50 text-violet-600 border border-violet-200 py-1 rounded text-[8px] font-black uppercase hover:bg-violet-100 flex items-center justify-center gap-1"
+                                                                    title="Mantenimiento"
+                                                                >
+                                                                    <Wrench size={8} />
+                                                                </button>
+                                                            </div>
                                                         ) : (
                                                             <div className="grid grid-cols-2 gap-1">
                                                                 <button
@@ -1314,6 +1466,28 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                         )}
                     </div>
                 </div>
+            ) : activeSubTab === 'cinta' ? (
+                <div className="h-[calc(100vh-180px)]">
+                    <TapeChart
+                        rooms={rooms}
+                        bookings={bookings}
+                        onBookingClick={(booking) => {
+                            setSelectedBooking(booking);
+                        }}
+                    />
+                </div>
+            ) : activeSubTab === 'limpieza' ? (
+                <div className="h-[calc(100vh-180px)] overflow-y-auto custom-scrollbar">
+                    <HousekeepingApp selectedBranchId={selectedBranchId} />
+                </div>
+            ) : activeSubTab === 'crm' ? (
+                <div className="h-[calc(100vh-180px)] overflow-y-auto custom-scrollbar">
+                    <GuestCRM selectedBranchId={selectedBranchId} />
+                </div>
+            ) : activeSubTab === 'analitica' ? (
+                <div className="h-[calc(100vh-180px)] overflow-y-auto custom-scrollbar">
+                    <HotelAnalytics selectedBranchId={selectedBranchId} />
+                </div>
             ) : null}
 
             {/* --- MODALES --- */}
@@ -1345,6 +1519,11 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                     booking={selectedBooking}
                     isOpen={!!selectedBooking}
                     onClose={() => setSelectedBooking(null)}
+                    onBookingUpdated={loadBranchData}
+                    onEdit={(booking) => {
+                        setPreSelectedBooking(booking);
+                        setIsNewReservationModalOpen(true);
+                    }}
                     onCheckOut={(booking, taxData, extraData) => {
                         handleQuickCheckout(booking, taxData, extraData);
                     }}

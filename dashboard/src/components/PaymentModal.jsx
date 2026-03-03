@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Banknote, Landmark, CheckCircle2, FileText, ChevronDown, Hotel, Search, Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { sileo } from 'sileo';
 import ThirdPartyModal from './accounting/ThirdPartyModal';
 
 const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
@@ -85,12 +86,12 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
 
         // Validation for Hotel Charge
         if (method === 'cargo_habitacion' && !selectedBooking) {
-            alert("Por favor seleccione una habitación");
+            sileo.error({ title: 'Campo requerido', description: 'Seleccione una habitación para el cargo.' });
             return;
         }
 
         if (isElectronic && !selectedThirdParty) {
-            alert("Por favor seleccione un cliente/tercero para la factura electrónica.");
+            sileo.error({ title: 'Campo requerido', description: 'Seleccione un tercero para la factura electrónica.' });
             return;
         }
 

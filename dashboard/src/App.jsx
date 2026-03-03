@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { differenceInSeconds, parseISO } from 'date-fns';
 import { updateOrderStatus } from './api';
 import { useAuth } from './context/AuthContext';
 import { useRealtime } from './context/RealtimeContext';
@@ -24,6 +25,7 @@ import NotificationPanel from './components/NotificationPanel';
 import DigitalCheckIn from './components/DigitalCheckIn';
 import { LayoutGrid, Filter, Plus, Building2, ShieldCheck, Wallet, Activity } from 'lucide-react';
 import { Toaster, sileo } from 'sileo';
+import { emitInvoiceForOrder } from './services/invoiceHelper';
 import "./styles/sileo.css";
 
 // Mock data para previsualizar antes de conectar n8n
@@ -309,7 +311,7 @@ function App() {
         }
         // Opción 3: Abrir Modal de Pago
         else {
-          setPaymentModal({ isOpen: true, orderId, totalPrice: order.total });
+          setPaymentModal({ isOpen: true, orderId, totalPrice: order.total || order.total_price || 0 });
           return;
         }
       }
@@ -362,7 +364,6 @@ function App() {
         // para asegurarnos que n8n o el update posterior tengan la info completa
         let prepTime = 0;
         if (order && order.created_at) {
-          const { differenceInSeconds, parseISO } = require('date-fns');
           prepTime = Math.max(0, differenceInSeconds(new Date(), parseISO(order.created_at)));
         }
 
@@ -376,13 +377,20 @@ function App() {
           .eq('id', orderId);
 
         sileo.success({ title: 'Cargo a Habitación', description: `Pedido #${orderId} cargado a la habitación.` });
+        // Imprimir recibo para cargo a habitación
+        handlePrint({ ...order, status: 'pagado', payment_method: 'cargo_habitacion', preparation_time_seconds: prepTime }, 'recibo');
       }
 
       // Optimistic UI update
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
 
+      // Imprimir recibo para pedidos pre-pagados al finalizar (evitar duplicar cargo_habitacion)
+      if (newStatus === 'pagado' && order?.is_paid && paymentDetails?.method !== 'cargo_habitacion') {
+        const prepTime = order.created_at ? Math.max(0, differenceInSeconds(new Date(), parseISO(order.created_at))) : 0;
+        handlePrint({ ...order, status: 'pagado', preparation_time_seconds: prepTime }, 'recibo');
+      }
+
       // Delegar la actualización a n8n para activar triggers (ej. WhatsApp, Factus)
-      // Nota: Si ya actualizamos arriba, n8n podría redudnar, pero sirve para notificaciones.
       await updateOrderStatus(orderId, newStatus);
 
     } catch (error) {
@@ -395,7 +403,6 @@ function App() {
         if (newStatus === 'pagado') {
           const order = orders.find(o => o.id === orderId);
           if (order && order.created_at) {
-            const { differenceInSeconds, parseISO } = require('date-fns');
             updatePayload.preparation_time_seconds = Math.max(0, differenceInSeconds(new Date(), parseISO(order.created_at)));
           }
         }
@@ -563,7 +570,6 @@ function App() {
       const order = orders.find(o => o.id === orderId);
       let prepTime = 0;
       if (order && order.created_at) {
-        const { differenceInSeconds, parseISO } = require('date-fns');
         prepTime = Math.max(0, differenceInSeconds(new Date(), parseISO(order.created_at)));
       }
 
@@ -583,7 +589,7 @@ function App() {
             .insert([{
               booking_id: bookingId,
               description: `Consumo Restaurante - Pedido #${orderId}`,
-              amount: order.total_price,
+              amount: order.total || order.total_price || 0,
               order_id: orderId
             }]);
 
@@ -607,6 +613,26 @@ function App() {
       // Imprimir recibo
       if (order) handlePrint({ ...order, ...updates, tax_data: taxData }, 'recibo');
 
+      // 10. EMISIÓN AUTOMÁTICA DE FACTURA ELECTRÓNICA
+      // Si se proporcionaron datos fiscales (ej: third_party_id de un cliente), emitir DIAN
+      if (taxData?.third_party_id || taxData?.identification) {
+        // Ejecutar en segundo plano para no bloquear al cajero
+        (async () => {
+          try {
+            console.log('[App] Iniciando auto-factura para pedido:', orderId);
+            const res = await emitInvoiceForOrder({ ...order, ...updates, tax_data: taxData });
+            if (res.success) {
+              sileo.success({ title: 'Factura DIAN Emitida', description: `Pedido #${orderId} registrado ante la DIAN (${res.bill.number}).` });
+            } else {
+              // Si falla la auto-emisión, notificar para que lo hagan manual en Contabilidad
+              sileo.warning({ title: 'Factura DIAN Pendiente', description: `Error al emitir: ${res.error}. Por favor reintenta desde Contabilidad → Facturación.` });
+            }
+          } catch (err) {
+            console.error('[App] Error en auto-factura:', err);
+          }
+        })();
+      }
+
     } catch (error) {
       console.error("Error procesando pago:", error);
       sileo.error({ title: 'Error en el pago', description: error.message });
@@ -623,12 +649,12 @@ function App() {
 
   // Esta función ahora será llamada por NewOrderModal cuando termine de insertar en Supabase
   // O simplemente el Realtime lo hará. Para compatibilidad, la mantenemos como "refetch"
-  const handleAddOrder = (newOrder) => {
-    // Si NewOrderModal ya insertó en BD, aquí solo esperamos el Realtime.
-    // Pero si NewOrderModal nos pasa el objeto para insertar, lo hacemos aquí.
-    // POR AHORA: Asumiremos que NewOrderModal será refactorizado para insertar DIRECTAMENTE en Supabase.
-    // Así que esta función puede ser un simple fetchOrders() o empty si confiamos en Realtime.
+  const handleAddOrder = (newOrder = null) => {
     fetchOrders();
+    // Si el pedido fue creado como pre-pagado, imprimir recibo inmediatamente
+    if (newOrder?.is_paid) {
+      handlePrint(newOrder, 'recibo');
+    }
   };
 
   // --- PUBLIC ROUTES (No login required) ---

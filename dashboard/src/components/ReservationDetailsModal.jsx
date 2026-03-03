@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Calendar, User, CreditCard, Trash2, LogOut, Edit, FileText } from 'lucide-react';
+import { X, Calendar, User, CreditCard, Trash2, LogOut, Edit, FileText, Share2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, onEdit, onCheckOut }) => {
@@ -31,8 +31,6 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
                 .update({ status: 'finalizada' }) // Or whatever status determines history
                 .eq('id', booking.id);
 
-            if (error) throw error;
-            onBookingUpdated();
             if (error) throw error;
             onBookingUpdated();
             onClose();
@@ -257,6 +255,16 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
 
                         {/* Actions */}
                         <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-100">
+                            <button
+                                onClick={() => {
+                                    const link = `${window.location.origin}/?id=${booking.id}`;
+                                    navigator.clipboard.writeText(link);
+                                    alert('Link de Check-in copiado al portapapeles');
+                                }}
+                                className="bg-blue-50 hover:bg-blue-100 text-blue-600 py-3 rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 transition-colors border border-blue-100"
+                            >
+                                <Share2 size={16} /> Link Check-in
+                            </button>
                             {booking.status !== 'checkout' && (
                                 <button
                                     onClick={() => {
@@ -271,9 +279,9 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
                             {booking.status === 'reservada' && (
                                 <button
                                     onClick={handleDelete}
-                                    className="bg-red-50 hover:bg-red-100 text-red-500 py-3 rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 transition-colors"
+                                    className="col-span-2 bg-red-50 hover:bg-red-100 text-red-500 py-3 rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 transition-colors mt-1"
                                 >
-                                    <Trash2 size={16} /> Cancelar
+                                    <Trash2 size={16} /> Cancelar Reserva
                                 </button>
                             )}
                         </div>

@@ -1,0 +1,132 @@
+{
+    "name": "Hotel_Guest_Experience_Agent_v1",
+    "nodes": [
+        {
+            "parameters": {
+                "event": "insert",
+                "table": "bookings",
+                "schema": "public"
+            },
+            "name": "On_New_Booking",
+            "type": "n8n-nodes-base.supabaseTrigger",
+            "typeVersion": 1,
+            "position": [
+                100,
+                300
+            ],
+            "id": "supabase-trigger"
+        },
+        {
+            "parameters": {
+                "operation": "get",
+                "id": "={{ $json.room_id }}",
+                "table": "rooms"
+            },
+            "name": "Get_Room_Details",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                300,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "get",
+                "id": "={{ $json.guest_id }}",
+                "table": "guests"
+            },
+            "name": "Get_Guest_Details",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                300,
+                150
+            ]
+        },
+        {
+            "parameters": {
+                "model": "gpt-4o",
+                "prompt": "Escribe un mensaje de bienvenida de WhatsApp amable y profesional para un hotel.\nHuésped: {{ $('Get_Guest_Details').item.json.full_name }}\nHabitación: {{ $('Get_Room_Details').item.json.number }}\nCheck-in: {{ $node[\"On_New_Booking\"].json.check_in }}\n\nIncluye este link para el check-in digital: https://tu-hotel.com/checkin?id={{ $node[\"On_New_Booking\"].json.id }}\nY la clave del WiFi: 'Guest2024*'.",
+                "options": {}
+            },
+            "name": "Generate_Welcome_AI",
+            "type": "n8n-nodes-base.openAi",
+            "typeVersion": 1,
+            "position": [
+                550,
+                220
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "send",
+                "phoneNumberId": "TU_PHONE_ID",
+                "recipientPhoneNumber": "={{ $('Get_Guest_Details').item.json.phone }}",
+                "textBody": "={{ $json.choices[0].message.content }}",
+                "additionalFields": {}
+            },
+            "name": "Send_WhatsApp_Welcome",
+            "type": "n8n-nodes-base.whatsApp",
+            "typeVersion": 1.1,
+            "position": [
+                750,
+                220
+            ]
+        },
+        {
+            "parameters": {
+                "event": "update",
+                "table": "bookings",
+                "schema": "public"
+            },
+            "name": "On_Checkout",
+            "type": "n8n-nodes-base.supabaseTrigger",
+            "typeVersion": 1,
+            "position": [
+                100,
+                500
+            ]
+        }
+    ],
+    "connections": {
+        "On_New_Booking": {
+            "main": [
+                [
+                    {
+                        "node": "Get_Room_Details",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Get_Guest_Details",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get_Guest_Details": {
+            "main": [
+                [
+                    {
+                        "node": "Generate_Welcome_AI",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Generate_Welcome_AI": {
+            "main": [
+                [
+                    {
+                        "node": "Send_WhatsApp_Welcome",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}

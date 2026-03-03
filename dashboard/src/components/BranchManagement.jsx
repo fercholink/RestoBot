@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, MapPin, Phone, Users, Plus, Edit2, Trash2, Power, CheckCircle2, XCircle, Search, Save, X, FileText, Smartphone, Hash } from 'lucide-react';
+import { Building2, MapPin, Phone, Users, Plus, Edit2, Trash2, Power, CheckCircle2, XCircle, Search, Save, X, FileText, Smartphone, Hash, Globe } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const BranchManagement = () => {
@@ -46,6 +46,9 @@ const BranchManagement = () => {
             resolution_range: formData.get('resolution_range'),
             resolution_prefix: formData.get('resolution_prefix'),
             invoice_footer: formData.get('invoice_footer'),
+            booking_property_id: formData.get('booking_property_id'),
+            booking_machine_id: formData.get('booking_machine_id'),
+            booking_machine_password: formData.get('booking_machine_password'),
             active: true
         };
 
@@ -255,6 +258,26 @@ const BranchManagement = () => {
                                 <div className="space-y-1 col-span-2">
                                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Pie de Página Factura</label>
                                     <textarea name="invoice_footer" rows="2" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-xs" defaultValue={editingBranch?.invoice_footer} placeholder="Gracias por su compra..." />
+                                </div>
+
+                                {/* Conectividad Booking.com */}
+                                <div className="col-span-2 pt-4 pb-2 border-b border-gray-100 mb-2">
+                                    <h4 className="text-xs font-black text-secondary uppercase tracking-widest flex items-center gap-2">
+                                        <Globe size={14} className="text-blue-500" /> Conectividad Booking.com
+                                    </h4>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Property ID</label>
+                                    <input name="booking_property_id" type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-mono text-sm" defaultValue={editingBranch?.booking_property_id} placeholder="Ej. 1234567" />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Machine Account ID</label>
+                                    <input name="booking_machine_id" type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-mono text-sm" defaultValue={editingBranch?.booking_machine_id} placeholder="Username" />
+                                </div>
+                                <div className="space-y-1 col-span-2">
+                                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Machine Password</label>
+                                    <input name="booking_machine_password" type="password" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-mono text-sm" defaultValue={editingBranch?.booking_machine_password} placeholder="••••••••" />
                                 </div>
                             </div>
 

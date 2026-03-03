@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, User, Calendar, CreditCard, Search, Trash2, Key } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { sileo } from 'sileo';
 
 const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, initialData, bookingToEdit, branchId }) => {
     if (!isOpen) return null;
@@ -27,6 +28,8 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
 
     const [loading, setLoading] = useState(false);
     const [existingGuest, setExistingGuest] = useState(null);
+    const [pendingCancel, setPendingCancel] = useState(false);
+    const [pendingCheckout, setPendingCheckout] = useState(false);
 
     // Effect to update formData when initialData OR bookingToEdit changes
     useEffect(() => {
@@ -113,12 +116,11 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
                 // alert(`Huésped encontrado: ${data.full_name}`); 
             } else {
                 setExistingGuest(null);
-                alert("⚠️ Cliente no encontrado en la base de datos.");
-                // Opcional: Limpiar campos si se quiere, o dejarlos para que el usuario llene
+                sileo.warning({ title: 'Cliente no encontrado', description: 'No existe un huésped con ese documento. Complete los datos manualmente.' });
             }
         } catch (err) {
             console.error("Error buscando cliente:", err);
-            alert("Error al buscar cliente.");
+            sileo.error({ title: 'Error al buscar cliente', description: err.message });
             setExistingGuest(null);
         } finally {
             setLoading(false);
@@ -139,6 +141,7 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
             .select('id')
             .eq('room_id', formData.roomId)
             .neq('status', 'cancelada')
+            .neq('status', 'checkout')
             // Overlap: (StartA < EndB) and (EndA > StartB)
             .lt('check_in', rangeEnd)
             .gt('check_out', rangeStart);
@@ -158,7 +161,7 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
         try {
             // 0. Date Validation
             if (new Date(formData.checkOut) <= new Date(formData.checkIn)) {
-                alert("⚠️ La fecha de salida debe ser posterior a la fecha de entrada.");
+                sileo.warning({ title: 'Fechas inválidas', description: 'La fecha de salida debe ser posterior a la fecha de entrada.' });
                 setLoading(false);
                 return;
             }
@@ -166,7 +169,7 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
             // 0. Availability Check
             const isAvailable = await checkAvailability();
             if (!isAvailable) {
-                alert("❌ La habitación no está disponible para estas fechas. Ya existe una reserva.");
+                sileo.error({ title: 'Habitación no disponible', description: 'Ya existe una reserva activa para esta habitación en las fechas seleccionadas.' });
                 setLoading(false);
                 return;
             }
@@ -226,7 +229,7 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
             onClose();
         } catch (error) {
             console.error('Error saving reservation:', error);
-            alert('Error al guardar la reserva: ' + error.message);
+            sileo.error({ title: 'Error al guardar reserva', description: error.message });
         } finally {
             setLoading(false);
         }
@@ -234,8 +237,13 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
 
     const handleDelete = async () => {
         if (!bookingToEdit) return;
-        if (!confirm("¿Está seguro de cancelar esta reserva?")) return;
-
+        if (!pendingCancel) {
+            setPendingCancel(true);
+            sileo.warning({ title: '¿Cancelar reserva?', description: 'Haz clic de nuevo en Cancelar Reserva para confirmar.' });
+            setTimeout(() => setPendingCancel(false), 5000);
+            return;
+        }
+        setPendingCancel(false);
         setLoading(true);
         try {
             const { error } = await supabase
@@ -244,11 +252,12 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
                 .eq('id', bookingToEdit.id);
 
             if (error) throw error;
-            onReservationCreated(); // Refresh
+            sileo.success({ title: 'Reserva cancelada', description: 'La reserva fue cancelada correctamente.' });
+            onReservationCreated();
             onClose();
         } catch (error) {
-            console.error('Error canceling reservation:', error);
-            alert('Error al cancelar: ' + error.message);
+            console.error('Error canceling booking:', error);
+            sileo.error({ title: 'Error al cancelar reserva', description: error.message });
         } finally {
             setLoading(false);
         }
@@ -256,30 +265,44 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
 
     const handleCheckOut = async () => {
         if (!bookingToEdit) return;
-        if (!confirm("¿Confirmar salida (Check-Out) del huésped?")) return;
-
+        if (!pendingCheckout) {
+            setPendingCheckout(true);
+            sileo.warning({ title: '¿Confirmar Check-Out?', description: 'Haz clic de nuevo en Check-Out para confirmar la salida del huésped.' });
+            setTimeout(() => setPendingCheckout(false), 5000);
+            return;
+        }
+        setPendingCheckout(false);
         setLoading(true);
         try {
             // Update booking status
             const { error } = await supabase
                 .from('bookings')
-                .update({ status: 'checkout' })
+                .update({ status: 'checkout', check_out: new Date().toISOString() })
                 .eq('id', bookingToEdit.id);
 
             if (error) throw error;
 
             // Mark room as cleaning?
             // Optional: Update room status to 'limpieza' if desired
+            const room = rooms.find(r => r.id === bookingToEdit.room_id);
+            const currentFeatures = room?.features || {};
+
             await supabase
                 .from('rooms')
-                .update({ status: 'limpieza' })
+                .update({
+                    status: 'limpieza',
+                    features: {
+                        ...currentFeatures,
+                        cleaning_start: new Date().toISOString()
+                    }
+                })
                 .eq('id', bookingToEdit.room_id);
 
             onReservationCreated(); // Refresh
             onClose();
         } catch (error) {
             console.error('Error processing checkout:', error);
-            alert('Error al hacer check-out: ' + error.message);
+            sileo.error({ title: 'Error en Check-Out', description: error.message });
         } finally {
             setLoading(false);
         }
@@ -299,7 +322,7 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
             onReservationCreated();
             onClose();
         } catch (e) {
-            alert(e.message);
+            sileo.error({ title: 'Error en Check-In', description: e.message });
         } finally { setLoading(false); }
     };
 
