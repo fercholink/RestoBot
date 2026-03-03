@@ -41,8 +41,9 @@ export const AuthProvider = ({ children }) => {
         const dbPerms = profileData.permissions;
         const hasRealPermissions = dbPerms && typeof dbPerms === 'object' && Object.keys(dbPerms).length > 0;
         const resolvedPermissions = hasRealPermissions ? dbPerms : getDefaultPermissions(resolvedRole);
+        const resolvedOrganizationId = profileData.organization_id || metadata.organization_id || null;
 
-        console.log(`[Auth] ✅ Usuario listo — rol: ${resolvedRole}, permisos: ${hasRealPermissions ? 'BD' : 'DEFAULT'}`);
+        console.log(`[Auth] ✅ Usuario listo — rol: ${resolvedRole}, permisos: ${hasRealPermissions ? 'BD' : 'DEFAULT'}, org: ${resolvedOrganizationId}`);
 
 
         return {
@@ -51,6 +52,7 @@ export const AuthProvider = ({ children }) => {
             ...profileData,
             role: resolvedRole,
             permissions: resolvedPermissions,
+            organization_id: resolvedOrganizationId,
             branch: { name: profileData.branch_id ? 'Sede' : 'Sede Principal', id: profileData.branch_id || metadata.branch_id },
             name: profileData.full_name || metadata.name || sessionUser.email?.split('@')[0] || 'Usuario'
         };

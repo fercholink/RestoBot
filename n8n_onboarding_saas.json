@@ -1,0 +1,205 @@
+{
+    "meta": {
+        "instanceId": "nexus-saas"
+    },
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "nexus-saas-onboarding",
+                "responseMode": "lastNode",
+                "options": {}
+            },
+            "id": "1",
+            "name": "Webhook (Nuevo Cliente)",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 1,
+            "position": [
+                0,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "={{ $env.VITE_SUPABASE_URL }}/auth/v1/admin/users",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "=Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "email",
+                            "value": "={{ $json.body.owner_email }}"
+                        },
+                        {
+                            "name": "password",
+                            "value": "={{ $json.body.password }}"
+                        },
+                        {
+                            "name": "email_confirm",
+                            "value": "true"
+                        },
+                        {
+                            "name": "user_metadata",
+                            "value": "={{ { \"name\": $json.body.owner_name } }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "2",
+            "name": "1. Crear Admin en Auth",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                250,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "=INSERT INTO organizations (name, contact_email, plan, owner_id) VALUES ('{{ $('Webhook (Nuevo Cliente)').item.json.body.hotel_name }}', '{{ $('Webhook (Nuevo Cliente)').item.json.body.owner_email }}', '{{ $('Webhook (Nuevo Cliente)').item.json.body.plan }}', '{{ $json.id }}') RETURNING id;",
+                "options": {}
+            },
+            "id": "3",
+            "name": "2. Crear Organización BD",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 2.3,
+            "position": [
+                500,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "=UPDATE profiles SET organization_id = '{{ $json.id }}', role = 'admin', full_name = '{{ $('Webhook (Nuevo Cliente)').item.json.body.owner_name }}' WHERE id = '{{ $('1. Crear Admin en Auth').item.json.id }}';",
+                "options": {}
+            },
+            "id": "4",
+            "name": "3. Asignar Org al Perfil",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 2.3,
+            "position": [
+                750,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "=INSERT INTO branches (name, organization_id, is_active) VALUES ('Sede Principal', '{{ $('2. Crear Organización BD').item.json.id }}', true) RETURNING id;",
+                "options": {}
+            },
+            "id": "5",
+            "name": "4. Crear Sede Default",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 2.3,
+            "position": [
+                1000,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "executeQuery",
+                "query": "=UPDATE profiles SET branch_id = '{{ $json.id }}' WHERE id = '{{ $('1. Crear Admin en Auth').item.json.id }}';",
+                "options": {}
+            },
+            "id": "6",
+            "name": "5. Vincular Dueño a Sede",
+            "type": "n8n-nodes-base.postgres",
+            "typeVersion": 2.3,
+            "position": [
+                1250,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "content": "## FÁBRICA DE CLIENTES SAAS NEXUS 🚀\nEste Workflow se activa cuando haces una venta. \nSimula la entrada de datos: hotel_name, owner_email, \npassword, owner_name y plan.\n\nAutomáticamente crea un espacio aislado (Multi-Tenant) \npara este nuevo cliente en Supabase y le construye \nlas bases para que inicie sesión y trabaje sin mezclar datos.",
+                "height": 280,
+                "width": 1450,
+                "color": 6
+            },
+            "id": "7",
+            "name": "Sticky Note",
+            "type": "n8n-nodes-base.stickyNote",
+            "typeVersion": 1,
+            "position": [
+                -50,
+                -100
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook (Nuevo Cliente)": {
+            "main": [
+                [
+                    {
+                        "node": "1. Crear Admin en Auth",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "1. Crear Admin en Auth": {
+            "main": [
+                [
+                    {
+                        "node": "2. Crear Organización BD",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "2. Crear Organización BD": {
+            "main": [
+                [
+                    {
+                        "node": "3. Asignar Org al Perfil",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "3. Asignar Org al Perfil": {
+            "main": [
+                [
+                    {
+                        "node": "4. Crear Sede Default",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "4. Crear Sede Default": {
+            "main": [
+                [
+                    {
+                        "node": "5. Vincular Dueño a Sede",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    }
+}
