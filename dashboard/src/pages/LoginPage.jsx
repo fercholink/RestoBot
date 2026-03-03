@@ -46,7 +46,7 @@ const LoginPage = () => {
                     <div className="bg-primary/10 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
                         <LayoutPanelLeft size={32} className="text-primary" />
                     </div>
-                    <h1 className="text-3xl font-black text-secondary tracking-tighter">RestoBot</h1>
+                    <h1 className="text-3xl font-black text-secondary tracking-tighter">Nexus</h1>
                     <p className="text-accent font-bold text-sm uppercase tracking-widest mt-2">{isLogin ? 'Acceso al Panel' : 'Crear Cuenta Nueva'}</p>
                 </div>
 

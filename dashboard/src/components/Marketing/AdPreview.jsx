@@ -13,14 +13,14 @@ const AdPreview = ({ data }) => {
                         <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-yellow-400 to-purple-600 p-[2px]">
                             <div className="w-full h-full rounded-full bg-white p-[2px]">
                                 <img
-                                    src="https://api.dicebear.com/7.x/avataaars/svg?seed=RestoBot"
+                                    src="https://api.dicebear.com/7.x/avataaars/svg?seed=Nexus"
                                     alt="Profile"
                                     className="w-full h-full rounded-full bg-gray-100"
                                 />
                             </div>
                         </div>
                         <div>
-                            <p className="font-semibold text-xs text-gray-900">restobot_official</p>
+                            <p className="font-semibold text-xs text-gray-900">nexus_official</p>
                             <p className="text-[10px] text-gray-500 leading-none">Publicidad</p>
                         </div>
                     </div>
@@ -44,7 +44,7 @@ const AdPreview = ({ data }) => {
                     </div>
                     <p className="font-semibold text-xs mb-1">2,453 Me gusta</p>
                     <div className="text-xs text-gray-800">
-                        <span className="font-semibold mr-1">restobot_official</span>
+                        <span className="font-semibold mr-1">nexus_official</span>
                         <span className="whitespace-pre-wrap">{generatedText}</span>
                     </div>
                 </div>
@@ -59,13 +59,13 @@ const AdPreview = ({ data }) => {
                 <div className="p-3 flex items-center gap-2 mb-1">
                     <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
                         <img
-                            src="https://api.dicebear.com/7.x/avataaars/svg?seed=RestoBot"
+                            src="https://api.dicebear.com/7.x/avataaars/svg?seed=Nexus"
                             alt="Profile"
                             className="w-full h-full object-cover"
                         />
                     </div>
                     <div>
-                        <h3 className="font-semibold text-gray-900 text-sm">RestoBot</h3>
+                        <h3 className="font-semibold text-gray-900 text-sm">Nexus</h3>
                         <p className="text-xs text-gray-500">Publicidad · <span className="text-gray-400">🌍</span></p>
                     </div>
                 </div>

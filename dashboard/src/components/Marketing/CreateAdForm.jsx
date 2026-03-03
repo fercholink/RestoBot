@@ -30,7 +30,7 @@ const CreateAdForm = () => {
             setIsGenerating(false);
             setResult({
                 imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80',
-                generatedText: `¡Descubre el sabor inigualable de nuestra ${formData.productName}! 🍔✨\n\nPerfecta para ${formData.targetAudience || 'todos los amantes de la comida'}. ¡Pídela ya! #RestoBot #${formData.platform} #Foodie`,
+                generatedText: `¡Descubre el sabor inigualable de nuestra ${formData.productName}! 🍔✨\n\nPerfecta para ${formData.targetAudience || 'todos los amantes de la comida'}. ¡Pídela ya! #Nexus #${formData.platform} #Foodie`,
                 platform: formData.platform
             });
         }, 2500);

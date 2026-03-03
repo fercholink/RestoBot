@@ -350,8 +350,8 @@ const UserManagement = () => {
     };
 
     const sendInvite = (u) => {
-        const subject = 'Bienvenido a RestoBot – Tus Credenciales de Acceso';
-        const body = `Hola ${u.full_name},\n\nTe hemos creado una cuenta en RestoBot.\n\nUsuario: ${u.email}\nURL de acceso: ${window.location.origin}\n\nSi aún no tienes contraseña, solicita el enlace de recuperación.\n\nSaludos,\nEl equipo RestoBot`;
+        const subject = 'Bienvenido a Nexus – Tus Credenciales de Acceso';
+        const body = `Hola ${u.full_name},\n\nTe hemos creado una cuenta en Nexus.\n\nUsuario: ${u.email}\nURL de acceso: ${window.location.origin}\n\nSi aún no tienes contraseña, solicita el enlace de recuperación.\n\nSaludos,\nEl equipo Nexus`;
         window.open(`mailto:${u.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
     };
 

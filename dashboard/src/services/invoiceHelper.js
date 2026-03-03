@@ -212,7 +212,7 @@ export async function emitInvoiceForOrder(order) {
         const invoicePayload = {
             numbering_range_id: Number(selectedRange.id),
             reference_code: `ORD-${order.id}-${Date.now()}`,
-            observation: `Pedido #${order.id} - RestoBot POS`,
+            observation: `Pedido #${order.id} - Nexus POS`,
             payment_form: '1',
             payment_method_code: mapPaymentMethod(order.payment_method),
             customer,

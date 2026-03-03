@@ -160,7 +160,7 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
                     </p>
 
                     <div className="grid grid-cols-2 gap-x-4">
-                        <div className="flex justify-between"><span>No:</span> <span className="font-bold">{order.prefix || 'RB'}-{order.id}</span></div>
+                        <div className="flex justify-between"><span>No:</span> <span className="font-bold">{order.prefix || 'NX'}-{order.id}</span></div>
                         <div className="flex justify-between"><span>FECHA:</span> <span>{new Date(order.created_at).toLocaleDateString()}</span></div>
                         <div className="flex justify-between"><span>HORA:</span> <span>{new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
                         <div className="flex justify-between"><span>TIPO:</span> <span className="uppercase font-bold">{
@@ -394,7 +394,7 @@ const TicketPrinter = ({ order, type = 'comanda', branchName = 'BS COMUNICACIONE
 
                         <div className="text-[7px] space-y-1">
                             <p className="font-black">¡GRACIAS POR SU VISITA!</p>
-                            <p className="font-bold opacity-30">Software: RestoBot v2.0 - BS COMUNICACIONES</p>
+                            <p className="font-bold opacity-30">Software: Nexus v2.0 - BS COMUNICACIONES</p>
                             <p className="opacity-30 italic"> Montería - Colombia </p>
                         </div>
                     </div>

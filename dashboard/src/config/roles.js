@@ -1,5 +1,5 @@
 // ============================================================
-// DEFINICIÓN MAESTRA DE ROLES Y PERMISOS — RestoBot
+// DEFINICIÓN MAESTRA DE ROLES Y PERMISOS — Nexus
 // Fuente de verdad única para toda la aplicación
 // ============================================================
 

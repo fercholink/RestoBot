@@ -320,7 +320,7 @@ const DigitalCheckIn = () => {
                                 </div>
                                 <div className="flex justify-between items-center border-b border-gray-100 pb-3">
                                     <span className="text-[10px] font-black uppercase text-gray-400">WiFi Red</span>
-                                    <span className="text-xs font-black text-primary">RestoBot_Hotel</span>
+                                    <span className="text-xs font-black text-primary">Nexus_Hotel</span>
                                 </div>
                                 <div className="flex justify-between items-center pb-1">
                                     <span className="text-[10px] font-black uppercase text-gray-400">WiFi Pass</span>

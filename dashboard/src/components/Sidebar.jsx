@@ -127,7 +127,7 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
             {/* ... Header igual ... */}
             <div className={`p-6 border-b border-white/10 text-white flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'}`}>
                 <LayoutPanelLeft className="text-primary" size={isCollapsed ? 28 : 24} />
-                {!isCollapsed && <span className="text-2xl font-black tracking-tighter">RestoBot</span>}
+                {!isCollapsed && <span className="text-2xl font-black tracking-tighter">Nexus</span>}
             </div>
 
             <div className={`p-6 border-b border-white/5 bg-white/5 ${isCollapsed ? 'flex justify-center' : ''}`}>
@@ -265,7 +265,7 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
             <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-secondary flex items-center justify-between px-6 z-40 border-b border-white/5 shadow-md">
                 <div className="flex items-center gap-2">
                     <LayoutPanelLeft className="text-primary" size={24} />
-                    <span className="text-white font-black tracking-tighter text-xl">RestoBot</span>
+                    <span className="text-white font-black tracking-tighter text-xl">Nexus</span>
                 </div>
                 <button onClick={() => setIsOpen(!isOpen)} className="text-white p-2">
                     {isOpen ? <X size={28} /> : <Menu size={28} />}
