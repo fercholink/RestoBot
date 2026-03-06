@@ -2062,3 +2062,438 @@ h2::after {
     border-color: var(--color-primary);
     box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.1);
 }
+
+/* ==========================================================================
+   MODAL MULTI-PASO — NEXUS PMS
+   ========================================================================== */
+
+/* ─── Barra de progreso ─── */
+.res-progress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 2rem;
+}
+
+.res-progress-step {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--color-border);
+    color: var(--color-text-light);
+    font-weight: 700;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: background 0.3s, color 0.3s;
+    flex-shrink: 0;
+}
+
+.res-progress-step .res-step-label {
+    position: absolute;
+    bottom: -1.4rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--color-text-light);
+    white-space: nowrap;
+}
+
+.res-progress-step.active {
+    background: var(--grad-gold);
+    color: #fff;
+    box-shadow: var(--shadow-gold);
+}
+
+.res-progress-step.active .res-step-label {
+    color: var(--color-accent);
+}
+
+.res-progress-step.done {
+    background: var(--color-accent);
+    color: #fff;
+}
+
+.res-progress-line {
+    flex: 1;
+    height: 2px;
+    background: var(--color-border);
+    max-width: 60px;
+}
+
+/* ─── Label de fechas ─── */
+.res-dates-label {
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-accent);
+    background: rgba(184, 146, 106, 0.08);
+    border: 1px solid rgba(184, 146, 106, 0.2);
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    margin-bottom: 1.5rem;
+}
+
+/* ─── Tarjetas de habitación ─── */
+.res-rooms-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 0.5rem;
+    text-align: left;
+}
+
+.res-room-card {
+    border: 2px solid var(--color-border);
+    border-radius: 16px;
+    padding: 1.1rem;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    background: var(--color-white);
+    outline: none;
+}
+
+.res-room-card:hover {
+    border-color: var(--color-accent);
+    background: #fdf8f3;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(184, 146, 106, 0.15);
+}
+
+.res-room-card.selected {
+    border-color: var(--color-accent);
+    background: #fdf8f3;
+    box-shadow: 0 0 0 3px rgba(184, 146, 106, 0.15);
+}
+
+.res-room-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    margin-bottom: 0.9rem;
+}
+
+.res-room-icon {
+    font-size: 1.8rem;
+    flex-shrink: 0;
+    line-height: 1;
+    margin-top: 0.1rem;
+}
+
+.res-room-info h4 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-secondary);
+    margin-bottom: 0.25rem;
+    font-family: var(--font-heading);
+}
+
+.res-room-info p {
+    font-size: 0.82rem;
+    color: var(--color-text-light);
+    line-height: 1.4;
+}
+
+.res-room-features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+}
+
+.res-room-features span {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background: #f1f5f9;
+    border-radius: 20px;
+    padding: 0.2rem 0.6rem;
+}
+
+.res-room-pricing {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--color-border);
+    flex-wrap: wrap;
+}
+
+.res-room-price {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--color-secondary);
+    line-height: 1;
+}
+
+.res-room-price small {
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--color-text-light);
+}
+
+.res-room-total {
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    flex: 1;
+}
+
+.res-room-total strong {
+    color: var(--color-secondary);
+}
+
+.btn-reservar-sm {
+    display: inline-block;
+    background: var(--grad-gold);
+    color: var(--color-white) !important;
+    padding: 0.5rem 1.1rem;
+    border-radius: 50px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+    box-shadow: 0 3px 10px rgba(184, 146, 106, 0.3);
+}
+
+.btn-reservar-sm:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-gold);
+}
+
+/* ─── Resumen de la reserva ─── */
+.res-booking-summary {
+    background: linear-gradient(135deg, #0a1128 0%, #001f3f 100%);
+    color: white;
+    border-radius: 14px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+}
+
+.res-summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    padding: 0.3rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.85);
+}
+
+.res-summary-row:last-child {
+    border-bottom: none;
+}
+
+.res-summary-total {
+    font-weight: 700;
+    color: var(--color-accent-light) !important;
+    padding-top: 0.5rem;
+    margin-top: 0.1rem;
+    font-size: 0.95rem;
+}
+
+/* ─── Error inline ─── */
+.res-form-error {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.hero-form-error {
+    background: rgba(220, 38, 38, 0.1);
+    border: 1px solid rgba(220, 38, 38, 0.3);
+    color: #fee2e2;
+    border-radius: 8px;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    text-align: center;
+}
+
+/* ─── Textarea en formulario ─── */
+.res-guest-form textarea {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    resize: vertical;
+    min-height: 72px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.res-guest-form textarea:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(184, 146, 106, 0.1);
+}
+
+.res-required {
+    color: #dc2626;
+    font-size: 0.8rem;
+}
+
+.res-disclaimer {
+    font-size: 0.78rem;
+    color: var(--color-text-light);
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+/* ─── Acciones del formulario ─── */
+.res-form-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.res-form-actions .btn-reservar {
+    flex: 1;
+    padding: 0.9rem 1.5rem;
+    font-size: 0.95rem;
+}
+
+.btn-back {
+    background: none;
+    border: 2px solid var(--color-border);
+    color: var(--color-text-muted);
+    border-radius: 50px;
+    padding: 0.9rem 1.25rem;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.btn-back:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+}
+
+/* ─── Vista de éxito ─── */
+.res-view-success {
+    text-align: center;
+    padding: 0.5rem 0;
+}
+
+.res-success-icon {
+    font-size: 3.5rem;
+    color: #10b981;
+    margin-bottom: 0.75rem;
+}
+
+.res-view-success h3 {
+    color: #065f46;
+    margin-bottom: 0.5rem;
+}
+
+.res-success-msg {
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+}
+
+.res-confirm-box {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 14px;
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
+    text-align: center;
+}
+
+.res-confirm-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #6b7280;
+    margin-bottom: 0.25rem;
+}
+
+.res-confirm-code {
+    font-size: 1.5rem;
+    font-weight: 800;
+    font-family: monospace;
+    color: #065f46;
+    letter-spacing: 0.1em;
+}
+
+.res-confirm-details {
+    margin-top: 0.75rem;
+    font-size: 0.82rem;
+    color: var(--color-text-muted);
+}
+
+.res-confirm-row {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.2rem 0;
+}
+
+.btn-whatsapp {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    background: #25D366;
+    color: white;
+    border-radius: 50px;
+    padding: 0.9rem 1.5rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    width: 100%;
+    margin-bottom: 0.75rem;
+    transition: var(--transition);
+    box-shadow: 0 4px 15px rgba(37, 211, 102, 0.3);
+}
+
+.btn-whatsapp:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(37, 211, 102, 0.4);
+    color: white;
+}
+
+/* ─── Modal más ancho para el paso de habitaciones ─── */
+.reservation-modal {
+    max-width: 580px;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 480px) {
+    .res-room-pricing {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    .btn-reservar-sm {
+        width: 100%;
+        text-align: center;
+    }
+    .res-form-actions {
+        flex-direction: column-reverse;
+    }
+    .res-form-actions .btn-reservar,
+    .btn-back {
+        width: 100%;
+        text-align: center;
+    }
+}

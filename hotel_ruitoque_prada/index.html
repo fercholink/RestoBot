@@ -65,7 +65,7 @@
                     <p class="oferta-especial">¡30% OFF - Oferta de fin de año!</p>
                 </div>
             </div>
-            <div class="hero-booking">
+            <div class="hero-booking" id="reservar">
                 <form class="booking-form" id="mainBookingForm">
                     <div class="form-group">
                         <label>Fecha de entrada</label>
@@ -84,7 +84,8 @@
                             <option>2 adultos, 2 niños</option>
                         </select>
                     </div>
-                    <button type="submit" id="mainBookBtn">Buscar disponibilidad</button>
+                    <div id="heroFormError" class="hero-form-error" style="display:none"></div>
+                    <button type="submit" id="mainBookBtn">Ver disponibilidad →</button>
                 </form>
             </div>
         </section>
@@ -213,7 +214,7 @@
                     <div class="habitacion-info">
                         <h3>Habitación Estándar</h3>
                         <p>Confortable espacio con todas las comodidades básicas para tu descanso.</p>
-                        <a href="#reservar" class="btn-reservar btn-habitacion">Reservar Estándar</a>
+                        <a href="#" class="btn-reservar btn-habitacion" data-book-room="estandar">Reservar Estándar →</a>
                     </div>
                 </div>
                 <div class="habitacion">
@@ -228,7 +229,7 @@
                     <div class="habitacion-info">
                         <h3>Habitación Ejecutiva</h3>
                         <p>Amplia habitación con área de trabajo y vistas a la ciudad.</p>
-                        <a href="#reservar" class="btn-reservar btn-habitacion">Reservar Ejecutiva</a>
+                        <a href="#" class="btn-reservar btn-habitacion" data-book-room="ejecutiva">Reservar Ejecutiva →</a>
                     </div>
                 </div>
                 <div class="habitacion">
@@ -243,7 +244,7 @@
                     <div class="habitacion-info">
                         <h3>Suite</h3>
                         <p>Lujo y confort en un espacio exclusivo con las mejores vistas.</p>
-                        <a href="#reservar" class="btn-reservar btn-habitacion">Reservar Suite</a>
+                        <a href="#" class="btn-reservar btn-habitacion" data-book-room="suite">Reservar Suite →</a>
                     </div>
                 </div>
             </div>
@@ -628,49 +629,109 @@
         })(document, "script");
     </script>
 
-    <!-- Modal de Reserva Integrada (Flujo Simplificado OTA) -->
-    <div id="reservationModal" class="reservation-modal-overlay">
+    <!-- Modal de Reserva — Nexus PMS (Multi-paso) -->
+    <div id="reservationModal" class="reservation-modal-overlay" role="dialog" aria-modal="true" aria-label="Formulario de Reserva">
         <div class="reservation-modal">
-            <button id="closeResModal" class="res-close-btn">&times;</button>
-            <div id="resModalForm" class="res-modal-view">
-                <h3>Solicitud de Reserva</h3>
-                <p id="resDatesLabel" style="color:#666; font-size:0.9rem; margin-bottom:1rem;"></p>
+            <button id="closeResModal" class="res-close-btn" aria-label="Cerrar">&times;</button>
+
+            <!-- Barra de progreso -->
+            <div class="res-progress">
+                <div class="res-progress-step active" data-step="1">1
+                    <span class="res-step-label">Habitación</span>
+                </div>
+                <div class="res-progress-line"></div>
+                <div class="res-progress-step" data-step="2">2
+                    <span class="res-step-label">Tus datos</span>
+                </div>
+                <div class="res-progress-line"></div>
+                <div class="res-progress-step" data-step="3">3
+                    <span class="res-step-label">Confirmado</span>
+                </div>
+            </div>
+
+            <!-- VISTA 1: Selección de habitación -->
+            <div id="resViewRooms" class="res-modal-view">
+                <h3>Elige tu habitación</h3>
+                <p id="resDatesLabel" class="res-dates-label"></p>
+                <div class="res-rooms-list" id="resRoomsList">
+                    <!-- Generado por JS -->
+                </div>
+            </div>
+
+            <!-- VISTA 2: Datos del huésped -->
+            <div id="resViewGuest" class="res-modal-view" style="display:none">
+                <h3>Completa tu reserva</h3>
+
+                <!-- Resumen de la selección -->
+                <div class="res-booking-summary" id="resBookingSummary"></div>
+
+                <!-- Error inline -->
+                <div id="resFormError" class="res-form-error" style="display:none"></div>
+
                 <form id="resGuestForm" class="res-guest-form">
                     <div class="form-group">
-                        <label>Nombre Completo</label>
-                        <input type="text" id="guestFullName" required placeholder="Ej: Juan Pérez">
+                        <label for="guestFullName">Nombre Completo <span class="res-required">*</span></label>
+                        <input type="text" id="guestFullName" required autocomplete="name"
+                            placeholder="Ej: María García">
                     </div>
                     <div class="form-group">
-                        <label>Cédula / Pasaporte</label>
-                        <input type="text" id="guestId" required placeholder="Número de documento">
+                        <label for="guestId">Cédula / Pasaporte <span class="res-required">*</span></label>
+                        <input type="text" id="guestId" required autocomplete="off"
+                            placeholder="Número de documento">
                     </div>
                     <div class="form-group">
-                        <label>Teléfono (WhatsApp)</label>
-                        <input type="tel" id="guestPhone" required placeholder="Ej: +57 300 0000000">
+                        <label for="guestPhone">Teléfono / WhatsApp <span class="res-required">*</span></label>
+                        <input type="tel" id="guestPhone" required autocomplete="tel"
+                            placeholder="+57 300 000 0000">
                     </div>
                     <div class="form-group">
-                        <label>Correo Electrónico</label>
-                        <input type="email" id="guestEmail" required placeholder="correo@ejemplo.com">
+                        <label for="guestEmail">Correo Electrónico</label>
+                        <input type="email" id="guestEmail" autocomplete="email"
+                            placeholder="correo@ejemplo.com">
                     </div>
                     <div class="form-group">
-                        <label>Notas Secundarias (Opcional)</label>
-                        <textarea id="guestNotes" placeholder="Alguna petición especial, etc."
-                            style="width: 100%; padding: 0.8rem; border: 1px solid var(--color-border); border-radius: 8px; font-family: inherit; font-size: 0.95rem;"></textarea>
+                        <label for="guestNotes">Petición especial (opcional)</label>
+                        <textarea id="guestNotes" rows="2"
+                            placeholder="Ej: llegamos tarde, cama adicional, ocasión especial..."></textarea>
                     </div>
-                    <p style="font-size: 0.8rem; color:#666; margin-bottom:1rem;">Te contactaremos por WhatsApp o correo
-                        para confirmar tu solicitud.</p>
-                    <button type="submit" id="submitResBtn" class="btn-reservar" style="width:100%;">Enviar
-                        Solicitud</button>
+
+                    <p class="res-disclaimer">
+                        <i class="fas fa-shield-alt"></i>
+                        Tu solicitud es revisada por recepción y te confirmaremos por WhatsApp.
+                    </p>
+
+                    <div class="res-form-actions">
+                        <button type="button" id="resBackBtn" class="btn-back">
+                            ← Volver
+                        </button>
+                        <button type="submit" id="submitResBtn" class="btn-reservar">
+                            Confirmar Reserva
+                        </button>
+                    </div>
                 </form>
             </div>
 
-            <div id="resModalSuccess" class="res-modal-view" style="display: none;">
-                <i class="fas fa-paper-plane text-success"
-                    style="font-size: 4rem; color: #2ecc71; margin-bottom: 1rem;"></i>
-                <h3 style="color:#2ecc71;">¡Solicitud Enviada!</h3>
-                <p style="margin-bottom: 1.5rem;">Hemos recibido tu interés de hospedaje. Nuestro equipo te confirmará a
-                    la brevedad.</p>
-                <button id="finishResBtn" class="btn-reservar">Cerrar</button>
+            <!-- VISTA 3: Confirmación exitosa -->
+            <div id="resViewSuccess" class="res-modal-view res-view-success" style="display:none">
+                <div class="res-success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3>¡Solicitud Enviada!</h3>
+                <p class="res-success-msg">Tu solicitud ha sido recibida. El equipo del hotel te confirmará a la brevedad.</p>
+
+                <div class="res-confirm-box">
+                    <p class="res-confirm-label">Código de referencia</p>
+                    <p class="res-confirm-code" id="resConfirmRef">—</p>
+                    <div id="resConfirmDetails" class="res-confirm-details"></div>
+                </div>
+
+                <a id="resWhatsappLink" href="#" target="_blank" rel="noopener" class="btn-whatsapp">
+                    <i class="fab fa-whatsapp"></i> Seguimiento por WhatsApp
+                </a>
+
+                <button id="finishResBtn" class="btn-back" style="margin-top:0.75rem; width:100%;">
+                    Cerrar
+                </button>
             </div>
         </div>
     </div>
