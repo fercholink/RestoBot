@@ -6,10 +6,24 @@
  *  3. Confirmación de éxito
  */
 
+console.log('[integration.js v20260306b] Iniciando...');
+
 const SUPABASE_URL = 'https://n8n-bs-comunicaciones-bd-supabase.jz98vr.easypanel.host';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9sZSI6ICJhbm9uIiwKICAgICJpc3MiOiAic3VwYWJhc2UtZGVtbyIsCiAgICAiaWF0IjogMTY0MTc2OTIwMCwKICAgICJleHAiOiAxNzk5NTM1NjAwCn0.dc_X5iR_VP_qT0zsiyj_I_OZ2T9FtRU2BBNWN8Bu4GE';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Lazy init — si el CDN falla, el UI sigue funcionando
+let _supabase = null;
+function getSupabase() {
+    if (!_supabase) {
+        try {
+            _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+            console.log('[integration.js] Supabase OK ✓');
+        } catch (e) {
+            console.error('[integration.js] Supabase no disponible:', e.message);
+        }
+    }
+    return _supabase;
+}
 
 // ─── Tipos de habitación (precios en COP por noche) ──────────────────────
 const ROOM_TYPES = [
@@ -343,7 +357,9 @@ function initBookingForm() {
                     raw_email_body: `Solicitud web — ${room?.name || 'Sin tipo'} — ${state.checkIn} a ${state.checkOut}`
                 };
 
-                const { data, error } = await supabase.from('channel_bookings').insert([payload]).select('id').single();
+                const sb = getSupabase();
+                if (!sb) throw new Error('No hay conexión con la base de datos. Intenta de nuevo.');
+                const { data, error } = await sb.from('channel_bookings').insert([payload]).select('id').single();
                 if (error) throw error;
 
                 const refCode = data?.id?.slice(0, 8).toUpperCase() || '—';
