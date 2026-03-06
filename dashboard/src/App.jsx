@@ -658,7 +658,7 @@ function App() {
   };
 
   // --- PUBLIC ROUTES (No login required) ---
-  const isPublicCheckIn = window.location.search.includes('id=') && !window.location.pathname.includes('/admin');
+  const isPublicCheckIn = (window.location.search.includes('id=') || window.location.search.includes('source=landing_page') || window.location.pathname.includes('/digital-checkin')) && !window.location.pathname.includes('/admin');
 
   if (isPublicCheckIn) return <DigitalCheckIn />;
   if (loading) {

@@ -23,13 +23,25 @@ const DigitalCheckIn = () => {
     const canvasRef = useRef(null);
     const [isDrawing, setIsDrawing] = useState(false);
 
-    // 1. Detectar ID de reserva en la URL
+    // 1. Detectar ID de reserva en la URL o Parámetros de Landing
+    const [isNewBooking, setIsNewBooking] = useState(false);
+    const [bookingParams, setBookingParams] = useState(null);
+
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const bookingId = urlParams.get('id');
+        const source = urlParams.get('source');
 
         if (bookingId) {
             fetchBooking(bookingId);
+        } else if (source === 'landing_page') {
+            setIsNewBooking(true);
+            setBookingParams({
+                check_in: urlParams.get('check_in'),
+                check_out: urlParams.get('check_out'),
+                pax: urlParams.get('pax')
+            });
+            setLoading(false);
         } else {
             setLoading(false);
         }
@@ -103,36 +115,53 @@ const DigitalCheckIn = () => {
     const handleSubmit = async () => {
         setLoading(true);
         try {
-            // A. Guardar Firma como DataURL (simplificado, idealmente a Storage)
-            const signatureData = canvasRef.current.toDataURL();
+            const signatureData = canvasRef.current.toDataURL(); // Firma Base64
 
-            // B. Actualizar o Crear Guest
-            let guestId = booking.guest_id;
+            // A. Crear o Actualizar Guest
+            let guestId = booking?.guest_id || null;
             const guestPayload = {
                 full_name: formData.full_name,
+                identification: formData.identification,
                 email: formData.email,
                 phone: formData.phone,
                 nationality: formData.nationality,
                 preferences: formData.preferences,
-                signature_url: signatureData, // En una app real, subiríamos a Supabase Storage
+                signature_url: signatureData,
             };
 
             if (guestId) {
                 await supabase.from('guests').update(guestPayload).eq('id', guestId);
             } else {
-                const { data: newGuest } = await supabase.from('guests').insert([guestPayload]).select().single();
+                const { data: newGuest, error: guestErr } = await supabase.from('guests').insert([guestPayload]).select().single();
+                if (guestErr) throw guestErr;
                 guestId = newGuest.id;
             }
 
-            // C. Actualizar Booking
-            await supabase.from('bookings').update({
-                guest_id: guestId,
-                status: 'pre_checkin' // Estado intermedio indicando que ya llenó sus datos
-            }).eq('id', booking.id);
+            // B. Gestión de Booking (Actualizar o Crear Nuevo)
+            if (isNewBooking) {
+                // Crear Booking Público Provisional
+                const newBookingPayload = {
+                    guest_id: guestId,
+                    check_in: bookingParams.check_in,
+                    check_out: bookingParams.check_out,
+                    status: 'pendiente', // Todavía no asigna habitación directa, pasa por recepción
+                    amount_paid: 0
+                };
+                const { data: createdBooking, error: bookErr } = await supabase.from('bookings').insert([newBookingPayload]).select().single();
+                if (bookErr) throw bookErr;
+                setBooking(createdBooking); // Guardamos para la tarjeta final
+            } else {
+                // Actualizar check-in
+                await supabase.from('bookings').update({
+                    guest_id: guestId,
+                    status: 'pre_checkin'
+                }).eq('id', booking.id);
+            }
 
             setStep(4);
-            sileo.success({ title: 'Check-in Completado', description: 'Tus datos han sido registrados con éxito.' });
+            sileo.success({ title: '¡Completado!', description: 'Tus datos han sido registrados con éxito.' });
         } catch (error) {
+            console.error(error);
             sileo.error({ title: 'Error', description: error.message });
         } finally {
             setLoading(false);
@@ -146,7 +175,7 @@ const DigitalCheckIn = () => {
         </div>
     );
 
-    if (!booking && !loading) return (
+    if (!booking && !isNewBooking && !loading) return (
         <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-gray-50 text-center">
             <Globe className="text-gray-300 mb-4" size={64} />
             <h2 className="text-xl font-black text-secondary">Link Inválido</h2>
@@ -161,11 +190,14 @@ const DigitalCheckIn = () => {
                 {/* Header Contextual */}
                 <div className="bg-secondary p-8 text-white relative">
                     <div className="relative z-10">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-2">Check-in Digital Express</p>
-                        <h1 className="text-3xl font-black tracking-tighter">Bienvenido/a a {booking.branch?.name || 'Nuestro Hotel'}</h1>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-2">
+                            {isNewBooking ? 'Nueva Solicitud de Reserva' : 'Check-in Digital Express'}
+                        </p>
+                        <h1 className="text-3xl font-black tracking-tighter">Bienvenido/a a {booking?.branch?.name || 'Nuestro Hotel'}</h1>
+
                         <div className="flex items-center gap-4 mt-4 opacity-80">
-                            <div className="flex items-center gap-1.5"><Calendar size={14} /> <span className="text-xs font-bold">{booking.check_in}</span></div>
-                            <div className="flex items-center gap-1.5"><MapPin size={14} /> <span className="text-xs font-bold">Hab. {booking.room?.number}</span></div>
+                            <div className="flex items-center gap-1.5"><Calendar size={14} /> <span className="text-xs font-bold">{isNewBooking ? bookingParams?.check_in : booking?.check_in}</span></div>
+                            <div className="flex items-center gap-1.5"><MapPin size={14} /> <span className="text-xs font-bold">{isNewBooking ? 'Por Asignar' : `Hab. ${booking?.room?.number}`}</span></div>
                         </div>
                     </div>
                     <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
@@ -203,6 +235,15 @@ const DigitalCheckIn = () => {
                                         />
                                     </div>
                                     <div className="relative flex items-center">
+                                        <Smartphone className="absolute left-4 text-gray-400" size={18} />
+                                        <input
+                                            placeholder="Teléfono (WhatsApp)"
+                                            className="w-full bg-gray-50 border-none rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-secondary"
+                                            value={formData.phone}
+                                            onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="relative flex items-center">
                                         <Globe className="absolute left-4 text-gray-400" size={18} />
                                         <input
                                             placeholder="Nacionalidad"
@@ -215,7 +256,8 @@ const DigitalCheckIn = () => {
                             </div>
                             <button
                                 onClick={() => setStep(2)}
-                                className="w-full bg-primary text-white py-4 rounded-2xl font-black shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-2"
+                                disabled={!formData.full_name || !formData.identification}
+                                className="w-full bg-primary text-white py-4 rounded-2xl font-black shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-40"
                             >
                                 Siguiente Paso <ArrowRight size={18} />
                             </button>
@@ -316,7 +358,7 @@ const DigitalCheckIn = () => {
                             <div className="bg-gray-50 p-6 rounded-3xl w-full text-left space-y-4">
                                 <div className="flex justify-between items-center border-b border-gray-100 pb-3">
                                     <span className="text-[10px] font-black uppercase text-gray-400">Reserva</span>
-                                    <span className="text-xs font-black text-secondary">#{booking.id.slice(0, 8)}</span>
+                                    <span className="text-xs font-black text-secondary">#{booking?.id?.slice(0, 8) || 'PND'}</span>
                                 </div>
                                 <div className="flex justify-between items-center border-b border-gray-100 pb-3">
                                     <span className="text-[10px] font-black uppercase text-gray-400">WiFi Red</span>

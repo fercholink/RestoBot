@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hotel Ruitoque de Prada | Tu Oasis en Bucaramanga</title>
+    <meta name="description"
+        content="Disfruta de la auténtica hospitalidad santandereana en el corazón de Bucaramanga. Ubicación privilegiada, confort y gastronomía local.">
+    <!-- Google Fonts: Playfair Display for Elegance, Inter for Clarity -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap"
+        rel="stylesheet">
+    <!-- Font Awesome for Modern Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <header class="header">
+        <nav class="navbar">
+            <div class="logo">
+                <a href="#inicio">
+                    <img src="img/Logos Hotel/Logo Hotel Horizontal.png" alt="Hotel Ruitoque de Prada">
+
+                </a>
+            </div>
+            <button class="nav-toggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="primary-navigation">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <ul class="nav-links" id="primary-navigation">
+                <li><a href="#inicio">Inicio</a></li>
+                <li><a href="#habitaciones">Habitaciones</a></li>
+                <li><a href="#servicios">Servicios</a></li>
+                <li><a href="#ubicacion">Ubicación</a></li>
+                <li><a href="#contacto">Contacto</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section id="inicio" class="hero">
+            <div class="hero-content">
+                <h1 class="animated-text"
+                    data-phrases="Hotel Ruitoque de Prada|Tu oasis de tranquilidad|Auténtica hospitalidad santandereana">
+                    <span>Hotel Ruitoque de Prada</span>
+                </h1>
+                <div class="hero-rating reveal">
+                    <span class="stars">★★★</span>
+                    <span class="rating-number">8.4</span>
+                    <span class="rating-text">Muy bien · 1.148 comentarios</span>
+                </div>
+                <p class="hero-description fade-up visible">Tu oasis de tranquilidad en el corazón de Bucaramanga</p>
+                <div class="hero-features">
+                    <span class="slide-left visible"><i class="fas fa-star"></i> Ubicación céntrica</span>
+
+                    <span class="slide-right visible"><i class="fas fa-parking"></i> Parking gratis</span>
+                </div>
+                <div class="hero-buttons scale-in visible">
+                    <a href="#reservar" class="btn-reservar ripple">Reservar Ahora</a>
+                    <p class="oferta-especial">¡30% OFF - Oferta de fin de año!</p>
+                </div>
+            </div>
+            <div class="hero-booking">
+                <form class="booking-form" id="mainBookingForm">
+                    <div class="form-group">
+                        <label>Fecha de entrada</label>
+                        <input type="date" id="q_check_in" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Fecha de salida</label>
+                        <input type="date" id="q_check_out" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Huéspedes</label>
+                        <select id="q_guests">
+                            <option>1 adulto</option>
+                            <option>2 adultos</option>
+                            <option>2 adultos, 1 niño</option>
+                            <option>2 adultos, 2 niños</option>
+                        </select>
+                    </div>
+                    <button type="submit" id="mainBookBtn">Buscar disponibilidad</button>
+                </form>
+            </div>
+        </section>
+
+        <section id="gastronomia" class="galeria-gastronomia">
+            <div class="galeria-gastronomia-content">
+                <div class="galeria-gastronomia-header">
+                    <span class="galeria-subtitle">Sabores del Ruitoque</span>
+                    <h2>Galería Gastronómica</h2>
+                    <p>Explora algunos de los platos más solicitados de nuestro restaurante, preparados con ingredientes
+                        locales y el toque auténtico santandereano.</p>
+                </div>
+                <div class="galeria-gastronomia-grid gallery-group" data-gallery-group="gastronomia">
+                    <figure class="galeria-item">
+                        <img src="img/425945356.jpg" alt="Desayuno típico con frutas y pan artesanal"
+                            data-caption="Desayuno típico con frutas frescas, pan artesanal y café colombiano.">
+                        <figcaption>Desayuno típico</figcaption>
+                    </figure>
+                    <figure class="galeria-item">
+                        <img src="img/425945357.jpg" alt="Arepas rellenas acompañadas con guiso"
+                            data-caption="Arepas santandereanas rellenas acompañadas con guiso de la casa.">
+                        <figcaption>Arepas de la casa</figcaption>
+                    </figure>
+                    <figure class="galeria-item">
+                        <img src="img/425945384.jpg" alt="Sopa criolla servida en plato hondo"
+                            data-caption="Sopa criolla con sabores tradicionales para reconfortar el alma.">
+                        <figcaption>Sopa criolla</figcaption>
+                    </figure>
+                    <figure class="galeria-item">
+                        <img src="img/425945398.jpg" alt="Plato principal con proteína y vegetales frescos"
+                            data-caption="Plato principal con proteína a la plancha, vegetales frescos y reducción de la casa.">
+                        <figcaption>Plato principal</figcaption>
+                    </figure>
+
+                </div>
+            </div>
+        </section>
+
+        <section id="sobre-hotel" class="sobre-hotel-section">
+            <div class="sobre-hotel-layout">
+                <!-- Columna Izquierda: Historia/Mensaje -->
+                <div class="sobre-hotel-texto">
+                    <span class="subtitulo-premium">Tu hogar en Bucaramanga</span>
+                    <h2>Experimenta el confort del Hotel Ruitoque</h2>
+
+                    <p class="texto-principal">
+                        Ubicados estratégicamente en el corazón de la ciudad, te ofrecemos un refugio de paz a tan solo
+                        5 minutos del centro financiero y comercial.
+                    </p>
+                    <p class="texto-secundario">
+                        Cada uno de nuestros espacios ha sido cuidadosamente diseñado con detalles en obras de arte y
+                        colores cálidos que propician el descanso ideal, ya sea que nos visites por negocios o por el
+                        placer de explorar la ciudad.
+                    </p>
+
+                    <div class="estadisticas-hotel">
+                        <div class="stat-box">
+                            <span class="stat-number">24/7</span>
+                            <span class="stat-label">Seguridad y Recepción</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-number">+15</span>
+                            <span class="stat-label">Años de Tradición</span>
+                        </div>
+                        <div class="stat-box">
+                            <span class="stat-number">100%</span>
+                            <span class="stat-label">Satisfacción Garantizada</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Columna Derecha: Tarjetas de Beneficios (Highlights) -->
+                <div class="sobre-hotel-beneficios">
+                    <div class="beneficio-card">
+                        <div class="beneficio-icon-wrap"><i class="fas fa-wifi"></i></div>
+                        <div class="beneficio-info">
+                            <h3>Conexión Total</h3>
+                            <p>Cada habitación posee <strong>WiFi de red independiente y privado</strong>. Trabaja y
+                                navega sin interrupciones a máxima velocidad.</p>
+                        </div>
+                    </div>
+
+                    <div class="beneficio-card">
+                        <div class="beneficio-icon-wrap"><i class="fas fa-bed"></i></div>
+                        <div class="beneficio-info">
+                            <h3>Estancias de Lujo</h3>
+                            <p>Habitaciones insonorizadas, TV por cable, radio, minibar y lencería premium para un
+                                descanso profundo.</p>
+                        </div>
+                    </div>
+
+                    <div class="beneficio-card">
+                        <div class="beneficio-icon-wrap"><i class="fas fa-utensils"></i></div>
+                        <div class="beneficio-info">
+                            <h3>Sabores Memorables</h3>
+                            <p>Embárcate en un viaje culinario con nuestra gastronomía local y aprovecha el rápido
+                                <em>Room Service</em>.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="beneficio-card">
+                        <div class="beneficio-icon-wrap"><i class="fas fa-map-marked-alt"></i></div>
+                        <div class="beneficio-info">
+                            <h3>Ubicación Estratégica</h3>
+                            <p>A pasos de los emblemáticos Parques Santander y Simón Bolívar. Todo comercio a distancia
+                                para caminar.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="habitaciones" class="habitaciones">
+            <h2>Nuestras Habitaciones</h2>
+            <div class="habitaciones-grid">
+                <div class="habitacion">
+                    <div class="habitacion-galeria gallery-group" data-gallery-group="habitacion-estandar">
+                        <img src="img/425945518.jpg" alt="Habitación Estándar - vista principal"
+                            data-caption="Habitación Estándar con cama queen y ambiente iluminado.">
+                        <img src="img/425945506.jpg" alt="Habitación Estándar - detalle de la cama"
+                            data-caption="Detalle de lencería premium y texturas cálidas en la habitación estándar.">
+                        <img src="img/425945515.jpg" alt="Habitación Estándar - área de estar"
+                            data-caption="Área de estar compacta ideal para estancias cortas.">
+                    </div>
+                    <div class="habitacion-info">
+                        <h3>Habitación Estándar</h3>
+                        <p>Confortable espacio con todas las comodidades básicas para tu descanso.</p>
+                        <a href="#reservar" class="btn-reservar btn-habitacion">Reservar Estándar</a>
+                    </div>
+                </div>
+                <div class="habitacion">
+                    <div class="habitacion-galeria gallery-group" data-gallery-group="habitacion-ejecutiva">
+                        <img src="img/425945536.jpg" alt="Habitación Ejecutiva - vista principal"
+                            data-caption="Habitación Ejecutiva con cama king y escritorio ergonómico.">
+                        <img src="img/74589666.png" alt="Habitación Ejecutiva - zona de trabajo"
+                            data-caption="Zona de trabajo equipada para viajeros de negocios.">
+                        <img src="img/425945537.jpg" alt="Habitación Ejecutiva - detalle de iluminación"
+                            data-caption="Iluminación cálida y decoración moderna en la habitación ejecutiva.">
+                    </div>
+                    <div class="habitacion-info">
+                        <h3>Habitación Ejecutiva</h3>
+                        <p>Amplia habitación con área de trabajo y vistas a la ciudad.</p>
+                        <a href="#reservar" class="btn-reservar btn-habitacion">Reservar Ejecutiva</a>
+                    </div>
+                </div>
+                <div class="habitacion">
+                    <div class="habitacion-galeria gallery-group" data-gallery-group="habitacion-suite">
+                        <img src="img/425945529.jpg" alt="Suite - vista principal"
+                            data-caption="Suite con cama king y iluminación ambiental.">
+                        <img src="img/425945532.jpg" alt="Suite - sala privada"
+                            data-caption="Sala privada de la suite con sofás y rincón de café.">
+                        <img src="img/425945521.jpg" alt="Suite - detalle del baño"
+                            data-caption="Baño de la suite con acabados premium y amenidades.">
+                    </div>
+                    <div class="habitacion-info">
+                        <h3>Suite</h3>
+                        <p>Lujo y confort en un espacio exclusivo con las mejores vistas.</p>
+                        <a href="#reservar" class="btn-reservar btn-habitacion">Reservar Suite</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="servicios" class="servicios">
+            <div class="servicios-header">
+                <h2>Servicios Exclusivos</h2>
+                <div class="puntuacion-premium">
+                    <div class="puntuacion-badge">
+                        <span class="rating">8.4</span>
+                        <div class="rating-stars">★★★★★</div>
+                    </div>
+                    <div class="puntuacion-texto">
+                        <p class="calificacion">"Fabuloso"</p>
+                        <p class="comentarios">Basado en más de 1.140 experiencias</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="servicios-grid">
+                <div class="servicio-card">
+                    <div class="servicio-icon"><i class="fas fa-coffee"></i></div>
+                    <h3>Desayuno Fabuloso</h3>
+                    <p>Desayuno americano tipo buffet con el mejor café colombiano de la región para empezar el día.</p>
+                </div>
+                <div class="servicio-card">
+                    <div class="servicio-icon"><i class="fas fa-wifi"></i></div>
+                    <h3>WiFi Dedicado</h3>
+                    <p>Conexión de fibra óptica de ultra alta velocidad y red exclusiva en cada habitación.</p>
+                </div>
+                <div class="servicio-card">
+                    <div class="servicio-icon"><i class="fas fa-parking"></i></div>
+                    <h3>Parking Privado</h3>
+                    <p>Estacionamiento seguro, subterráneo y completamente gratuito durante toda tu estadía.</p>
+                </div>
+                <div class="servicio-card">
+                    <div class="servicio-icon"><i class="fas fa-utensils"></i></div>
+                    <h3>Restaurante Gourmet</h3>
+                    <p>Alta cocina con especialidades regionales y servicio directo a la comodidad de tu habitación.</p>
+                </div>
+            </div>
+
+            <div class="amenidades-container">
+                <div class="amenidades-header">
+                    <h3>Amenidades Adicionales</h3>
+                    <p>Cada detalle pensado para hacer de tu estadía un momento inolvidable.</p>
+                </div>
+                <div class="amenidades-grid">
+                    <span class="amenidad-pill"><i class="fas fa-ban"></i> Espacios Libres de Humo</span>
+                    <span class="amenidad-pill"><i class="fas fa-snowflake"></i> Aire Acondicionado</span>
+                    <span class="amenidad-pill"><i class="fas fa-tv"></i> Smart TV Premium</span>
+                    <span class="amenidad-pill"><i class="fas fa-glass-martini-alt"></i> Minibar Surtido</span>
+                    <span class="amenidad-pill"><i class="fas fa-users"></i> Habitaciones Familiares</span>
+                    <span class="amenidad-pill"><i class="fas fa-map"></i> Asesoría Turística VIP</span>
+                </div>
+            </div>
+        </section>
+
+        <section id="testimonios" class="testimonios-section">
+            <div class="testimonios-header">
+                <h2>Lo que dicen nuestros huéspedes</h2>
+                <p>Experiencias reales de quienes han elegido el Hotel Ruitoque de Prada para su estadía.</p>
+            </div>
+
+            <div class="testimonios-layout">
+                <div class="calificaciones-sidebar">
+                    <div class="calificacion-total-box">
+                        <span class="nota-gigante">8.4</span>
+                        <div class="estrellas">★★★★★</div>
+                        <p>Basado en 1.148 reseñas verificadas</p>
+                    </div>
+                    <div class="barras-calificacion-container">
+                        <div class="barra-item">
+                            <div class="barra-info"><span>Personal</span> <strong>8.9</strong></div>
+                            <div class="barra-bg">
+                                <div class="barra-fill" style="width: 89%"></div>
+                            </div>
+                        </div>
+                        <div class="barra-item">
+                            <div class="barra-info"><span>Limpieza</span> <strong>8.8</strong></div>
+                            <div class="barra-bg">
+                                <div class="barra-fill" style="width: 88%"></div>
+                            </div>
+                        </div>
+                        <div class="barra-item">
+                            <div class="barra-info"><span>Confort</span> <strong>8.8</strong></div>
+                            <div class="barra-bg">
+                                <div class="barra-fill" style="width: 88%"></div>
+                            </div>
+                        </div>
+                        <div class="barra-item">
+                            <div class="barra-info"><span>Ubicación</span> <strong>8.3</strong></div>
+                            <div class="barra-bg">
+                                <div class="barra-fill" style="width: 83%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="testimonios-grid">
+                    <div class="resena-card">
+                        <div class="quote-icon"><i class="fas fa-quote-right"></i></div>
+                        <div class="resena-estrellas">★★★★★</div>
+                        <p class="comentario-texto">"El desayuno incluído muy rico; las instalaciones del Hotel muy
+                            cómodas y agradables; sin ruido exterior por lo que el descanso fue excelente. El Lobby
+                            tiene zona de trabajo remoto muy cómodo; mis requerimientos fueron solucionados."</p>
+                        <div class="huesped-info">
+                            <div class="huesped-avatar">Y</div>
+                            <div class="huesped-meta">
+                                <h4>Yenny</h4>
+                                <span><i class="fas fa-check-circle"></i> Huésped Verificado · Colombia</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="resena-card">
+                        <div class="quote-icon"><i class="fas fa-quote-right"></i></div>
+                        <div class="resena-estrellas">★★★★★</div>
+                        <p class="comentario-texto">"La atención fue maravillosa, el hotel es lindo, muy limpio y
+                            cómodo. El personal está capacitado para brindar un trato inigualable."</p>
+                        <div class="huesped-info">
+                            <div class="huesped-avatar">D</div>
+                            <div class="huesped-meta">
+                                <h4>Daniela</h4>
+                                <span><i class="fas fa-check-circle"></i> Huésped Verificado · Colombia</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="resena-card">
+                        <div class="quote-icon"><i class="fas fa-quote-right"></i></div>
+                        <div class="resena-estrellas">★★★★☆</div>
+                        <p class="comentario-texto">"Limpio e higiénico. Siempre disponibles al servicio del cliente. La
+                            ubicación céntrica nos permitió movernos fácilmente a los lugares que queríamos visitar a
+                            pie."</p>
+                        <div class="huesped-info">
+                            <div class="huesped-avatar">S</div>
+                            <div class="huesped-meta">
+                                <h4>Sofia</h4>
+                                <span><i class="fas fa-check-circle"></i> Huésped Verificado · Colombia</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="ubicacion" class="ubicacion-section">
+            <div class="seccion-header">
+                <h2>Ubicación Privilegiada</h2>
+                <p>En el corazón de Bucaramanga, cerca de todo lo que necesitas.</p>
+            </div>
+
+            <div class="ubicacion-layout">
+                <div class="ubicacion-mapa-container">
+                    <iframe title="Mapa con la ubicación del Hotel Ruitoque de Prada"
+                        src="https://maps.google.com/maps?q=Carrera%2019%20%2337-26%2C%20Bucaramanga%2C%20Colombia&z=17&output=embed"
+                        loading="lazy" allowfullscreen referrerpolicy="no-referrer-when-downgrade"
+                        class="google-map"></iframe>
+                    <div class="mapa-floating-card">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <div>
+                            <strong>Hotel Ruitoque de Prada</strong>
+                            <span>Carrera 19 # 37-26, Bucaramanga</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="ubicacion-info-cards">
+                    <div class="info-card-premium">
+                        <div class="card-icon"><i class="fas fa-building"></i></div>
+                        <div class="card-content">
+                            <h3>Ubicación Céntrica</h3>
+                            <ul class="lista-ubicacion">
+                                <li><i class="fas fa-car-side"></i> 5 min en coche del centro comercial y financiero
+                                </li>
+                                <li><i class="fas fa-walking"></i> 3 calles de parques Santander y Simón Bolívar</li>
+                                <li><i class="fas fa-plane-departure"></i> 30 minutos del Aeropuerto Int. Palonegro</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="info-card-premium">
+                        <div class="card-icon"><i class="fas fa-store"></i></div>
+                        <div class="card-content">
+                            <h3>Lugares Cercanos a pie</h3>
+                            <ul class="lista-ubicacion">
+                                <li><i class="fas fa-hamburger"></i> Mr Brosty (50m)</li>
+                                <li><i class="fas fa-coffee"></i> La Esquina Café (40m)</li>
+                                <li><i class="fas fa-utensils"></i> Empanadas Alfonso El de la 19 (40m)</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <a href="https://www.google.com/maps/search/?api=1&query=Hotel+Ruitoque+de+Prada,+Carrera+19+%23+37-26,+Bucaramanga"
+                        target="_blank" rel="noopener noreferrer" class="btn-primary-outline w-100 text-center">
+                        <i class="fas fa-external-link-alt"></i> Abrir en Google Maps
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <section id="contacto" class="contacto-section">
+            <div class="contacto-wrapper">
+                <div class="contacto-info-caja">
+                    <h2>Información de Reservas</h2>
+                    <p>Todo lo que necesitas saber antes de tu llegada.</p>
+
+                    <div class="horarios-grid">
+                        <div class="horario-box">
+                            <i class="fas fa-sign-in-alt"></i>
+                            <div>
+                                <h4>Check-in</h4>
+                                <span>15:00 - 23:00</span>
+                                <small>Requiere documento de identidad válido</small>
+                            </div>
+                        </div>
+                        <div class="horario-box">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <div>
+                                <h4>Check-out</h4>
+                                <span>00:00 - 13:00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pagos-box">
+                        <h4>Métodos de Pago</h4>
+                        <div class="tarjetas-grid">
+                            <i class="fab fa-cc-visa" title="Visa"></i>
+                            <i class="fab fa-cc-mastercard" title="MasterCard"></i>
+                            <i class="fab fa-cc-amex" title="American Express"></i>
+                            <i class="fab fa-cc-diners-club" title="Diners Club"></i>
+                            <i class="fas fa-money-bill-wave" title="Efectivo"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="politicas-faq" class="dual-section">
+            <div class="dual-layout">
+                <!-- FAQ Section -->
+                <div class="faq-container">
+                    <div class="seccion-header align-left">
+                        <h2>Preguntas Frecuentes</h2>
+                    </div>
+                    <div class="faq-list">
+                        <div class="faq-card">
+                            <h4><i class="fas fa-question-circle"></i> ¿Qué tipo de desayuno se sirve?</h4>
+                            <p>Ofrecemos un desayuno tipo buffet americano que incluye café colombiano de calidad, panes
+                                y pasteles frescos.</p>
+                        </div>
+                        <div class="faq-card">
+                            <h4><i class="fas fa-question-circle"></i> ¿Hay servicio de transporte al aeropuerto?</h4>
+                            <p>Sí, contamos con servicio de transporte al Aeropuerto Internacional Palonegro (consultar
+                                tarifas en recepción).</p>
+                        </div>
+                        <div class="faq-card">
+                            <h4><i class="fas fa-question-circle"></i> ¿El parking es seguro?</h4>
+                            <p>Sí, contamos con parking privado subterráneo y vigilado las 24 horas sin costo adicional
+                                para huéspedes.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Policies Section -->
+                <div class="politicas-container">
+                    <div class="seccion-header align-left">
+                        <h2>Políticas del Hotel</h2>
+                    </div>
+                    <div class="politicas-list">
+                        <div class="politica-line">
+                            <div class="politica-icon"><i class="fas fa-child"></i></div>
+                            <div class="politica-texto">
+                                <strong>Niños y camas extras</strong>
+                                <span>Se aceptan de todas las edades. Mayores de 5 años pagan tarifa de adulto. No hay
+                                    cunas disponibles.</span>
+                            </div>
+                        </div>
+                        <div class="politica-line">
+                            <div class="politica-icon"><i class="fas fa-paw"></i></div>
+                            <div class="politica-texto">
+                                <strong>Mascotas</strong>
+                                <span>Por higiene y confort de otros huéspedes, no se admiten mascotas en el
+                                    establecimiento.</span>
+                            </div>
+                        </div>
+                        <div class="politica-line">
+                            <div class="politica-icon"><i class="fas fa-id-card"></i></div>
+                            <div class="politica-texto">
+                                <strong>Documentación</strong>
+                                <span>Es indispensable presentar documento de identidad original y poseer tarjeta de
+                                    crédito como garantía al ingresar.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="footer-section">
+        <div class="footer-grid">
+            <!-- Brand & About -->
+            <div class="footer-brand">
+                <img src="img/Logos Hotel/Logo Hotel Horizontal.png" alt="Logo Hotel Ruitoque de Prada"
+                    class="footer-logo-img">
+                <p class="footer-description">Tu hogar premium en el corazón de Bucaramanga. Confort, atención
+                    inigualable y experiencias diseñadas a tu medida.</p>
+                <div class="footer-social-premium">
+                    <a href="#" aria-label="Facebook"><i class="fab fa-facebook-f"></i></a>
+                    <a href="#" aria-label="Instagram"><i class="fab fa-instagram"></i></a>
+                    <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+                    <a href="#" aria-label="TripAdvisor"><i class="fab fa-tripadvisor"></i></a>
+                </div>
+            </div>
+
+            <!-- Direct Contact -->
+            <div class="footer-widget">
+                <h4 class="widget-title">Contacto Directo</h4>
+                <ul class="contact-list">
+                    <li><i class="fas fa-map-marker-alt"></i> Carrera 19 # 37-26, Bucaramanga</li>
+                    <li><i class="fas fa-phone-alt"></i> <a href="tel:+576071234567">+57 (607) 123 4567</a></li>
+                    <li><i class="fab fa-whatsapp"></i> <a href="https://wa.me/573214567890">+57 321 456 7890</a></li>
+                    <li><i class="fas fa-envelope"></i> <a
+                            href="mailto:reservas@hotelruitoque.com">reservas@hotelruitoque.com</a></li>
+                </ul>
+            </div>
+
+            <!-- Quick Links -->
+            <div class="footer-widget">
+                <h4 class="widget-title">Enlaces Rápidos</h4>
+                <ul class="links-list">
+                    <li><a href="#habitaciones"><i class="fas fa-chevron-right"></i> Nuestras Habitaciones</a></li>
+                    <li><a href="#gastronomia"><i class="fas fa-chevron-right"></i> Gastronomía Local</a></li>
+                    <li><a href="#servicios"><i class="fas fa-chevron-right"></i> Amenidades y Servicios</a></li>
+                    <li><a href="#ubicacion"><i class="fas fa-chevron-right"></i> Cómo Llegar</a></li>
+                </ul>
+            </div>
+
+            <!-- Trust & Payments -->
+            <div class="footer-widget">
+                <h4 class="widget-title">Garantía y Seguridad</h4>
+                <p class="footer-security-text">Reserva 100% segura. Aceptamos las principales tarjetas de crédito.</p>
+                <div class="footer-payments">
+                    <i class="fab fa-cc-visa"></i>
+                    <i class="fab fa-cc-mastercard"></i>
+                    <i class="fab fa-cc-amex"></i>
+                    <i class="fab fa-cc-diners-club"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-bottom-bar">
+            <div class="footer-bottom-content">
+                <p>&copy; 2025 Hotel Ruitoque de Prada. Todos los derechos reservados.</p>
+                <div class="footer-legal-links">
+                    <a href="#">Términos y Condiciones</a>
+                    <a href="#">Política de Privacidad</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Chatwoot Native Widget -->
+    <script>
+        (function (d, t) {
+            var BASE_URL = "https://bs-comunicaciones-integrales-chatwoot.jz98vr.easypanel.host";
+            var g = d.createElement(t), s = d.getElementsByTagName(t)[0];
+            g.src = BASE_URL + "/packs/js/sdk.js";
+            g.async = true;
+            s.parentNode.insertBefore(g, s);
+            g.onload = function () {
+                window.chatwootSDK.run({
+                    websiteToken: 'pCj1Z8ziZSeUmwVxovfdnCx8',
+                    baseUrl: BASE_URL
+                })
+            }
+        })(document, "script");
+    </script>
+
+    <!-- Supabase CDN and Reservation Modal -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Custom Integration logic -->
+    <script src="js/integration.js"></script>
+    <script src="js/main.js"></script>
+
+    <!-- Modal de Reserva Integrada (Flujo Simplificado OTA) -->
+    <div id="reservationModal" class="reservation-modal-overlay">
+        <div class="reservation-modal">
+            <button id="closeResModal" class="res-close-btn">&times;</button>
+            <div id="resModalForm" class="res-modal-view">
+                <h3>Solicitud de Reserva</h3>
+                <p id="resDatesLabel" style="color:#666; font-size:0.9rem; margin-bottom:1rem;"></p>
+                <form id="resGuestForm" class="res-guest-form">
+                    <div class="form-group">
+                        <label>Nombre Completo</label>
+                        <input type="text" id="guestFullName" required placeholder="Ej: Juan Pérez">
+                    </div>
+                    <div class="form-group">
+                        <label>Cédula / Pasaporte</label>
+                        <input type="text" id="guestId" required placeholder="Número de documento">
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono (WhatsApp)</label>
+                        <input type="tel" id="guestPhone" required placeholder="Ej: +57 300 0000000">
+                    </div>
+                    <div class="form-group">
+                        <label>Correo Electrónico</label>
+                        <input type="email" id="guestEmail" required placeholder="correo@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Notas Secundarias (Opcional)</label>
+                        <textarea id="guestNotes" placeholder="Alguna petición especial, etc."
+                            style="width: 100%; padding: 0.8rem; border: 1px solid var(--color-border); border-radius: 8px; font-family: inherit; font-size: 0.95rem;"></textarea>
+                    </div>
+                    <p style="font-size: 0.8rem; color:#666; margin-bottom:1rem;">Te contactaremos por WhatsApp o correo
+                        para confirmar tu solicitud.</p>
+                    <button type="submit" id="submitResBtn" class="btn-reservar" style="width:100%;">Enviar
+                        Solicitud</button>
+                </form>
+            </div>
+
+            <div id="resModalSuccess" class="res-modal-view" style="display: none;">
+                <i class="fas fa-paper-plane text-success"
+                    style="font-size: 4rem; color: #2ecc71; margin-bottom: 1rem;"></i>
+                <h3 style="color:#2ecc71;">¡Solicitud Enviada!</h3>
+                <p style="margin-bottom: 1.5rem;">Hemos recibido tu interés de hospedaje. Nuestro equipo te confirmará a
+                    la brevedad.</p>
+                <button id="finishResBtn" class="btn-reservar">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
