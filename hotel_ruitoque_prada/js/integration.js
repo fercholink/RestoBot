@@ -12,7 +12,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyAgCiAgICAicm9s
 // Inicializar cliente de Supabase (requiere que el CDN ya cargó antes de este script)
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-document.addEventListener('DOMContentLoaded', () => {
+function initBookingForm() {
     const bookingForm = document.getElementById('mainBookingForm');
     const modal = document.getElementById('reservationModal');
     const closeBtn = document.getElementById('closeResModal');
@@ -104,4 +104,11 @@ document.addEventListener('DOMContentLoaded', () => {
         bookingForm.reset();
         resGuestForm.reset();
     });
-});
+}
+
+// Patrón robusto: funciona tanto si el DOM ya cargó como si no
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initBookingForm);
+} else {
+    initBookingForm();
+}
