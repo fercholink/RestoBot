@@ -381,14 +381,7 @@ h2::after {
 }
 
 .hero-booking::before {
-    content: 'Encuentra tu Hotel';
-    display: block;
-    font-family: var(--font-heading);
-    font-size: 1.6rem;
-    color: var(--color-primary);
-    margin-bottom: 1.5rem;
-    text-align: center;
-    font-weight: 700;
+    display: none;
 }
 
 .booking-form {
