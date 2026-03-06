@@ -1,10 +1,9 @@
 /**
  * integration.js — Hotel Ruitoque de Prada × Nexus PMS
- * Formulario de reserva en 3 pasos:
- *  1. Selección de fechas (hero form)
- *  2. Selección de tipo de habitación
- *  3. Datos del huésped → guardado en channel_bookings (Nexus Dashboard)
- *  4. Confirmación de éxito
+ * Formulario de reserva en 3 pasos dentro del modal:
+ *  1. Fechas + selección de tipo de habitación
+ *  2. Datos del huésped → guardado en channel_bookings (Nexus Dashboard)
+ *  3. Confirmación de éxito
  */
 
 const SUPABASE_URL = 'https://n8n-bs-comunicaciones-bd-supabase.jz98vr.easypanel.host';
@@ -83,7 +82,6 @@ function showView(viewId) {
         const el = document.getElementById(id);
         if (el) el.style.display = id === viewId ? 'block' : 'none';
     });
-    // Actualizar barra de progreso
     const stepMap = { resViewRooms: 1, resViewGuest: 2, resViewSuccess: 3 };
     const currentStep = stepMap[viewId] || 1;
     document.querySelectorAll('.res-progress-step').forEach(s => {
@@ -93,8 +91,15 @@ function showView(viewId) {
     });
 }
 
-function openModal() {
+function openModal(preselectedRoom) {
+    if (preselectedRoom) state.preselectedRoomId = preselectedRoom;
+    showView('resViewRooms');
+    // Ocultar lista de habitaciones hasta que se busque disponibilidad
+    const roomsList = document.getElementById('resRoomsList');
+    if (roomsList) roomsList.style.display = 'none';
     document.getElementById('reservationModal').classList.add('active');
+    // Enfocar el primer campo de fecha
+    setTimeout(() => document.getElementById('q_check_in')?.focus(), 100);
 }
 
 function closeModal() {
@@ -132,7 +137,8 @@ function renderRooms() {
         </div>`;
     }).join('');
 
-    // Listeners en tarjetas
+    list.style.display = 'block';
+
     list.querySelectorAll('.btn-select-room').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -144,6 +150,18 @@ function renderRooms() {
         card.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') selectRoom(card.dataset.roomId); });
     });
 
+    // Si hay habitación preseleccionada, ir directo al paso 2
+    if (state.preselectedRoomId) {
+        const room = ROOM_TYPES.find(r => r.id === state.preselectedRoomId);
+        if (room) {
+            state.selectedRoom = room;
+            state.preselectedRoomId = null;
+            setTimeout(() => {
+                populateGuestFormSummary();
+                showView('resViewGuest');
+            }, 150);
+        }
+    }
 }
 
 function selectRoom(roomId) {
@@ -151,7 +169,6 @@ function selectRoom(roomId) {
     if (!room) return;
     state.selectedRoom = room;
 
-    // Actualizar visual
     document.querySelectorAll('.res-room-card').forEach(c => {
         const selected = c.dataset.roomId === roomId;
         c.classList.toggle('selected', selected);
@@ -159,7 +176,6 @@ function selectRoom(roomId) {
         if (btn) btn.textContent = selected ? '✓ Seleccionada' : 'Elegir →';
     });
 
-    // Mostrar paso 2 tras breve pausa para feedback visual
     setTimeout(() => {
         populateGuestFormSummary();
         showView('resViewGuest');
@@ -192,11 +208,19 @@ function populateGuestFormSummary() {
     }
 }
 
-// ─── Inicializar formulario principal ────────────────────────────────────
+// ─── Parsear huéspedes del select ─────────────────────────────────────────
+function parseGuests() {
+    const val = document.getElementById('q_guests')?.value || '1 adulto';
+    const adults = parseInt(val.match(/\d+/)?.[0] || '1');
+    const children = val.match(/(\d+)\s*(niño|child)/i)?.[1] ? parseInt(val.match(/(\d+)\s*(niño|child)/i)[1]) : 0;
+    return { adults, children };
+}
+
+// ─── Inicializar ──────────────────────────────────────────────────────────
 function initBookingForm() {
-    const heroForm = document.getElementById('mainBookingForm');
     const modal = document.getElementById('reservationModal');
     const closeBtn = document.getElementById('closeResModal');
+    const heroForm = document.getElementById('mainBookingForm');
     const guestForm = document.getElementById('resGuestForm');
     const backBtn = document.getElementById('resBackBtn');
     const finishBtn = document.getElementById('finishResBtn');
@@ -215,103 +239,65 @@ function initBookingForm() {
             next.setDate(next.getDate() + 1);
             qOut.value = next.toISOString().split('T')[0];
         }
+        if (qOut) qOut.min = qIn.value || today;
     });
 
-    // Abrir modal desde el hero form
-    if (heroForm) {
-        heroForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const checkIn = qIn?.value;
-            const checkOut = qOut?.value;
-            if (!checkIn || !checkOut || new Date(checkOut) <= new Date(checkIn)) {
-                const errEl = document.getElementById('heroFormError');
-                if (errEl) { errEl.textContent = 'Selecciona fechas válidas de entrada y salida.'; errEl.style.display = 'block'; }
-                return;
-            }
-            const guestsSel = document.getElementById('q_guests');
-            const guestsVal = guestsSel?.value || '2 adultos';
-            const adults = parseInt(guestsVal.match(/\d+/)?.[0] || '1');
-            const children = (guestsVal.match(/(\d+)\s*(niño|child)/i)?.[1]) ? parseInt(guestsVal.match(/(\d+)\s*(niño|child)/i)[1]) : 0;
+    // Botón "Reservar Ahora" del hero → abre modal
+    document.getElementById('btnReservarAhora')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        openModal(null);
+    });
 
-            state.checkIn = checkIn;
-            state.checkOut = checkOut;
-            state.nights = Math.ceil((new Date(checkOut) - new Date(checkIn)) / 86400000);
-            state.adults = adults;
-            state.children = children;
-            state.selectedRoom = null;
-
-            // Actualizar encabezado del modal
-            const header = document.getElementById('resDatesLabel');
-            if (header) header.textContent = `${fmt.date(checkIn)} → ${fmt.date(checkOut)}  ·  ${state.nights} noche${state.nights !== 1 ? 's' : ''}  ·  ${adults} adulto${adults !== 1 ? 's' : ''}${children ? `, ${children} niño${children !== 1 ? 's' : ''}` : ''}`;
-
-            renderRooms();
-            showView('resViewRooms');
-            openModal();
-            if (document.getElementById('heroFormError')) document.getElementById('heroFormError').style.display = 'none';
-        });
-    }
-
-    // Botones de habitación (desde la sección habitaciones)
+    // Botones de habitación (desde sección habitaciones) → abren modal preseleccionando
     document.querySelectorAll('[data-book-room]').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
-            const roomId = btn.dataset.bookRoom;
+            openModal(btn.dataset.bookRoom);
+        });
+    });
+
+    // Submit del form de fechas dentro del modal → mostrar habitaciones
+    if (heroForm) {
+        heroForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            hideError('heroFormError');
+
             const checkIn = qIn?.value;
             const checkOut = qOut?.value;
-
             if (!checkIn || !checkOut || new Date(checkOut) <= new Date(checkIn)) {
-                // Scroll al hero form y mostrar mensaje
-                document.getElementById('inicio')?.scrollIntoView({ behavior: 'smooth' });
-                setTimeout(() => {
-                    const errEl = document.getElementById('heroFormError');
-                    if (errEl) { errEl.textContent = 'Selecciona primero las fechas de entrada y salida arriba.'; errEl.style.display = 'block'; }
-                    qIn?.focus();
-                }, 600);
+                showError('heroFormError', 'Selecciona fechas válidas de entrada y salida.');
                 return;
             }
 
-            const guestsSel = document.getElementById('q_guests');
-            const guestsVal = guestsSel?.value || '2 adultos';
-            const adults = parseInt(guestsVal.match(/\d+/)?.[0] || '1');
-            const children = (guestsVal.match(/(\d+)\s*(niño|child)/i)?.[1]) ? parseInt(guestsVal.match(/(\d+)\s*(niño|child)/i)[1]) : 0;
-
+            const { adults, children } = parseGuests();
             state.checkIn = checkIn;
             state.checkOut = checkOut;
             state.nights = Math.ceil((new Date(checkOut) - new Date(checkIn)) / 86400000);
             state.adults = adults;
             state.children = children;
             state.selectedRoom = null;
-            state.preselectedRoomId = roomId;
-
-            const header = document.getElementById('resDatesLabel');
-            if (header) header.textContent = `${fmt.date(checkIn)} → ${fmt.date(checkOut)}  ·  ${state.nights} noche${state.nights !== 1 ? 's' : ''}  ·  ${adults} adulto${adults !== 1 ? 's' : ''}${children ? `, ${children} niño${children !== 1 ? 's' : ''}` : ''}`;
 
             renderRooms();
-
-            // Si hay preselección, ir directo al paso 2
-            const room = ROOM_TYPES.find(r => r.id === roomId);
-            if (room) {
-                state.selectedRoom = room;
-                populateGuestFormSummary();
-                showView('resViewGuest');
-            } else {
-                showView('resViewRooms');
-            }
-            openModal();
         });
-    });
+    }
 
     // Volver al paso anterior
     if (backBtn) backBtn.addEventListener('click', () => {
-        renderRooms();
         showView('resViewRooms');
+        const roomsList = document.getElementById('resRoomsList');
+        if (roomsList && state.nights > 0) roomsList.style.display = 'block';
     });
 
     // Cerrar modal
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
     modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
-    if (finishBtn) finishBtn.addEventListener('click', () => { closeModal(); heroForm?.reset(); });
+    if (finishBtn) finishBtn.addEventListener('click', () => {
+        closeModal();
+        heroForm?.reset();
+        const roomsList = document.getElementById('resRoomsList');
+        if (roomsList) roomsList.style.display = 'none';
+    });
 
     // Envío del formulario de huésped → Supabase
     if (guestForm) {
@@ -360,9 +346,8 @@ function initBookingForm() {
                 const { data, error } = await supabase.from('channel_bookings').insert([payload]).select('id').single();
                 if (error) throw error;
 
-                // Mostrar confirmación
-                const confirmRef = document.getElementById('resConfirmRef');
                 const refCode = data?.id?.slice(0, 8).toUpperCase() || '—';
+                const confirmRef = document.getElementById('resConfirmRef');
                 if (confirmRef) confirmRef.textContent = `# ${refCode}`;
 
                 const confirmDetails = document.getElementById('resConfirmDetails');
@@ -374,7 +359,6 @@ function initBookingForm() {
                     `;
                 }
 
-                // WhatsApp link
                 const waLink = document.getElementById('resWhatsappLink');
                 if (waLink) {
                     const waMsg = encodeURIComponent(`Hola! Acabo de hacer una solicitud de reserva en su web.\n*Código:* #${refCode}\n*Nombre:* ${fullName}\n*Fechas:* ${state.checkIn} al ${state.checkOut}\n*Habitación:* ${room?.name || '-'}`);

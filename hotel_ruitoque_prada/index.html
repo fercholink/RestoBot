@@ -61,32 +61,9 @@
                     <span class="slide-right visible"><i class="fas fa-parking"></i> Parking gratis</span>
                 </div>
                 <div class="hero-buttons scale-in visible">
-                    <a href="#reservar" class="btn-reservar ripple">Reservar Ahora</a>
+                    <a href="#" id="btnReservarAhora" class="btn-reservar ripple">Reservar Ahora</a>
                     <p class="oferta-especial">¡30% OFF - Oferta de fin de año!</p>
                 </div>
-            </div>
-            <div class="hero-booking" id="reservar">
-                <form class="booking-form" id="mainBookingForm">
-                    <div class="form-group">
-                        <label>Fecha de entrada</label>
-                        <input type="date" id="q_check_in" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Fecha de salida</label>
-                        <input type="date" id="q_check_out" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Huéspedes</label>
-                        <select id="q_guests">
-                            <option>1 adulto</option>
-                            <option>2 adultos</option>
-                            <option>2 adultos, 1 niño</option>
-                            <option>2 adultos, 2 niños</option>
-                        </select>
-                    </div>
-                    <div id="heroFormError" class="hero-form-error" style="display:none"></div>
-                    <button type="submit" id="mainBookBtn">Ver disponibilidad →</button>
-                </form>
             </div>
         </section>
 
@@ -649,13 +626,39 @@
                 </div>
             </div>
 
-            <!-- VISTA 1: Selección de habitación -->
+            <!-- VISTA 1: Fechas + Selección de habitación -->
             <div id="resViewRooms" class="res-modal-view">
-                <h3>Elige tu habitación</h3>
-                <p id="resDatesLabel" class="res-dates-label"></p>
-                <div class="res-rooms-list" id="resRoomsList">
-                    <!-- Generado por JS -->
-                </div>
+                <h3>Haz tu reserva</h3>
+
+                <!-- Formulario de fechas -->
+                <form id="mainBookingForm" class="res-dates-form">
+                    <div class="res-dates-grid">
+                        <div class="form-group">
+                            <label for="q_check_in">Entrada</label>
+                            <input type="date" id="q_check_in" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="q_check_out">Salida</label>
+                            <input type="date" id="q_check_out" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="q_guests">Huéspedes</label>
+                            <select id="q_guests">
+                                <option>1 adulto</option>
+                                <option>2 adultos</option>
+                                <option>2 adultos, 1 niño</option>
+                                <option>2 adultos, 2 niños</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="heroFormError" class="res-form-error" style="display:none"></div>
+                    <button type="submit" class="btn-reservar" style="width:100%; margin-top:0.75rem;">
+                        Ver habitaciones disponibles →
+                    </button>
+                </form>
+
+                <!-- Lista de habitaciones (oculta hasta buscar) -->
+                <div id="resRoomsList" style="display:none"></div>
             </div>
 
             <!-- VISTA 2: Datos del huésped -->
