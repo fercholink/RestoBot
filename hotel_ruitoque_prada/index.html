@@ -628,13 +628,6 @@
         })(document, "script");
     </script>
 
-    <!-- Supabase CDN and Reservation Modal -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <!-- Custom Integration logic -->
-    <script src="js/integration.js"></script>
-    <script src="js/main.js"></script>
-
     <!-- Modal de Reserva Integrada (Flujo Simplificado OTA) -->
     <div id="reservationModal" class="reservation-modal-overlay">
         <div class="reservation-modal">
@@ -681,6 +674,14 @@
             </div>
         </div>
     </div>
+
+    <!-- Supabase CDN - debe cargar ANTES de integration.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Custom Integration logic -->
+    <script src="js/integration.js"></script>
+    <script src="js/main.js"></script>
+
 </body>
 
 </html>
