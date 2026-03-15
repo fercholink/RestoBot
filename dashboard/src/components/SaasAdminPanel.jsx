@@ -145,7 +145,7 @@ export default function SaasAdminPanel() {
 
     // Contadores para métricas top
     const totalTenants = organizations.length;
-    const activeTenants = organizations.filter(o => o.status === 'activo' || !o.status).length;
+    const activeTenants = organizations.filter(o => o.status !== 'inactivo').length;
     const hotelPacks = organizations.filter(o => (o.active_modules || []).includes('hotel')).length;
 
     return (
