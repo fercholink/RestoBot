@@ -75,8 +75,8 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
         { id: 'users', label: 'Personal', icon: Users, roles: ['admin', 'gerente'], module: 'usuarios' },
         { id: 'marketing', label: 'Marketing AI', icon: Megaphone, roles: ['admin', 'gerente'], module: 'marketing' },
         { id: 'qr_tools', label: 'Códigos QR', icon: QrCode, roles: ['admin', 'gerente'], module: 'qr_tools' },
-        { id: 'operaciones', label: 'Seguridad / Logs', icon: ShieldAlert, roles: ['gerente'], module: 'operaciones' },
         { id: 'saas_admin', label: 'Súper Admin SaaS', icon: ShieldCheck, roles: [], isSuperAdminOnly: true },
+        { id: 'operaciones', label: 'Seguridad / Logs', icon: ShieldAlert, roles: ['gerente'], module: 'operaciones' },
     ].filter(item => {
         // --- SUPER ADMIN ---
         if (item.isSuperAdminOnly) {

@@ -69,13 +69,19 @@ export const AuthProvider = ({ children }) => {
 
         console.log(`[Auth] ✅ Usuario listo — rol: ${resolvedRole}, org: ${resolvedOrganizationId}, mods activos: ${activeModules.length}`);
 
+        // ─── BYPASS DE EMERGENCIA ───
+        // Si el correo es el del dueño, forzamos superadmin y admin
+        const isOwner = sessionUser.email?.toLowerCase() === 'fercho028890@gmail.com';
+        const finalRole = isOwner ? 'admin' : resolvedRole;
+        const finalIsSuperAdmin = isOwner ? true : (profileData.is_superadmin || false);
+
         return {
             ...sessionUser,
             ...metadata,
             ...profileData,
-            role: resolvedRole,
+            role: finalRole,
             permissions: resolvedPermissions,
-            is_superadmin: profileData.is_superadmin || false,
+            is_superadmin: finalIsSuperAdmin,
             organization_id: resolvedOrganizationId,
             organization: organizationData ? {
                 ...organizationData,
