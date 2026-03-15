@@ -96,7 +96,7 @@ export default function SaasAdminPanel() {
         // Optimistic: quitar de la lista de inmediato
         setOrganizations(prev => prev.filter(o => o.id !== org.id));
         try {
-            const { error } = await supabase.from('organizations').delete().eq('id', org.id);
+            const { error } = await supabase.rpc('delete_saas_tenant', { p_org_id: org.id });
             if (error) throw error;
             sileo.success({ title: 'Tenant eliminado', description: `"${org.name}" fue eliminado de la plataforma.` });
         } catch (err) {
