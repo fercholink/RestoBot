@@ -15,6 +15,7 @@ import TapeChart from './TapeChart';
 import HousekeepingApp from './HousekeepingApp';
 import HotelAnalytics from './HotelAnalytics';
 import GuestCRM from './GuestCRM';
+import { useAuth } from '../context/AuthContext';
 
 // Helper Component for Cleaning Timer
 const CleaningTimer = ({ startTime }) => {
@@ -59,6 +60,7 @@ const CleaningTimer = ({ startTime }) => {
 };
 
 const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
+    const { user: currentUser } = useAuth();
     // --- ESTADO GLOBAL ---
     const [loading, setLoading] = useState(true);
     const [branches, setBranches] = useState([]);
@@ -99,11 +101,13 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
     const fetchBranches = async () => {
         setLoading(true);
         try {
+            // El aislamiento multi-tenant lo maneja RLS en Supabase.
+            // No filtramos por organization_id aquí para no romper sedes
+            // que aún no tienen ese campo asignado (migración gradual).
+            const branchesQuery = supabase.from('branches').select('*').order('id', { ascending: true });
+
             // Promise.race para evitar que se quede cargando infinitamente
-            const fetchPromise = supabase
-                .from('branches')
-                .select('*')
-                .order('id', { ascending: true });
+            const fetchPromise = branchesQuery;
 
             const timeoutPromise = new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Timeout: La conexión tardó demasiado')), 5000)
@@ -258,8 +262,10 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
     }, [selectedBranchId, currentDate]); // Recargar si cambia la fecha (para calendario si filtramos por fecha exacta)
 
     useEffect(() => {
-        fetchBranches();
-    }, []);
+        if (currentUser) {
+            fetchBranches();
+        }
+    }, [currentUser]);
 
     // Crea una sede por defecto si no existe ninguna
     const createDefaultBranch = async () => {
@@ -270,7 +276,8 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                     name: 'Sede Principal',
                     address: 'Dirección Principal',
                     phone: '0000000000',
-                    active: true
+                    active: true,
+                    organization_id: currentUser?.organization_id || null
                 }])
                 .select();
 

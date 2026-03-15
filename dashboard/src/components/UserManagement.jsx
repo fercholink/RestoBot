@@ -118,11 +118,24 @@ const UserManagement = () => {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
+            // El Super Admin ('admin') puede ver todo, el resto solo de su organización
+            const isSuperAdmin = currentUser?.role === 'admin';
+            
+            let profilesQuery = supabase.from('profiles').select('*, branch:branches(name)').order('created_at', { ascending: false });
+            let branchesQuery = supabase.from('branches').select('id, name').order('name');
+            
+            // Fila clave para Multi-Tenant:
+            if (!isSuperAdmin && currentUser?.organization_id) {
+                profilesQuery = profilesQuery.eq('organization_id', currentUser.organization_id);
+                branchesQuery = branchesQuery.eq('organization_id', currentUser.organization_id);
+            }
+
             const [profilesRes, branchesRes, rolesRes] = await Promise.all([
-                supabase.from('profiles').select('*, branch:branches(name)').order('created_at', { ascending: false }),
-                supabase.from('branches').select('id, name').order('name'),
+                profilesQuery,
+                branchesQuery,
                 supabase.from('roles').select('*').order('id', { ascending: true }),
             ]);
+            
             setUsers(profilesRes.data || []);
             setBranches(branchesRes.data || []);
             setDbRoles(rolesRes.data || []);
@@ -132,7 +145,7 @@ const UserManagement = () => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [currentUser]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -260,6 +273,7 @@ const UserManagement = () => {
                             data: {
                                 full_name: formUser.full_name,
                                 role: formUser.role,
+                                organization_id: currentUser.organization_id || null,
                             },
                         },
                     });

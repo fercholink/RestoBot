@@ -23,6 +23,7 @@ import MarketingModule from './components/Marketing/MarketingModule';
 import TableQRGenerator from './components/TableQRGenerator';
 import NotificationPanel from './components/NotificationPanel';
 import DigitalCheckIn from './components/DigitalCheckIn';
+import SaasAdminPanel from './components/SaasAdminPanel';
 import { LayoutGrid, Filter, Plus, Building2, ShieldCheck, Wallet, Activity } from 'lucide-react';
 import { Toaster, sileo } from 'sileo';
 import { emitInvoiceForOrder } from './services/invoiceHelper';
@@ -704,7 +705,8 @@ function App() {
                             activeTab === 'hotels' ? 'Gestión Hotelera' :
                               activeTab === 'contabilidad' ? 'Contabilidad General' :
                                 activeTab === 'marketing' ? 'Marketing AI Studio' :
-                                  activeTab === 'qr_tools' ? 'Generador de QR' : 'Seguridad y Auditoría'}
+                                  activeTab === 'qr_tools' ? 'Generador de QR' : 
+                                    activeTab === 'saas_admin' ? 'Super Admin SaaS' : 'Seguridad y Auditoría'}
                   </h1>
                 </div>
                 <p className="text-xs font-bold text-accent/70 flex items-center gap-2 uppercase tracking-tight">
@@ -783,6 +785,7 @@ function App() {
           {activeTab === 'marketing' && <MarketingModule />}
           {activeTab === 'qr_tools' && <TableQRGenerator />}
           {activeTab === 'operaciones' && <OperationsHub />}
+          {activeTab === 'saas_admin' && <SaasAdminPanel />}
         </main>
 
         <NewOrderModal

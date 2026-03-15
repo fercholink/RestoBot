@@ -43,8 +43,31 @@ export const AuthProvider = ({ children }) => {
         const resolvedPermissions = hasRealPermissions ? dbPerms : getDefaultPermissions(resolvedRole);
         const resolvedOrganizationId = profileData.organization_id || metadata.organization_id || null;
 
-        console.log(`[Auth] ✅ Usuario listo — rol: ${resolvedRole}, permisos: ${hasRealPermissions ? 'BD' : 'DEFAULT'}, org: ${resolvedOrganizationId}`);
+        // ─── PASO 2.1: FETCHAR MODULES POR ORGANIZACIÓN ───
+        let organizationData = null;
+        if (resolvedOrganizationId) {
+            try {
+                const { data: orgData, error: orgError } = await supabase
+                    .from('organizations')
+                    .select('*')
+                    .eq('id', resolvedOrganizationId)
+                    .single();
+                
+                if (orgData && !orgError) {
+                    organizationData = orgData;
+                } else if (orgError) {
+                    console.warn("[Auth] No se pudo cargar organización:", orgError.message);
+                }
+            } catch (err) {
+                console.warn("[Auth] Excepción al cargar organización:", err.message);
+            }
+        }
 
+        // Si la org no tiene array predefinido (ej. migración incompleta), le damos todos como fallback.
+        const defaultModules = ['restaurante', 'hotel', 'financiero', 'usuarios', 'sedes', 'marketing', 'qr_tools', 'operaciones'];
+        const activeModules = organizationData?.active_modules || defaultModules;
+
+        console.log(`[Auth] ✅ Usuario listo — rol: ${resolvedRole}, org: ${resolvedOrganizationId}, mods activos: ${activeModules.length}`);
 
         return {
             ...sessionUser,
@@ -52,7 +75,12 @@ export const AuthProvider = ({ children }) => {
             ...profileData,
             role: resolvedRole,
             permissions: resolvedPermissions,
+            is_superadmin: profileData.is_superadmin || false,
             organization_id: resolvedOrganizationId,
+            organization: organizationData ? {
+                ...organizationData,
+                active_modules: activeModules
+            } : { active_modules: activeModules },
             branch: { name: profileData.branch_id ? 'Sede' : 'Sede Principal', id: profileData.branch_id || metadata.branch_id },
             name: profileData.full_name || metadata.name || sessionUser.email?.split('@')[0] || 'Usuario'
         };

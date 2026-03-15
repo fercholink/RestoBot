@@ -7,6 +7,7 @@ import {
     CheckCircle2, XCircle, Info
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 
 // ─── Mapa de Iconos disponibles ─────────────────────────────────────────────
 const ICON_MAP = {
@@ -62,6 +63,7 @@ const EMPTY_PERMISSIONS = Object.fromEntries(
 
 // ─── Componente Principal ───────────────────────────────────────────────────
 const RoleManagement = () => {
+    const { user: currentUser } = useAuth();
     const [roles, setRoles] = useState([]);
     const [userCounts, setUserCounts] = useState({});
     const [loading, setLoading] = useState(true);
@@ -672,7 +674,13 @@ const RoleManagement = () => {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-100">
-                                                {Object.entries(formRole.permissions || {}).map(([moduleName, perms]) => {
+                                                {Object.entries(formRole.permissions || {})
+                                                    .filter(([moduleName]) => {
+                                                        const orgModules = currentUser?.organization?.active_modules;
+                                                        if (orgModules && !orgModules.includes(moduleName)) return false;
+                                                        return true;
+                                                    })
+                                                    .map(([moduleName, perms]) => {
                                                     const modInfo = MODULE_LABELS[moduleName] || { label: moduleName, emoji: '📦' };
                                                     const allOn = Object.values(perms).every(Boolean);
                                                     return (

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutPanelLeft, Users, Utensils, Settings, Menu, X, LogOut, ChevronLeft, ChevronRight, Building2, Wallet, ShieldAlert, Zap, Megaphone, QrCode } from 'lucide-react';
+import { LayoutPanelLeft, Users, Utensils, Settings, Menu, X, LogOut, ChevronLeft, ChevronRight, Building2, Wallet, ShieldAlert, Zap, Megaphone, QrCode, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeRestaurantSubTab, setActiveRestaurantSubTab, activeHotelSubTab, setActiveHotelSubTab, activeAccountingSubTab, setActiveAccountingSubTab }) => {
@@ -73,11 +73,26 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
         { id: 'contabilidad', label: 'Contabilidad', icon: Wallet, roles: ['gerente', 'admin'], hasSubmenu: true, module: 'financiero' },
         { id: 'sedes', label: 'Sucursales', icon: Building2, roles: ['gerente'], module: 'sedes' },
         { id: 'users', label: 'Personal', icon: Users, roles: ['admin', 'gerente'], module: 'usuarios' },
-        { id: 'marketing', label: 'Marketing AI', icon: Megaphone, roles: ['admin', 'gerente'] },
-        { id: 'qr_tools', label: 'Códigos QR', icon: QrCode, roles: ['admin', 'gerente'] },
-        { id: 'operaciones', label: 'Seguridad / Logs', icon: ShieldAlert, roles: ['gerente'] },
+        { id: 'marketing', label: 'Marketing AI', icon: Megaphone, roles: ['admin', 'gerente'], module: 'marketing' },
+        { id: 'qr_tools', label: 'Códigos QR', icon: QrCode, roles: ['admin', 'gerente'], module: 'qr_tools' },
+        { id: 'operaciones', label: 'Seguridad / Logs', icon: ShieldAlert, roles: ['gerente'], module: 'operaciones' },
+        { id: 'saas_admin', label: 'Súper Admin SaaS', icon: ShieldCheck, roles: [], isSuperAdminOnly: true },
     ].filter(item => {
-        // 0. Super Admin siempre ve todo
+        // --- SUPER ADMIN ---
+        if (item.isSuperAdminOnly) {
+            return user?.is_superadmin === true;
+        }
+
+        // --- FEATURE FLAG POR ORGANIZACIÓN (NIVEL SaaS) ---
+        // Si el menú pertenece a un módulo particular y la organización NO lo tiene activo, se oculta completamente.
+        if (item.module && user?.organization?.active_modules) {
+            if (!user.organization.active_modules.includes(item.module)) {
+                return false; // Módulo bloqueado/no comprado para este Tenant
+            }
+        }
+
+        // --- AUTORIZACIÓN POR ROLES/PERMISOS DEL USUARIO ---
+        // 0. Super Admin siempre ve todo (siempre que la org tenga el módulo, verificado arriba)
         if (user?.role === 'admin' || user?.role === 'gerente') return true;
 
         // 1. Si no hay permisos definidos, usamos validación legacy por roles
@@ -91,7 +106,7 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
             return hasPermission(item.module);
         }
 
-        // 3. Módulos sin 'module' key (como Marketing/QR por ahora), fallback a rol
+        // 3. Módulos sin 'module' key fallback a rol
         return item.roles.includes(user?.role || 'cajero');
     });
 

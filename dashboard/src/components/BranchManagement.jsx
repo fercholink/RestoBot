@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, MapPin, Phone, Users, Plus, Edit2, Trash2, Power, CheckCircle2, XCircle, Search, Save, X, FileText, Smartphone, Hash, Globe } from 'lucide-react';
+import { Building2, MapPin, Phone, Plus, Edit2, Power, Search, Save, X, FileText, Globe } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 
 const BranchManagement = () => {
+    const { user: currentUser } = useAuth();
     const [branches, setBranches] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -17,10 +19,14 @@ const BranchManagement = () => {
     const fetchBranches = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('branches')
-                .select('*')
-                .order('id', { ascending: true });
+            const isSuperAdmin = currentUser?.role === 'admin';
+            let query = supabase.from('branches').select('*').order('id', { ascending: true });
+
+            if (!isSuperAdmin && currentUser?.organization_id) {
+                query = query.eq('organization_id', currentUser.organization_id);
+            }
+
+            const { data, error } = await query;
 
             if (error) throw error;
             setBranches(data || []);
@@ -49,7 +55,8 @@ const BranchManagement = () => {
             booking_property_id: formData.get('booking_property_id'),
             booking_machine_id: formData.get('booking_machine_id'),
             booking_machine_password: formData.get('booking_machine_password'),
-            active: true
+            active: true,
+            organization_id: currentUser?.organization_id || null
         };
 
         try {
@@ -69,20 +76,6 @@ const BranchManagement = () => {
             fetchBranches();
         } catch (error) {
             alert('Error al guardar sucursal: ' + error.message);
-        }
-    };
-
-    const handleDeleteBranch = async (id) => {
-        if (!confirm('¿Está seguro de desactivar esta sucursal?')) return;
-        try {
-            const { error } = await supabase
-                .from('branches')
-                .update({ active: false })
-                .eq('id', id);
-            if (error) throw error;
-            fetchBranches();
-        } catch (error) {
-            alert('Error: ' + error.message);
         }
     };
 
