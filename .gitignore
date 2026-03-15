@@ -28,3 +28,11 @@ yarn-error.log*
 .vscode
 *.swp
 *.swo
+
+# Binarios y archivos locales grandes
+*.exe
+*.msi
+*.dmg
+dashboard/eslint-report*.json
+prueba_webhook_n8n.json
+.claude/

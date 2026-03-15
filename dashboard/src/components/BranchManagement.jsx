@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, MapPin, Phone, Plus, Edit2, Power, Search, Save, X, FileText, Globe } from 'lucide-react';
+import { Building2, MapPin, Phone, Plus, Edit2, Power, Search, Save, X, FileText, Globe, Trash2, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { sileo } from 'sileo';
 
 const BranchManagement = () => {
     const { user: currentUser } = useAuth();
     const [branches, setBranches] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [editingBranch, setEditingBranch] = useState(null);
+    const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
-    // Initial Load
     useEffect(() => {
         fetchBranches();
     }, []);
@@ -19,20 +21,17 @@ const BranchManagement = () => {
     const fetchBranches = async () => {
         setLoading(true);
         try {
-            const isSuperAdmin = currentUser?.role === 'admin';
-            let query = supabase.from('branches').select('*').order('id', { ascending: true });
-
-            if (!isSuperAdmin && currentUser?.organization_id) {
-                query = query.eq('organization_id', currentUser.organization_id);
-            }
-
-            const { data, error } = await query;
+            // RLS maneja el aislamiento multi-tenant a nivel de BD
+            const { data, error } = await supabase
+                .from('branches')
+                .select('*')
+                .order('id', { ascending: true });
 
             if (error) throw error;
             setBranches(data || []);
         } catch (error) {
             console.error('Error fetching branches:', error);
-            // Fallback to empty or toast
+            sileo.error({ title: 'Error de conexión', description: 'No se pudieron cargar las sedes.' });
         } finally {
             setLoading(false);
         }
@@ -40,6 +39,7 @@ const BranchManagement = () => {
 
     const handleSaveBranch = async (e) => {
         e.preventDefault();
+        setSaving(true);
         const formData = new FormData(e.target);
         const branchData = {
             name: formData.get('name'),
@@ -66,16 +66,40 @@ const BranchManagement = () => {
                     .update(branchData)
                     .eq('id', editingBranch.id);
                 if (error) throw error;
+                sileo.success({ title: 'Sede actualizada', description: `"${branchData.name}" guardada correctamente.` });
             } else {
                 const { error } = await supabase
                     .from('branches')
                     .insert([branchData]);
                 if (error) throw error;
+                sileo.success({ title: 'Sede creada', description: `"${branchData.name}" fue agregada al sistema.` });
             }
             setShowModal(false);
+            setEditingBranch(null);
             fetchBranches();
         } catch (error) {
-            alert('Error al guardar sucursal: ' + error.message);
+            sileo.error({ title: 'Error al guardar', description: error.message });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDelete = async (branch) => {
+        // Doble-clic para confirmar
+        if (pendingDeleteId !== branch.id) {
+            setPendingDeleteId(branch.id);
+            sileo.warning({ title: 'Confirmar eliminación', description: `Haz clic en eliminar nuevamente para borrar "${branch.name}".` });
+            setTimeout(() => setPendingDeleteId(null), 3500);
+            return;
+        }
+        setPendingDeleteId(null);
+        try {
+            const { error } = await supabase.from('branches').delete().eq('id', branch.id);
+            if (error) throw error;
+            sileo.success({ title: 'Sede eliminada', description: `"${branch.name}" fue eliminada.` });
+            fetchBranches();
+        } catch (error) {
+            sileo.error({ title: 'Error al eliminar', description: error.message });
         }
     };
 
@@ -86,9 +110,13 @@ const BranchManagement = () => {
                 .update({ active: !branch.active })
                 .eq('id', branch.id);
             if (error) throw error;
-            fetchBranches();
+            setBranches(prev => prev.map(b => b.id === branch.id ? { ...b, active: !b.active } : b));
+            sileo.success({
+                title: branch.active ? 'Sede desactivada' : 'Sede activada',
+                description: `"${branch.name}" quedó ${branch.active ? 'inactiva' : 'activa'}.`
+            });
         } catch (error) {
-            alert('Error: ' + error.message);
+            sileo.error({ title: 'Error', description: error.message });
         }
     };
 
@@ -121,7 +149,14 @@ const BranchManagement = () => {
             </div>
 
             {loading ? (
-                <div className="text-center py-20 text-gray-400">Cargando sucursales...</div>
+                <div className="flex items-center justify-center py-20 gap-3 text-gray-400">
+                    <Loader2 size={24} className="animate-spin text-primary" />
+                    <span className="font-bold">Cargando sucursales...</span>
+                </div>
+            ) : filteredBranches.length === 0 ? (
+                <div className="text-center py-20 text-gray-400 font-bold">
+                    {searchTerm ? 'No se encontraron sedes con ese criterio.' : 'No hay sedes registradas aún.'}
+                </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredBranches.map((branch) => (
@@ -151,7 +186,6 @@ const BranchManagement = () => {
                                     </div>
                                 </div>
 
-                                {/* Info Legal Compacta */}
                                 <div className="bg-gray-50 rounded-xl p-3 text-[10px] space-y-1 border border-gray-100">
                                     <div className="flex justify-between">
                                         <span className="font-bold text-gray-400">NIT:</span>
@@ -180,6 +214,18 @@ const BranchManagement = () => {
                                         <Edit2 size={14} />
                                         Editar
                                     </button>
+                                    <button
+                                        onClick={() => handleDelete(branch)}
+                                        className={`flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl transition-all font-black text-[10px] uppercase tracking-widest border ${
+                                            pendingDeleteId === branch.id
+                                                ? 'bg-red-500 text-white border-red-500 animate-pulse'
+                                                : 'bg-gray-50 text-red-400 hover:bg-red-50 hover:text-red-600 border-gray-100'
+                                        }`}
+                                        title="Eliminar sede"
+                                    >
+                                        <Trash2 size={14} />
+                                        {pendingDeleteId === branch.id ? '¿Seguro?' : 'Eliminar'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -193,17 +239,16 @@ const BranchManagement = () => {
                     <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in fade-in duration-200 my-8">
                         <div className="bg-secondary p-8 text-white flex justify-between items-center relative overflow-hidden">
                             <div className="relative z-10">
-                                <h3 className="text-2xl font-black tracking-tight">{editingBranch ? 'Configuración Legal' : 'Nueva Sede'}</h3>
+                                <h3 className="text-2xl font-black tracking-tight">{editingBranch ? 'Editar Sede' : 'Nueva Sede'}</h3>
                                 <p className="text-white/60 text-xs font-medium mt-1">Datos de facturación y contacto</p>
                             </div>
-                            <button onClick={() => setShowModal(false)} className="relative z-10 p-2 hover:bg-white/10 rounded-full transition-colors">
+                            <button onClick={() => { setShowModal(false); setEditingBranch(null); }} className="relative z-10 p-2 hover:bg-white/10 rounded-full transition-colors">
                                 <X size={24} />
                             </button>
                             <Building2 className="absolute -right-8 -bottom-8 text-white/5 w-40 h-40" />
                         </div>
                         <form onSubmit={handleSaveBranch} className="p-8 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Datos Básicos */}
                                 <div className="space-y-1 col-span-2">
                                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Nombre Comercial</label>
                                     <input name="name" type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none font-bold" defaultValue={editingBranch?.name} required placeholder="Ej. Restaurante Sede Norte" />
@@ -221,7 +266,6 @@ const BranchManagement = () => {
                                     <input name="address" type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-sm" defaultValue={editingBranch?.address} placeholder="Dirección completa" />
                                 </div>
 
-                                {/* Separador Legal */}
                                 <div className="col-span-2 pt-4 pb-2 border-b border-gray-100 mb-2">
                                     <h4 className="text-xs font-black text-secondary uppercase tracking-widest flex items-center gap-2">
                                         <FileText size={14} className="text-primary" /> Información Tributaria (DIAN)
@@ -253,7 +297,6 @@ const BranchManagement = () => {
                                     <textarea name="invoice_footer" rows="2" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none text-xs" defaultValue={editingBranch?.invoice_footer} placeholder="Gracias por su compra..." />
                                 </div>
 
-                                {/* Conectividad Booking.com */}
                                 <div className="col-span-2 pt-4 pb-2 border-b border-gray-100 mb-2">
                                     <h4 className="text-xs font-black text-secondary uppercase tracking-widest flex items-center gap-2">
                                         <Globe size={14} className="text-blue-500" /> Conectividad Booking.com
@@ -275,11 +318,19 @@ const BranchManagement = () => {
                             </div>
 
                             <div className="flex gap-4 pt-4 border-t border-gray-100">
-                                <button type="submit" className="flex-1 bg-primary text-white py-4 rounded-xl font-black shadow-premium hover:brightness-110 active:scale-95 transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-2">
-                                    <Save size={18} />
-                                    Guardar Cambios
+                                <button
+                                    type="submit"
+                                    disabled={saving}
+                                    className="flex-1 bg-primary text-white py-4 rounded-xl font-black shadow-premium hover:brightness-110 active:scale-95 transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                                >
+                                    {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                                    {saving ? 'Guardando...' : 'Guardar Cambios'}
                                 </button>
-                                <button type="button" onClick={() => setShowModal(false)} className="px-8 py-4 bg-gray-100 text-secondary rounded-xl font-black hover:bg-gray-200 transition-all text-sm uppercase tracking-widest">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowModal(false); setEditingBranch(null); }}
+                                    className="px-8 py-4 bg-gray-100 text-secondary rounded-xl font-black hover:bg-gray-200 transition-all text-sm uppercase tracking-widest"
+                                >
                                     Cancelar
                                 </button>
                             </div>
