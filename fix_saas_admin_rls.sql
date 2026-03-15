@@ -50,6 +50,8 @@ BEGIN
 END $$;
 
 -- ─── PASO 3: Función delete_saas_tenant (cascade completo) ───────────────────
+-- Orden correcto: hijos primero, luego padres (respetando FKs)
+-- orders_branch_id_fkey y otras constraints requieren borrar en secuencia.
 
 CREATE OR REPLACE FUNCTION public.delete_saas_tenant(p_org_id uuid)
 RETURNS void
@@ -63,16 +65,52 @@ BEGIN
     -- Obtener owner antes de borrar
     SELECT owner_id INTO v_owner_id FROM public.organizations WHERE id = p_org_id;
 
-    -- 1. Eliminar sedes de la organización
+    -- NIVEL 1: Tablas hoja (referencian orders / bookings / rooms)
+    DELETE FROM public.order_items
+        WHERE order_id IN (
+            SELECT id FROM public.orders
+            WHERE branch_id IN (SELECT id FROM public.branches WHERE organization_id = p_org_id)
+        );
+
+    DELETE FROM public.room_charges
+        WHERE booking_id IN (
+            SELECT id FROM public.bookings
+            WHERE room_id IN (SELECT id FROM public.rooms WHERE branch_id IN (SELECT id FROM public.branches WHERE organization_id = p_org_id))
+        );
+
+    DELETE FROM public.accounting_entries
+        WHERE shift_id IN (
+            SELECT id FROM public.shifts
+            WHERE branch_id IN (SELECT id FROM public.branches WHERE organization_id = p_org_id)
+        );
+
+    -- NIVEL 2: orders, bookings, shifts (referencian branches / rooms)
+    DELETE FROM public.orders
+        WHERE branch_id IN (SELECT id FROM public.branches WHERE organization_id = p_org_id);
+
+    DELETE FROM public.bookings
+        WHERE room_id IN (SELECT id FROM public.rooms WHERE branch_id IN (SELECT id FROM public.branches WHERE organization_id = p_org_id));
+
+    DELETE FROM public.shifts
+        WHERE branch_id IN (SELECT id FROM public.branches WHERE organization_id = p_org_id);
+
+    -- NIVEL 3: rooms (referencia branches)
+    DELETE FROM public.rooms
+        WHERE branch_id IN (SELECT id FROM public.branches WHERE organization_id = p_org_id);
+
+    -- NIVEL 4: third_parties y otros que puedan referenciar organization
+    DELETE FROM public.third_parties WHERE organization_id = p_org_id;
+
+    -- NIVEL 5: branches
     DELETE FROM public.branches WHERE organization_id = p_org_id;
 
-    -- 2. Eliminar perfiles de la organización
+    -- NIVEL 6: profiles de la organización
     DELETE FROM public.profiles WHERE organization_id = p_org_id;
 
-    -- 3. Eliminar la organización
+    -- NIVEL 7: la organización
     DELETE FROM public.organizations WHERE id = p_org_id;
 
-    -- 4. Eliminar el usuario de auth (limpieza completa)
+    -- NIVEL 8: usuario de auth (limpieza final)
     IF v_owner_id IS NOT NULL THEN
         DELETE FROM auth.users WHERE id = v_owner_id;
     END IF;
