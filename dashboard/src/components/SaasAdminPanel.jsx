@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { ShieldCheck, Search, CheckCircle2, XCircle, Building2, Server, Power, Loader2, Plus } from 'lucide-react';
+import { ShieldCheck, Search, CheckCircle2, XCircle, Building2, Server, Power, Loader2, Plus, Trash2, Edit2, Save, X } from 'lucide-react';
 import { sileo } from 'sileo';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -22,15 +22,18 @@ export default function SaasAdminPanel() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     
-    // Modal State
+    // Modal Crear
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [creating, setCreating] = useState(false);
-    const [formData, setFormData] = useState({
-        name: '',
-        email: '',
-        password: '',
-        modules: []
-    });
+    const [formData, setFormData] = useState({ name: '', email: '', password: '', modules: [] });
+
+    // Modal Editar
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editingOrg, setEditingOrg] = useState(null);
+    const [saving, setSaving] = useState(false);
+
+    // Eliminar con doble-clic
+    const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
     useEffect(() => {
         fetchOrganizations();
@@ -51,6 +54,49 @@ export default function SaasAdminPanel() {
             sileo.error({ title: 'Acceso Denegado', description: 'Ocurrió un error cargando la BBDD Global.' });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleEditOrg = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        const fd = new FormData(e.target);
+        try {
+            const { error } = await supabase
+                .from('organizations')
+                .update({
+                    name: fd.get('name'),
+                    contact_email: fd.get('contact_email'),
+                    subscription_status: fd.get('subscription_status') || null,
+                })
+                .eq('id', editingOrg.id);
+            if (error) throw error;
+            sileo.success({ title: 'Tenant actualizado', description: `"${fd.get('name')}" guardado correctamente.` });
+            setIsEditModalOpen(false);
+            setEditingOrg(null);
+            fetchOrganizations();
+        } catch (err) {
+            sileo.error({ title: 'Error al guardar', description: err.message });
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDeleteOrg = async (org) => {
+        if (pendingDeleteId !== org.id) {
+            setPendingDeleteId(org.id);
+            sileo.warning({ title: 'Confirmar eliminación', description: `Haz clic en "Eliminar" nuevamente para borrar "${org.name}".` });
+            setTimeout(() => setPendingDeleteId(null), 3500);
+            return;
+        }
+        setPendingDeleteId(null);
+        try {
+            const { error } = await supabase.from('organizations').delete().eq('id', org.id);
+            if (error) throw error;
+            sileo.success({ title: 'Tenant eliminado', description: `"${org.name}" fue eliminado de la plataforma.` });
+            fetchOrganizations();
+        } catch (err) {
+            sileo.error({ title: 'Error al eliminar', description: err.message });
         }
     };
 
@@ -267,17 +313,30 @@ export default function SaasAdminPanel() {
                                             </td>
                                             
                                             <td className="px-6 py-5">
-                                                 {/* Placeholder de facturación para el pilar 2 */}
                                                 <div className="flex flex-col gap-2">
                                                     <span className="text-xs font-black text-secondary bg-gray-100 px-3 py-1.5 rounded-lg inline-flex items-center gap-2 w-max">
                                                         Suscripción: {org.subscription_status || 'En Trial'}
                                                     </span>
-                                                    <button 
+                                                    <button
                                                         onClick={() => handleToggleStatus(org)}
                                                         className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 border rounded-lg transition-all w-max ${isActive ? 'text-rose-600 border-rose-200 hover:bg-rose-50' : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50' }`}
                                                     >
-                                                        <Power size={14}/> {isActive ? 'Suspender Operación' : 'Restaurar Operación'}
+                                                        <Power size={14}/> {isActive ? 'Suspender' : 'Restaurar'}
                                                     </button>
+                                                    <div className="flex gap-1.5 mt-1">
+                                                        <button
+                                                            onClick={() => { setEditingOrg(org); setIsEditModalOpen(true); }}
+                                                            className="text-xs font-bold flex items-center gap-1 px-3 py-1.5 border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                                                        >
+                                                            <Edit2 size={12}/> Editar
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteOrg(org)}
+                                                            className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 border rounded-lg transition-all ${pendingDeleteId === org.id ? 'bg-red-500 text-white border-red-500 animate-pulse' : 'border-red-200 text-red-500 hover:bg-red-50'}`}
+                                                        >
+                                                            <Trash2 size={12}/> {pendingDeleteId === org.id ? '¿Seguro?' : 'Eliminar'}
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </td>
 
@@ -312,6 +371,68 @@ export default function SaasAdminPanel() {
                     )}
                 </div>
             </div>
+
+            {/* Modal Editar Tenant */}
+            {isEditModalOpen && editingOrg && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !saving && setIsEditModalOpen(false)}></div>
+                    <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl z-10 animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                            <div>
+                                <h3 className="text-xl font-black text-secondary">Editar Tenant</h3>
+                                <p className="text-sm text-gray-500 font-medium mt-1">Modifica los datos del cliente.</p>
+                            </div>
+                            <button onClick={() => setIsEditModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleEditOrg} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Nombre de la Empresa</label>
+                                <input
+                                    name="name"
+                                    type="text"
+                                    required
+                                    defaultValue={editingOrg.name}
+                                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 text-secondary"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Correo de Contacto</label>
+                                <input
+                                    name="contact_email"
+                                    type="email"
+                                    defaultValue={editingOrg.contact_email}
+                                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 text-secondary"
+                                    placeholder="contacto@empresa.com"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">Estado de Suscripción</label>
+                                <select
+                                    name="subscription_status"
+                                    defaultValue={editingOrg.subscription_status || ''}
+                                    className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 text-secondary"
+                                >
+                                    <option value="">En Trial</option>
+                                    <option value="activo">Activo</option>
+                                    <option value="suspendido">Suspendido</option>
+                                    <option value="vencido">Vencido</option>
+                                </select>
+                            </div>
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-5 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors">
+                                    Cancelar
+                                </button>
+                                <button type="submit" disabled={saving} className="px-5 py-2.5 rounded-xl font-bold text-white bg-primary hover:bg-primary-dark transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 flex items-center gap-2">
+                                    {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                    {saving ? 'Guardando...' : 'Guardar Cambios'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Modal Creación Nuevo Inquilino */}
             {isAddModalOpen && (
