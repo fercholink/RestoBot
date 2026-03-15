@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { ShieldCheck, Search, CheckCircle2, XCircle, Building2, Server, Power, Loader2, Plus, Trash2, Edit2, Save, X } from 'lucide-react';
 import { sileo } from 'sileo';
@@ -34,6 +34,9 @@ export default function SaasAdminPanel() {
 
     // Eliminar con doble-clic
     const [pendingDeleteId, setPendingDeleteId] = useState(null);
+
+    // Guard sincrónico para evitar múltiples envíos del formulario de creación
+    const isSubmittingRef = useRef(false);
 
     useEffect(() => {
         fetchOrganizations();
@@ -154,6 +157,8 @@ export default function SaasAdminPanel() {
 
     const handleCreateTenant = async (e) => {
         e.preventDefault();
+        if (isSubmittingRef.current) return;
+        isSubmittingRef.current = true;
         setCreating(true);
         try {
             const { data, error } = await supabase.rpc('create_saas_tenant', {
@@ -173,6 +178,7 @@ export default function SaasAdminPanel() {
             console.error('Error al crear tenant:', err);
             sileo.error({ title: 'Operación Fallida', description: err.message || 'Error desconocido creando cliente.' });
         } finally {
+            isSubmittingRef.current = false;
             setCreating(false);
         }
     };

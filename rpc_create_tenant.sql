@@ -1,5 +1,10 @@
 -- Función RPC para que el Super Admin pueda crear nuevos Tenants (SaaS) directamente desde el frontend.
 -- Debe ejecutarse en el SQL Editor de Supabase (con rol de superusuario Postgres).
+--
+-- PREREQUISITO: ejecutar primero si gen_salt falla:
+--   CREATE EXTENSION IF NOT EXISTS pgcrypto SCHEMA extensions;
+--   GRANT EXECUTE ON FUNCTION extensions.crypt(text, text) TO postgres;
+--   GRANT EXECUTE ON FUNCTION extensions.gen_salt(text) TO postgres;
 
 CREATE OR REPLACE FUNCTION public.create_saas_tenant(
     p_empresa_nombre text,
@@ -26,7 +31,7 @@ BEGIN
     )
     VALUES (
         new_user_id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', p_admin_email, 
-        crypt(p_admin_password, gen_salt('bf')), 
+        extensions.crypt(p_admin_password, extensions.gen_salt('bf')),
         now(), 
         '{"provider":"email","providers":["email"]}', 
         jsonb_build_object('name', 'Admin ' || p_empresa_nombre, 'role', 'gerente'), 
