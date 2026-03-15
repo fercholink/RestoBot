@@ -60,12 +60,12 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    v_owner_id uuid;
-    v_branch_ids uuid[];
-    v_room_ids   uuid[];
-    v_order_ids  uuid[];
-    v_booking_ids uuid[];
-    v_shift_ids  uuid[];
+    v_owner_id    uuid;
+    v_branch_ids  bigint[];   -- branches.id es bigint (serial)
+    v_room_ids    bigint[];
+    v_order_ids   bigint[];
+    v_booking_ids bigint[];
+    v_shift_ids   bigint[];
 BEGIN
     -- Obtener owner antes de borrar
     SELECT owner_id INTO v_owner_id FROM public.organizations WHERE id = p_org_id;
