@@ -90,12 +90,14 @@ export default function SaasAdminPanel() {
             return;
         }
         setPendingDeleteId(null);
+        // Optimistic: quitar de la lista de inmediato
+        setOrganizations(prev => prev.filter(o => o.id !== org.id));
         try {
             const { error } = await supabase.from('organizations').delete().eq('id', org.id);
             if (error) throw error;
             sileo.success({ title: 'Tenant eliminado', description: `"${org.name}" fue eliminado de la plataforma.` });
-            fetchOrganizations();
         } catch (err) {
+            fetchOrganizations(); // revertir si falló
             sileo.error({ title: 'Error al eliminar', description: err.message });
         }
     };
