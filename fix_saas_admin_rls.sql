@@ -60,88 +60,48 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    v_owner_id    uuid;
-    v_branch_ids  bigint[];   -- branches.id es bigint (serial)
-    v_room_ids    bigint[];
-    v_order_ids   bigint[];
-    v_booking_ids bigint[];
-    v_shift_ids   bigint[];
+    v_owner_id   uuid;
+    v_branch_ids bigint[];  -- solo necesario para floors y branch_resolutions (sin organization_id)
 BEGIN
-    -- Obtener owner antes de borrar
     SELECT owner_id INTO v_owner_id FROM public.organizations WHERE id = p_org_id;
+    SELECT array_agg(id) INTO v_branch_ids FROM public.branches WHERE organization_id = p_org_id;
 
-    -- Pre-calcular IDs para usar en subqueries sin columnas desconocidas
-    SELECT array_agg(id) INTO v_branch_ids  FROM public.branches  WHERE organization_id = p_org_id;
-    SELECT array_agg(id) INTO v_room_ids    FROM public.rooms     WHERE branch_id = ANY(v_branch_ids);
-    SELECT array_agg(id) INTO v_order_ids   FROM public.orders    WHERE branch_id = ANY(v_branch_ids);
-    SELECT array_agg(id) INTO v_booking_ids FROM public.bookings  WHERE room_id   = ANY(v_room_ids);
-    SELECT array_agg(id) INTO v_shift_ids   FROM public.shifts    WHERE branch_id = ANY(v_branch_ids);
+    -- Nivel 1: tablas hoja con organization_id propio
+    DELETE FROM public.order_items        WHERE organization_id = p_org_id;
+    DELETE FROM public.room_charges       WHERE organization_id = p_org_id;
+    DELETE FROM public.accounting_entries WHERE organization_id = p_org_id;
 
-    -- NIVEL 1: order_items
-    IF v_order_ids IS NOT NULL THEN
-        DELETE FROM public.order_items WHERE order_id = ANY(v_order_ids);
-    END IF;
+    -- Nivel 2: tablas intermedias con organization_id propio
+    DELETE FROM public.orders    WHERE organization_id = p_org_id;
+    DELETE FROM public.bookings  WHERE organization_id = p_org_id;
+    DELETE FROM public.shifts    WHERE organization_id = p_org_id;
+    DELETE FROM public.rooms     WHERE organization_id = p_org_id;
 
-    -- NIVEL 1: room_charges (intentar por booking_id, luego ignorar si columna no existe)
-    BEGIN
-        IF v_booking_ids IS NOT NULL THEN
-            DELETE FROM public.room_charges WHERE booking_id = ANY(v_booking_ids);
-        END IF;
-    EXCEPTION WHEN undefined_column OR undefined_table THEN NULL;
-    END;
-
-    -- NIVEL 1: accounting_entries — intentar por branch_id directo, luego por order_id
+    -- Nivel 3: tablas sin organization_id (referencian branch_id) — ignorar si no existen
     BEGIN
         IF v_branch_ids IS NOT NULL THEN
-            DELETE FROM public.accounting_entries WHERE branch_id = ANY(v_branch_ids);
+            DELETE FROM public.floors             WHERE branch_id = ANY(v_branch_ids);
+            DELETE FROM public.branch_resolutions WHERE branch_id = ANY(v_branch_ids);
         END IF;
-    EXCEPTION WHEN undefined_column OR undefined_table THEN
-        BEGIN
-            IF v_order_ids IS NOT NULL THEN
-                DELETE FROM public.accounting_entries WHERE order_id = ANY(v_order_ids);
-            END IF;
-        EXCEPTION WHEN undefined_column OR undefined_table THEN NULL;
-        END;
+    EXCEPTION WHEN undefined_table OR undefined_column THEN NULL;
     END;
 
-    -- NIVEL 2: orders
-    IF v_order_ids IS NOT NULL THEN
-        DELETE FROM public.orders WHERE id = ANY(v_order_ids);
-    END IF;
-
-    -- NIVEL 2: bookings
-    IF v_booking_ids IS NOT NULL THEN
-        DELETE FROM public.bookings WHERE id = ANY(v_booking_ids);
-    END IF;
-
-    -- NIVEL 2: shifts
-    IF v_shift_ids IS NOT NULL THEN
-        DELETE FROM public.shifts WHERE id = ANY(v_shift_ids);
-    END IF;
-
-    -- NIVEL 3: rooms
-    IF v_room_ids IS NOT NULL THEN
-        DELETE FROM public.rooms WHERE id = ANY(v_room_ids);
-    END IF;
-
-    -- NIVEL 4: third_parties
+    -- Nivel 4: third_parties si tiene organization_id
     BEGIN
         DELETE FROM public.third_parties WHERE organization_id = p_org_id;
-    EXCEPTION WHEN undefined_column OR undefined_table THEN NULL;
+    EXCEPTION WHEN undefined_table OR undefined_column THEN NULL;
     END;
 
-    -- NIVEL 5: branches
-    IF v_branch_ids IS NOT NULL THEN
-        DELETE FROM public.branches WHERE id = ANY(v_branch_ids);
-    END IF;
+    -- Nivel 5: branches (después de haber eliminado todos sus hijos)
+    DELETE FROM public.branches WHERE organization_id = p_org_id;
 
-    -- NIVEL 6: profiles
+    -- Nivel 6: profiles
     DELETE FROM public.profiles WHERE organization_id = p_org_id;
 
-    -- NIVEL 7: organización
+    -- Nivel 7: organización
     DELETE FROM public.organizations WHERE id = p_org_id;
 
-    -- NIVEL 8: usuario de auth
+    -- Nivel 8: usuario auth
     IF v_owner_id IS NOT NULL THEN
         DELETE FROM auth.users WHERE id = v_owner_id;
     END IF;
