@@ -36,3 +36,5 @@ yarn-error.log*
 dashboard/eslint-report*.json
 prueba_webhook_n8n.json
 .claude/
+.agent/
+mas_datos/

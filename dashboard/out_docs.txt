@@ -1,4 +1,0 @@
-{
-  "status": "Not Found",
-  "message": "No se encontr├│ la ruta o recurso solicitado."
-}
