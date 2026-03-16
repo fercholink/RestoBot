@@ -101,8 +101,15 @@ BEGIN
     -- Nivel 7: organización
     DELETE FROM public.organizations WHERE id = p_org_id;
 
-    -- Nivel 8: usuario auth
+    -- Nivel 8: limpiar referencias al usuario antes de borrarlo de auth
     IF v_owner_id IS NOT NULL THEN
+        -- Nullificar user_id en shifts que aún referencien este usuario
+        UPDATE public.shifts SET user_id = NULL WHERE user_id = v_owner_id;
+        -- Borrar identidades de auth (FK a auth.users)
+        DELETE FROM auth.identities WHERE user_id = v_owner_id;
+        -- Borrar sesiones activas
+        DELETE FROM auth.sessions   WHERE user_id = v_owner_id;
+        -- Finalmente borrar el usuario
         DELETE FROM auth.users WHERE id = v_owner_id;
     END IF;
 END;
