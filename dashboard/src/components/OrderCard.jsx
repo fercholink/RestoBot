@@ -72,7 +72,7 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
                     <div className="bg-success/10 p-1 rounded-md text-success">
                         <CheckCircle2 size={12} />
                     </div>
-                    <span className="text-[10px] font-black text-secondary">#{order.id}</span>
+                    <span className="text-[10px] font-black text-secondary">#{order.order_number || order.id}</span>
                 </div>
                 <span className="text-[9px] font-bold text-gray-400 truncate max-w-[60px]">
                     ${(order.total || order.total_price || 0).toLocaleString()}
@@ -93,7 +93,7 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
                         <CheckCircle2 size={14} />
                     </div>
                     <span className="text-xs font-black text-secondary uppercase tracking-wider">
-                        Pedido #{order.id}
+                        Pedido #{order.order_number || order.id}
                     </span>
                     <span className="text-[10px] font-bold text-gray-400">
                         {order.customer_name}
@@ -125,7 +125,7 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
                         <Icon size={14} className={statusIcons[order.status]?.color} />
                     </div>
                     <span className="text-xs font-black text-secondary uppercase tracking-wider">
-                        Pedido #{order.id}
+                        Pedido #{order.order_number || order.id}
                     </span>
                 </div>
 
@@ -188,7 +188,7 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
                             <span className="text-primary font-black text-sm">${order.total || order.total_price}</span>
                         </div>
                         <div className="flex items-center gap-2 text-xs font-bold text-accent uppercase tracking-tighter">
-                            <span className="flex items-center gap-1"><Package size={12} /> # {order.id}</span>
+                            <span className="flex items-center gap-1"><Package size={12} /> # {order.order_number || order.id}</span>
                             <span className="flex items-center gap-1">
                                 {order.table_number && order.table_number !== 'DOMICILIO' ? <Utensils size={12} /> : <MapPin size={12} />}
                                 {order.table_number && order.table_number !== 'DOMICILIO' ? `Mesa ${order.table_number}` : 'Domicilio'}
