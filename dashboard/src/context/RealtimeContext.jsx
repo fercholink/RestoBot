@@ -128,17 +128,17 @@ export const RealtimeProvider = ({ children }) => {
 
         if (eventType === 'INSERT') {
             const statusInfo = ORDER_STATUS_LABELS['nuevo'];
-            title = `${statusInfo.emoji} Nuevo Pedido #${newRecord.id}`;
+            title = `${statusInfo.emoji} Nuevo Pedido #${newRecord.order_number || newRecord.id}`;
             body = `Mesa ${newRecord.table_number || 'Domicilio'} · $${(newRecord.total || newRecord.total_price || 0).toLocaleString('es-CO')}`;
             color = statusInfo.color;
         } else if (eventType === 'UPDATE') {
             if (!newRecord.status || newRecord.status === oldRecord?.status) return; // Sin cambio de estado
             const statusInfo = ORDER_STATUS_LABELS[newRecord.status] || { label: newRecord.status, color: 'gray', emoji: '🔄' };
-            title = `${statusInfo.emoji} Pedido #${newRecord.id} — ${statusInfo.label}`;
+            title = `${statusInfo.emoji} Pedido #${newRecord.order_number || newRecord.id} — ${statusInfo.label}`;
             body = `Mesa ${newRecord.table_number || 'Domicilio'}`;
             color = statusInfo.color;
         } else if (eventType === 'DELETE') {
-            title = `❌ Pedido #${oldRecord.id} Eliminado`;
+            title = `❌ Pedido #${oldRecord.order_number || oldRecord.id} Eliminado`;
             body = 'El pedido fue removido del sistema';
             color = 'red';
         }

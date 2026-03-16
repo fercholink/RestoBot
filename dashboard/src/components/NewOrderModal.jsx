@@ -465,7 +465,7 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                     .from('room_charges')
                     .insert([{
                         booking_id: selectedBookingRooms,
-                        description: `Room Service - Pedido #${orderData.id}`,
+                        description: `Room Service - Pedido #${orderData.order_number || orderData.id}`,
                         amount: total,
                         order_id: orderData.id
                     }]);
@@ -474,7 +474,7 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
 
             // Feedback de éxito
             if (isPaid) {
-                sileo.success({ title: 'Pedido creado y pagado', description: `Pedido #${orderData.id} registrado. Generando recibo...` });
+                sileo.success({ title: 'Pedido creado y pagado', description: `Pedido #${orderData.order_number || orderData.id} registrado. Generando recibo...` });
             }
 
             // Si fue creado como pre-pagado, pasar los datos para imprimir recibo
