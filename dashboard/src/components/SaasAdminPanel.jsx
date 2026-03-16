@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { ShieldCheck, Search, CheckCircle2, XCircle, Building2, Server, Power, Loader2, Plus, Trash2, Edit2, Save, X } from 'lucide-react';
+import { ShieldCheck, Search, CheckCircle2, XCircle, Building2, Server, Power, Loader2, Plus, Trash2, Edit2, Save, X, TrendingUp, Clock, Activity, LayoutGrid } from 'lucide-react';
 import { sileo } from 'sileo';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -19,8 +19,10 @@ const ALL_MODULES = [
 
 export default function SaasAdminPanel() {
     const [organizations, setOrganizations] = useState([]);
+    const [orgMetrics, setOrgMetrics] = useState({});
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [activeTab, setActiveTab] = useState('list'); // 'list' or 'dashboard'
     
     // Modal Crear
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -45,16 +47,44 @@ export default function SaasAdminPanel() {
     const fetchOrganizations = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase
+            // 1. Fetch Orgs
+            const { data: orgData, error: orgError } = await supabase
                 .from('organizations')
                 .select('*')
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
-            setOrganizations(data || []);
+            if (orgError) throw orgError;
+            setOrganizations(orgData || []);
+
+            // 2. Fetch Aggregated Metrics from Orders
+            const { data: orderData, error: orderError } = await supabase
+                .from('orders')
+                .select('organization_id, total, total_price, status, created_at')
+                .eq('status', 'pagado');
+
+            if (orderError) throw orderError;
+
+            // Group by Org
+            const metrics = (orderData || []).reduce((acc, order) => {
+                const orgId = order.organization_id;
+                if (!acc[orgId]) {
+                    acc[orgId] = { totalOrders: 0, totalRevenue: 0, lastActivity: null };
+                }
+                acc[orgId].totalOrders += 1;
+                acc[orgId].totalRevenue += (order.total || order.total_price || 0);
+                
+                const orderDate = new Date(order.created_at);
+                if (!acc[orgId].lastActivity || orderDate > new Date(acc[orgId].lastActivity)) {
+                    acc[orgId].lastActivity = order.created_at;
+                }
+                return acc;
+            }, {});
+
+            setOrgMetrics(metrics);
+
         } catch (error) {
-            console.error('Error fetching orgs:', error);
-            sileo.error({ title: 'Acceso Denegado', description: 'Ocurrió un error cargando la BBDD Global.' });
+            console.error('Error fetching orgs or metrics:', error);
+            sileo.error({ title: 'Error de Datos', description: 'No se pudieron cargar los inquilinos o sus métricas.' });
         } finally {
             setLoading(false);
         }
@@ -93,14 +123,13 @@ export default function SaasAdminPanel() {
             return;
         }
         setPendingDeleteId(null);
-        // Optimistic: quitar de la lista de inmediato
         setOrganizations(prev => prev.filter(o => o.id !== org.id));
         try {
             const { error } = await supabase.rpc('delete_saas_tenant', { p_org_id: org.id });
             if (error) throw error;
             sileo.success({ title: 'Tenant eliminado', description: `"${org.name}" fue eliminado de la plataforma.` });
         } catch (err) {
-            fetchOrganizations(); // revertir si falló
+            fetchOrganizations(); 
             sileo.error({ title: 'Error al eliminar', description: err.message });
         }
     };
@@ -117,7 +146,6 @@ export default function SaasAdminPanel() {
                 newModules.push(moduleId);
             }
 
-            // Ocupación optimista UI
             setOrganizations(prev => prev.map(o => o.id === org.id ? { ...o, active_modules: newModules } : o));
 
             const { error } = await supabase
@@ -128,7 +156,6 @@ export default function SaasAdminPanel() {
             if (error) throw error;
             sileo.success({ title: 'Plan Actualizado', description: `Módulo ${isRemoving ? 'removido' : 'habilitado'} para ${org.name}.` });
             
-            // Insertar auditoria silenciosa
             supabase.from('global_logs').insert([{
                 organization_id: org.id,
                 action_type: 'MODULE_TOGGLED',
@@ -138,7 +165,7 @@ export default function SaasAdminPanel() {
         } catch (error) {
             console.error('Error en Toggle:', error);
             sileo.error({ title: 'Error', description: 'El cambio no pudo guardarse remotamente.' });
-            fetchOrganizations(); // revert
+            fetchOrganizations(); 
         }
     };
 
@@ -153,7 +180,7 @@ export default function SaasAdminPanel() {
         } catch (error) {
             console.error('Error al cambiar estado:', error);
             sileo.error({ title: 'Error', description: 'No se pudo cambiar el estado en la base de datos.' });
-            fetchOrganizations(); // revertir si falla
+            fetchOrganizations(); 
         }
     };
 
@@ -163,7 +190,7 @@ export default function SaasAdminPanel() {
         isSubmittingRef.current = true;
         setCreating(true);
         try {
-            const { data, error } = await supabase.rpc('create_saas_tenant', {
+            const { error } = await supabase.rpc('create_saas_tenant', {
                 p_empresa_nombre: formData.name,
                 p_admin_email: formData.email,
                 p_admin_password: formData.password,
@@ -196,17 +223,34 @@ export default function SaasAdminPanel() {
 
     const filteredOrgs = organizations.filter(org => 
         (org.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-        (org.contact_email || '').toLowerCase().includes(searchTerm.toLowerCase())
+        (org.contact_email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (org.id || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // Contadores para métricas top
     const totalTenants = organizations.length;
     const activeTenants = organizations.filter(o => o.status === 'active' || !o.status).length;
     const hotelPacks = organizations.filter(o => (o.active_modules || []).includes('hotel')).length;
+    const totalGlobalRevenue = Object.values(orgMetrics).reduce((sum, m) => sum + m.totalRevenue, 0);
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 flex flex-col gap-6">
             
+            {/* View Toggle */}
+            <div className="flex bg-gray-100 p-1 rounded-2xl w-fit shadow-inner mb-2">
+                <button 
+                    onClick={() => setActiveTab('list')}
+                    className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'list' ? 'bg-white text-secondary shadow-sm' : 'text-gray-400 hover:text-secondary'}`}
+                >
+                    Inquilinos
+                </button>
+                <button 
+                    onClick={() => setActiveTab('dashboard')}
+                    className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'dashboard' ? 'bg-white text-secondary shadow-sm' : 'text-gray-400 hover:text-secondary'}`}
+                >
+                    Panorama Global
+                </button>
+            </div>
+
             {/* Header / Stats Panel */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4">
@@ -214,7 +258,7 @@ export default function SaasAdminPanel() {
                         <Server size={24} />
                     </div>
                     <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase">Tenants (Organizaciones)</p>
+                        <p className="text-xs font-bold text-gray-400 uppercase">Tenants</p>
                         <h3 className="text-2xl font-black text-secondary">{loading ? '-' : totalTenants}</h3>
                     </div>
                 </div>
@@ -239,148 +283,212 @@ export default function SaasAdminPanel() {
                 
                 <div className="bg-gradient-to-br from-secondary to-[#1a202c] rounded-2xl p-5 border border-gray-800 shadow-lg flex flex-col justify-center">
                     <p className="text-xs font-bold text-white/50 uppercase flex items-center gap-2">
-                        <ShieldCheck size={14} className="text-primary"/> Acceso Root
+                        <Activity size={14} className="text-primary"/> Ingresos Globales
                     </p>
-                    <h3 className="text-lg font-black text-white mt-1">Super Admin Panel</h3>
+                    <h3 className="text-2xl font-black text-white mt-1">${totalGlobalRevenue.toLocaleString()}</h3>
                 </div>
             </div>
 
-            {/* Listado de Tenants */}
-            <div className="bg-white rounded-[2rem] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col">
-                <div className="p-6 md:p-8 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50/50">
-                    <div>
-                        <h2 className="text-xl font-black text-secondary tracking-tight">Gestión Inquilinos (Multi-Tenant)</h2>
-                        <p className="text-sm font-medium text-gray-500">Activa o suspende clientes y asígnales características de forma granular.</p>
-                    </div>
-                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                        <div className="relative w-full sm:w-80">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                            <input
-                                type="text"
-                                placeholder="Buscar por nombre o correo..."
-                                className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all text-sm font-medium text-secondary"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+            {activeTab === 'dashboard' ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-premium">
+                        <h3 className="text-lg font-black text-secondary uppercase tracking-tight mb-6 flex items-center gap-2">
+                            <TrendingUp className="text-primary" size={20}/> Top 5 Empresas (Ventas)
+                        </h3>
+                        <div className="space-y-6">
+                            {organizations
+                                .map(org => ({ ...org, revenue: orgMetrics[org.id]?.totalRevenue || 0 }))
+                                .sort((a, b) => b.revenue - a.revenue)
+                                .slice(0, 5)
+                                .map((org) => (
+                                    <div key={org.id} className="relative">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <span className="text-xs font-black text-secondary">{org.name}</span>
+                                            <span className="text-xs font-bold text-gray-500">${org.revenue.toLocaleString()}</span>
+                                        </div>
+                                        <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
+                                            <div 
+                                                className="bg-primary h-full rounded-full transition-all duration-1000"
+                                                style={{ width: `${totalGlobalRevenue > 0 ? (org.revenue / totalGlobalRevenue) * 100 : 0}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                ))
+                            }
                         </div>
-                        <button 
-                            onClick={() => setIsAddModalOpen(true)}
-                            className="bg-primary hover:bg-primary-dark text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center gap-2 transition-colors w-full sm:w-auto flex-shrink-0"
-                        >
-                            <Plus size={18} /> Nuevo Cliente
-                        </button>
+                    </div>
+
+                    <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-premium">
+                        <h3 className="text-lg font-black text-secondary uppercase tracking-tight mb-6 flex items-center gap-2">
+                            <LayoutGrid className="text-indigo-500" size={20}/> Distribución de Módulos
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            {ALL_MODULES.map(mod => {
+                                const count = organizations.filter(o => (o.active_modules || []).includes(mod.id)).length;
+                                return (
+                                    <div key={mod.id} className="p-4 bg-gray-50 rounded-2xl flex items-center justify-between border border-gray-100">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-2 h-2 rounded-full ${mod.color}`}></div>
+                                            <span className="text-[10px] font-black text-gray-500 uppercase">{mod.label}</span>
+                                        </div>
+                                        <span className="text-sm font-black text-secondary">{count}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
-
-                <div className="p-0 overflow-x-auto">
-                    {loading ? (
-                        <div className="p-20 flex flex-col items-center justify-center text-gray-400 gap-3">
-                            <Loader2 size={32} className="animate-spin text-primary" />
-                            <p className="font-bold">Sincronizando Plataforma B2B...</p>
+            ) : (
+                <div className="bg-white rounded-[2rem] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col">
+                    <div className="p-6 md:p-8 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50/50">
+                        <div>
+                            <h2 className="text-xl font-black text-secondary tracking-tight">Gestión Inquilinos (Multi-Tenant)</h2>
+                            <p className="text-sm font-medium text-gray-500">Activa o suspende clientes y asígnales características de forma granular.</p>
                         </div>
-                    ) : filteredOrgs.length === 0 ? (
-                        <div className="p-20 text-center text-gray-400 font-bold">No se encontraron clientes inquilinos.</div>
-                    ) : (
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="bg-gray-50 border-b border-gray-100">
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Organización (Tenant)</th>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Plan & Facturación</th>
-                                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 w-1/2">Suma de Módulos (Feature Flags)</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {filteredOrgs.map((org) => {
-                                    const rawD = org.created_at;
-                                    const createdAtStr = rawD ? format(new Date(rawD), "dd 'de' MMMM, yyyy", { locale: es }) : 'Desconocido';
-                                    const isActive = org.status === 'active';
-                                    const myModules = org.active_modules || [];
+                        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                            <div className="relative w-full sm:w-80">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por nombre, correo o ID..."
+                                    className="w-full pl-11 pr-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all text-sm font-medium text-secondary"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                            <button 
+                                onClick={() => setIsAddModalOpen(true)}
+                                className="bg-primary hover:bg-primary-dark text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center gap-2 transition-colors w-full sm:w-auto flex-shrink-0"
+                            >
+                                <Plus size={18} /> Nuevo Cliente
+                            </button>
+                        </div>
+                    </div>
 
-                                    return (
-                                        <tr key={org.id} className="hover:bg-gray-50/50 transition-colors group">
-                                            <td className="px-6 py-5">
-                                                <div className="flex items-start gap-4">
-                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-sm shrink-0 ${isActive ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 'bg-gray-300'}`}>
-                                                        {(org.name || 'U').charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <h4 className="font-black text-secondary truncate max-w-[180px]">{org.name}</h4>
-                                                            {isActive ? (
-                                                                <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
-                                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Activo
-                                                                </span>
-                                                            ) : (
-                                                                <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
-                                                                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500"></div> Suspendido
-                                                                </span>
-                                                            )}
+                    <div className="p-0 overflow-x-auto">
+                        {loading ? (
+                            <div className="p-20 flex flex-col items-center justify-center text-gray-400 gap-3">
+                                <Loader2 size={32} className="animate-spin text-primary" />
+                                <p className="font-bold">Sincronizando Plataforma B2B...</p>
+                            </div>
+                        ) : filteredOrgs.length === 0 ? (
+                            <div className="p-20 text-center text-gray-400 font-bold">No se encontraron clientes inquilinos.</div>
+                        ) : (
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50 border-b border-gray-100">
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Organización (Tenant)</th>
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Rendimiento (Orders/Sum)</th>
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Estado & Acciones</th>
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Módulos</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {filteredOrgs.map((org) => {
+                                        const rawD = org.created_at;
+                                        const createdAtStr = rawD ? format(new Date(rawD), "dd 'de' MMMM, yyyy", { locale: es }) : 'Desconocido';
+                                        const isActive = org.status === 'active';
+                                        const myModules = org.active_modules || [];
+
+                                        return (
+                                            <tr key={org.id} className="hover:bg-gray-50/50 transition-colors group">
+                                                <td className="px-6 py-5">
+                                                    <div className="flex items-start gap-4">
+                                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-sm shrink-0 ${isActive ? 'bg-gradient-to-br from-indigo-500 to-purple-600' : 'bg-gray-300'}`}>
+                                                            {(org.name || 'U').charAt(0).toUpperCase()}
                                                         </div>
-                                                        <p className="text-xs font-bold text-gray-400 mt-0.5 truncate max-w-[200px]">{org.contact_email || 'Sin correo'}</p>
-                                                        <p className="text-[10px] font-bold text-gray-300 mt-1 uppercase">Creado: {createdAtStr}</p>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <h4 className="font-black text-secondary truncate max-w-[180px]">{org.name}</h4>
+                                                                {isActive ? (
+                                                                    <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div> Activo
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+                                                                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500"></div> Suspendido
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-xs font-bold text-gray-400 mt-0.5 truncate max-w-[200px]">{org.contact_email || 'Sin correo'}</p>
+                                                            <p className="text-[10px] font-bold text-gray-300 mt-1 uppercase">ID: {org.id.split('-')[0]}... • {createdAtStr}</p>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </td>
-                                            
-                                            <td className="px-6 py-5">
-                                                <div className="flex flex-col gap-2">
-                                                    <span className="text-xs font-black text-secondary bg-gray-100 px-3 py-1.5 rounded-lg inline-flex items-center gap-2 w-max">
-                                                        Suscripción: {org.status || 'active'}
-                                                    </span>
-                                                    <button
-                                                        onClick={() => handleToggleStatus(org)}
-                                                        className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 border rounded-lg transition-all w-max ${isActive ? 'text-rose-600 border-rose-200 hover:bg-rose-50' : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50' }`}
-                                                    >
-                                                        <Power size={14}/> {isActive ? 'Suspender' : 'Activar'}
-                                                    </button>
-                                                    <div className="flex gap-1.5 mt-1">
-                                                        <button
-                                                            onClick={() => { setEditingOrg(org); setIsEditModalOpen(true); }}
-                                                            className="text-xs font-bold flex items-center gap-1 px-3 py-1.5 border border-indigo-200 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
-                                                        >
-                                                            <Edit2 size={12}/> Editar
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDeleteOrg(org)}
-                                                            className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 border rounded-lg transition-all ${pendingDeleteId === org.id ? 'bg-red-500 text-white border-red-500 animate-pulse' : 'border-red-200 text-red-500 hover:bg-red-50'}`}
-                                                        >
-                                                            <Trash2 size={12}/> {pendingDeleteId === org.id ? '¿Seguro?' : 'Eliminar'}
-                                                        </button>
+                                                </td>
+                                                
+                                                <td className="px-6 py-5">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-black text-secondary">${(orgMetrics[org.id]?.totalRevenue || 0).toLocaleString()}</span>
+                                                            <span className="text-[10px] font-bold text-gray-400">({orgMetrics[org.id]?.totalOrders || 0} pedidos)</span>
+                                                        </div>
+                                                        {orgMetrics[org.id]?.lastActivity && (
+                                                            <p className="text-[9px] font-bold text-blue-500 uppercase flex items-center gap-1">
+                                                                <Clock size={10}/> Activo: {format(new Date(orgMetrics[org.id].lastActivity), "HH:mm, dd/MM", { locale: es })}
+                                                            </p>
+                                                        )}
                                                     </div>
-                                                </div>
-                                            </td>
-
-                                            <td className="px-6 py-5">
-                                                <div className="bg-white border text-secondary border-gray-200 p-4 rounded-2xl flex flex-wrap gap-2 group-hover:border-primary/20 transition-colors">
-                                                    {ALL_MODULES.map(mod => {
-                                                        const isLicensed = myModules.includes(mod.id);
-                                                        return (
+                                                </td>
+                                                
+                                                <td className="px-6 py-5">
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="flex items-center gap-2">
                                                             <button
-                                                                key={mod.id}
-                                                                onClick={() => handleToggleModule(org, mod.id)}
-                                                                className={`
-                                                                    relative px-3 py-1.5 rounded-lg text-xs font-black tracking-tight border transition-all duration-300 flex items-center gap-1.5 overflow-hidden
-                                                                    ${isLicensed 
-                                                                        ? `bg-gray-800 text-white border-transparent shadow-md hover:ring-2 hover:ring-gray-800/30 hover:bg-gray-900` 
-                                                                        : `bg-white text-gray-400 border-gray-200 hover:border-gray-300 hover:text-gray-600`}
-                                                                `}
+                                                                onClick={() => handleToggleStatus(org)}
+                                                                className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 border rounded-lg transition-all w-max ${isActive ? 'text-rose-600 border-rose-200 hover:bg-rose-50' : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50' }`}
                                                             >
-                                                                {isLicensed && <span className={`absolute left-0 top-0 bottom-0 w-1 ${mod.color}`}></span>}
-                                                                {isLicensed ? <CheckCircle2 size={14} className="text-green-400"/> : <XCircle size={14}/>}
-                                                                <span>{mod.label}</span>
+                                                                <Power size={14}/> {isActive ? 'Suspender' : 'Activar'}
                                                             </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    )}
+                                                            <button
+                                                                onClick={() => { setEditingOrg(org); setIsEditModalOpen(true); }}
+                                                                className="p-1.5 border border-gray-200 text-gray-400 hover:text-secondary rounded-lg transition-all"
+                                                                title="Editar Datos"
+                                                            >
+                                                                <Edit2 size={14}/>
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteOrg(org)}
+                                                                className={`p-1.5 border rounded-lg transition-all ${pendingDeleteId === org.id ? 'bg-red-500 text-white border-red-500 animate-pulse' : 'border-red-200 text-red-500 hover:bg-red-50'}`}
+                                                                title="Eliminar Organización"
+                                                            >
+                                                                <Trash2 size={14}/>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </td>
+
+                                                <td className="px-6 py-5">
+                                                    <div className="bg-white border text-secondary border-gray-200 p-4 rounded-2xl flex flex-wrap gap-2 group-hover:border-primary/20 transition-colors">
+                                                        {ALL_MODULES.map(mod => {
+                                                            const isLicensed = myModules.includes(mod.id);
+                                                            return (
+                                                                <button
+                                                                    key={mod.id}
+                                                                    onClick={() => handleToggleModule(org, mod.id)}
+                                                                    className={`
+                                                                        relative px-3 py-1.5 rounded-lg text-xs font-black tracking-tight border transition-all duration-300 flex items-center gap-1.5 overflow-hidden
+                                                                        ${isLicensed 
+                                                                            ? `bg-gray-800 text-white border-transparent shadow-md hover:ring-2 hover:ring-gray-800/30 hover:bg-gray-900` 
+                                                                            : `bg-white text-gray-400 border-gray-200 hover:border-gray-300 hover:text-gray-600`}
+                                                                    `}
+                                                                >
+                                                                    {isLicensed && <span className={`absolute left-0 top-0 bottom-0 w-1 ${mod.color}`}></span>}
+                                                                    {isLicensed ? <CheckCircle2 size={14} className="text-green-400"/> : <XCircle size={14}/>}
+                                                                    <span>{mod.label}</span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Modal Editar Tenant */}
             {isEditModalOpen && editingOrg && (
