@@ -70,7 +70,7 @@ export default function SaasAdminPanel() {
                 .update({
                     name: fd.get('name'),
                     contact_email: fd.get('contact_email'),
-                    subscription_status: fd.get('subscription_status') || null,
+                    status: fd.get('status') || 'active',
                 })
                 .eq('id', editingOrg.id);
             if (error) throw error;
@@ -143,15 +143,17 @@ export default function SaasAdminPanel() {
     };
 
     const handleToggleStatus = async (org) => {
-        const newStatus = org.status === 'activo' ? 'inactivo' : 'activo';
+        const currentStatus = org.status || 'active';
+        const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
         try {
             setOrganizations(prev => prev.map(o => o.id === org.id ? { ...o, status: newStatus } : o));
             const { error } = await supabase.from('organizations').update({ status: newStatus }).eq('id', org.id);
             if (error) throw error;
-            sileo.success({ title: 'Estado Alterado', description: `${org.name} quedó ${newStatus}.` });
+            sileo.success({ title: 'Estado Alterado', description: `${org.name} quedó ${newStatus === 'active' ? 'Activado' : 'Suspendido'}.` });
         } catch (error) {
-            sileo.error({ title: 'Falló corte', description: 'No se pudo cambiar estado.' });
-            fetchOrganizations(); // revert
+            console.error('Error al cambiar estado:', error);
+            sileo.error({ title: 'Error', description: 'No se pudo cambiar el estado en la base de datos.' });
+            fetchOrganizations(); // revertir si falla
         }
     };
 
@@ -199,7 +201,7 @@ export default function SaasAdminPanel() {
 
     // Contadores para métricas top
     const totalTenants = organizations.length;
-    const activeTenants = organizations.filter(o => o.status !== 'inactivo').length;
+    const activeTenants = organizations.filter(o => o.status === 'active' || !o.status).length;
     const hotelPacks = organizations.filter(o => (o.active_modules || []).includes('hotel')).length;
 
     return (
@@ -291,7 +293,7 @@ export default function SaasAdminPanel() {
                                 {filteredOrgs.map((org) => {
                                     const rawD = org.created_at;
                                     const createdAtStr = rawD ? format(new Date(rawD), "dd 'de' MMMM, yyyy", { locale: es }) : 'Desconocido';
-                                    const isActive = org.status !== 'inactivo';
+                                    const isActive = org.status === 'active';
                                     const myModules = org.active_modules || [];
 
                                     return (
@@ -323,13 +325,13 @@ export default function SaasAdminPanel() {
                                             <td className="px-6 py-5">
                                                 <div className="flex flex-col gap-2">
                                                     <span className="text-xs font-black text-secondary bg-gray-100 px-3 py-1.5 rounded-lg inline-flex items-center gap-2 w-max">
-                                                        Suscripción: {org.subscription_status || 'En Trial'}
+                                                        Suscripción: {org.status || 'active'}
                                                     </span>
                                                     <button
                                                         onClick={() => handleToggleStatus(org)}
                                                         className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 border rounded-lg transition-all w-max ${isActive ? 'text-rose-600 border-rose-200 hover:bg-rose-50' : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50' }`}
                                                     >
-                                                        <Power size={14}/> {isActive ? 'Suspender' : 'Restaurar'}
+                                                        <Power size={14}/> {isActive ? 'Suspender' : 'Activar'}
                                                     </button>
                                                     <div className="flex gap-1.5 mt-1">
                                                         <button
@@ -387,7 +389,7 @@ export default function SaasAdminPanel() {
                     <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl z-10 animate-in zoom-in-95 duration-200">
                         <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                             <div>
-                                <h3 className="text-xl font-black text-secondary">Editar Tenant</h3>
+                                <h3 className="text-xl font-black text-secondary">Actualizar Información (SaaS)</h3>
                                 <p className="text-sm text-gray-500 font-medium mt-1">Modifica los datos del cliente.</p>
                             </div>
                             <button onClick={() => setIsEditModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 text-gray-500 transition-colors">
@@ -418,14 +420,13 @@ export default function SaasAdminPanel() {
                             <div>
                                 <label className="block text-sm font-bold text-gray-700 mb-1">Estado de Suscripción</label>
                                 <select
-                                    name="subscription_status"
-                                    defaultValue={editingOrg.subscription_status || ''}
+                                    name="status"
+                                    defaultValue={editingOrg.status || 'active'}
                                     className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 text-secondary"
                                 >
-                                    <option value="">En Trial</option>
-                                    <option value="activo">Activo</option>
-                                    <option value="suspendido">Suspendido</option>
-                                    <option value="vencido">Vencido</option>
+                                    <option value="active">Activo</option>
+                                    <option value="suspended">Suspendido</option>
+                                    <option value="cancelled">Cancelado</option>
                                 </select>
                             </div>
                             <div className="flex justify-end gap-3 pt-2">

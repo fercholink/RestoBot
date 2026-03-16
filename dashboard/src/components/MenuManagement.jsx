@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit2, Trash2, Tag, Utensils, IndianRupee, Image as ImageIcon, CheckCircle2, XCircle, ChevronRight, MoreVertical, Filter, Save, X, AlertTriangle, Building2, Layers, Coffee, Pizza, Beef, PlusCircle, MinusCircle, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 
 const MenuManagement = () => {
+    const { user } = useAuth();
+    const organizationId = user?.organization_id || null;
     const [categories, setCategories] = useState([]);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -172,7 +175,7 @@ const MenuManagement = () => {
             } else {
                 const { error: err } = await supabase
                     .from('categories')
-                    .insert([{ name, icon }]);
+                    .insert([{ name, icon, organization_id: organizationId }]);
                 error = err;
             }
 
@@ -244,7 +247,8 @@ const MenuManagement = () => {
             base_ingredients: tempIngredients,
             extras: tempExtras,
             image: image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500',
-            available: editingProduct ? editingProduct.available : true
+            available: editingProduct ? editingProduct.available : true,
+            organization_id: organizationId
         };
 
         // Optimistic UI Update
