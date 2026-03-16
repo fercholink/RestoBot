@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Wallet, Clock, ArrowRightLeft, CheckCircle2, AlertCircle, History, User, Building2, TrendingUp, TrendingDown, Landmark, Banknote, Save, X, Plus, Minus, Download, Send, XCircle } from 'lucide-react';
+import { Wallet, Clock, ArrowRightLeft, CheckCircle2, AlertCircle, History, User, Building2, TrendingUp, TrendingDown, Landmark, Banknote, Save, X, Plus, Minus, Download, Send, XCircle, LayoutGrid, BarChart3 } from 'lucide-react';
 import { sileo } from 'sileo';
+import SalesReportsAdvanced from './SalesReportsAdvanced';
 
 const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
     // Estado local para la UI
     const [shifts, setShifts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [view, setView] = useState('shifts'); // 'shifts' or 'reports'
     const { user } = useAuth();
 
     // Turno activo: filtrar por user_id del usuario logueado
@@ -280,6 +282,34 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
 
     return (
         <div className="space-y-8 pb-20 animate-in fade-in duration-500">
+            {/* View Selector Toggle */}
+            <div className="flex bg-gray-100 p-1.5 rounded-[2rem] w-fit mx-auto shadow-inner border border-gray-200/50">
+                <button 
+                    onClick={() => setView('shifts')}
+                    className={`flex items-center gap-3 px-8 py-3 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest transition-all ${
+                        view === 'shifts' 
+                        ? 'bg-white text-secondary shadow-premium scale-100' 
+                        : 'text-gray-400 hover:text-secondary'
+                    }`}
+                >
+                    <Wallet size={16} /> Control de Cajas
+                </button>
+                <button 
+                    onClick={() => setView('reports')}
+                    className={`flex items-center gap-3 px-8 py-3 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest transition-all ${
+                        view === 'reports' 
+                        ? 'bg-white text-secondary shadow-premium scale-100' 
+                        : 'text-gray-400 hover:text-secondary'
+                    }`}
+                >
+                    <BarChart3 size={16} /> Reportes de Ventas
+                </button>
+            </div>
+
+            {view === 'reports' ? (
+                <SalesReportsAdvanced />
+            ) : (
+                <>
             {/* Header / Acciones Globales */}
             {!activeShift && (
                 <div className="bg-white p-12 rounded-[3.5rem] border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-center space-y-6 shadow-sm">
@@ -683,6 +713,8 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
                         </div>
                     </div>
                 </div>
+            )}
+            </>
             )}
         </div>
     );
