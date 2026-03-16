@@ -424,6 +424,7 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                     },
                     shift_id: shiftId,
                     branch_id: user?.branch_id,
+                    organization_id: user?.organization_id || null,
                     tax_data: null,
                     created_at: new Date().toISOString()
                 }])
@@ -439,8 +440,9 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                 product_name: item.name,
                 quantity: item.quantity,
                 price: item.price,
-                unit_price: item.price, // Send both to be safe with schema variations
-                customization: item.customizations
+                unit_price: item.price,
+                customization: item.customizations,
+                organization_id: user?.organization_id || null
             }));
 
             const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
