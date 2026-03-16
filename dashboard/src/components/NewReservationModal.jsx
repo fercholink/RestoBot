@@ -176,17 +176,16 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
 
             let guestId = existingGuest?.id || bookingToEdit?.guest_id;
 
-            // 1. Create or Update Guest ...
+            // 1. Create or Update Guest (UPSERT: si el documento ya existe lo actualiza)
             if (!guestId) {
-                // New guest
                 const { data: newGuest, error: guestError } = await supabase
                     .from('guests')
-                    .insert([{
+                    .upsert([{
                         full_name: formData.guestName,
                         document_id: formData.guestDoc,
                         phone: formData.guestPhone,
                         email: formData.guestEmail
-                    }])
+                    }], { onConflict: 'document_id' })
                     .select()
                     .single();
 
