@@ -42,12 +42,14 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
     const [activeBookings, setActiveBookings] = useState([]);
     const [selectedBookingRooms, setSelectedBookingRooms] = useState('');
     const [selectedCategory, setSelectedCategory] = useState(null);
+    const [nextOrderNumber, setNextOrderNumber] = useState(null);
 
     // Cargar productos, categorías y habitaciones ocupadas desde Supabase
     useEffect(() => {
         if (isOpen) {
             fetchData();
             fetchActiveBookings();
+            if (!editingOrder) fetchNextOrderNumber();
 
             if (editingOrder) {
                 // Populate Form
@@ -127,6 +129,20 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
             console.error("Error loading menu:", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchNextOrderNumber = async () => {
+        if (!user?.organization_id) return;
+        try {
+            const { data } = await supabase
+                .from('organization_order_counters')
+                .select('last_number')
+                .eq('organization_id', user.organization_id)
+                .single();
+            setNextOrderNumber((data?.last_number || 0) + 1);
+        } catch {
+            setNextOrderNumber(null);
         }
     };
 
@@ -512,6 +528,16 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                     <h2 className="text-lg font-black flex items-center gap-3 tracking-wide">
                         <ShoppingCart className="text-primary" />
                         Punto de Venta
+                        {!editingOrder && nextOrderNumber && (
+                            <span className="bg-primary/20 border border-primary/40 text-primary text-xs font-black px-3 py-1 rounded-full tracking-widest animate-pulse">
+                                # {nextOrderNumber}
+                            </span>
+                        )}
+                        {editingOrder && (
+                            <span className="bg-white/10 border border-white/20 text-white/70 text-xs font-bold px-3 py-1 rounded-full">
+                                Editando # {editingOrder.order_number || editingOrder.id}
+                            </span>
+                        )}
                     </h2>
                     <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                         <X size={24} />
