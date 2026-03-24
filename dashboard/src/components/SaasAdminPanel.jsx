@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/AuthContext';
 import { ShieldCheck, Search, CheckCircle2, XCircle, Building2, Server, Power, Loader2, Plus, Trash2, Edit2, Save, X, TrendingUp, Clock, Activity, LayoutGrid, RefreshCw } from 'lucide-react';
 import { sileo } from 'sileo';
 import { format } from 'date-fns';
@@ -18,11 +19,13 @@ const ALL_MODULES = [
 ];
 
 export default function SaasAdminPanel() {
+    const { user } = useAuth();
     const [organizations, setOrganizations] = useState([]);
     const [orgMetrics, setOrgMetrics] = useState({});
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState('list'); // 'list' or 'dashboard'
+    const [pendingWipeId, setPendingWipeId] = useState(null);
     
     // Modal Crear
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -451,7 +454,13 @@ export default function SaasAdminPanel() {
                                                             {user?.email === 'fercho028890@gmail.com' && (
                                                                 <button
                                                                     onClick={async () => {
-                                                                        if (!confirm(`⚠️ ALERTA: ¿Seguro que quieres BORRAR TODOS los pedidos, facturas, reservaciones y contabilidad de "${org.name}"? Esta acción no se puede deshacer.`)) return;
+                                                                        if (pendingWipeId !== org.id) {
+                                                                            setPendingWipeId(org.id);
+                                                                            sileo.warning({ title: '¿Limpiar datos?', description: `Clic de nuevo para purgar TODOS los pedidos y contabilidad de "${org.name}".` });
+                                                                            setTimeout(() => setPendingWipeId(null), 4000);
+                                                                            return;
+                                                                        }
+                                                                        setPendingWipeId(null);
                                                                         try {
                                                                             const { error } = await supabase.rpc('wipe_tenant_data', { p_org_id: org.id });
                                                                             if (error) throw error;
@@ -461,7 +470,7 @@ export default function SaasAdminPanel() {
                                                                             sileo.error({ title: 'Fallo en la Limpieza', description: err.message });
                                                                         }
                                                                     }}
-                                                                    className="p-1.5 border border-amber-200 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
+                                                                    className={`p-1.5 border rounded-lg transition-all ${pendingWipeId === org.id ? 'bg-amber-500 text-white border-amber-500 animate-pulse' : 'border-amber-200 text-amber-500 hover:bg-amber-50'}`}
                                                                     title="LIMPIEZA TOTAL (SuperUser)"
                                                                 >
                                                                     <RefreshCw size={14}/>
