@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
-    Save, Building2, Briefcase, FileText, CheckCircle, Store, Building, Home, Activity, RefreshCw, AlertCircle
+    Save, Building2, Briefcase, FileText, CheckCircle, Store, Building, Home, Activity, RefreshCw, AlertCircle, Receipt
 } from 'lucide-react';
 import { sileo } from 'sileo';
 
@@ -103,7 +103,10 @@ const TenantAccountingConfig = () => {
                     email: profile?.organizations?.contact_email || '',
                     phone: '',
                     address: '',
-                    city: ''
+                    city: '',
+                    rnt_number: '',
+                    invima_registration: '',
+                    default_tax_type: 'impoconsumo_8'
                 };
                 const { data: inserted, error: insertError } = await supabase
                     .from('tenant_accounting_config')
@@ -156,6 +159,9 @@ const TenantAccountingConfig = () => {
                     phone: config.phone,
                     address: config.address,
                     city: config.city,
+                    rnt_number: config.rnt_number || null,
+                    invima_registration: config.invima_registration || null,
+                    default_tax_type: config.default_tax_type || 'impoconsumo_8',
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', config.id);
@@ -429,6 +435,30 @@ const TenantAccountingConfig = () => {
                             />
                         </div>
                     </div>
+
+                    {/* RNT e INVIMA */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">RNT — Registro Nacional de Turismo</label>
+                            <input
+                                type="text"
+                                value={config?.rnt_number || ''}
+                                onChange={e => setConfig({ ...config, rnt_number: e.target.value })}
+                                placeholder="Ej: 123456 (Obligatorio Ley 300/1996)"
+                                className="w-full bg-gray-50 border border-gray-200 text-secondary text-sm rounded-xl focus:ring-rose-500 focus:border-rose-500 block p-3 font-mono font-bold outline-none transition-all"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Registro INVIMA (si aplica)</label>
+                            <input
+                                type="text"
+                                value={config?.invima_registration || ''}
+                                onChange={e => setConfig({ ...config, invima_registration: e.target.value })}
+                                placeholder="Ej: RSAA-12345678 (Res 2674/2013)"
+                                className="w-full bg-gray-50 border border-gray-200 text-secondary text-sm rounded-xl focus:ring-rose-500 focus:border-rose-500 block p-3 font-mono font-bold outline-none transition-all"
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 {/* 1. MÓDULO PRINCIPAL */}
@@ -447,7 +477,11 @@ const TenantAccountingConfig = () => {
                         ].map(ind => (
                             <div
                                 key={ind.id}
-                                onClick={() => setConfig({ ...config, primary_industry: ind.id })}
+                                onClick={() => setConfig({
+                                    ...config,
+                                    primary_industry: ind.id,
+                                    default_tax_type: ind.id === 'restaurant' ? 'impoconsumo_8' : 'iva_19'
+                                })}
                                 className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${config?.primary_industry === ind.id
                                     ? 'border-blue-500 bg-blue-50/50'
                                     : 'border-gray-100 hover:border-gray-200'
@@ -568,6 +602,52 @@ const TenantAccountingConfig = () => {
                                 <span className="text-xs font-black text-secondary tracking-tight">Autorretenedor (Renta)</span>
                             </label>
                         </div>
+                    </div>
+                </div>
+
+                {/* 4. IMPUESTO POR DEFECTO EN FACTURACIÓN */}
+                <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-2 h-full bg-amber-500 rounded-l-[2rem]"></div>
+                    <h3 className="text-base font-black text-secondary mb-1 uppercase tracking-widest flex items-center gap-2">
+                        <Receipt size={18} className="text-amber-500" />
+                        Impuesto por Defecto en Facturación DIAN
+                    </h3>
+                    <p className="text-[10px] text-gray-400 font-bold mb-4">
+                        Se aplica a los ítems que no tengan impuesto explícito. Los productos de alojamiento siempre usan IVA 19%.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {[
+                            {
+                                id: 'impoconsumo_8',
+                                label: 'Impoconsumo 8% (INC)',
+                                desc: 'Restaurantes, Bares, Cafés — Ley 1607/2012',
+                                badge: 'Recomendado restaurantes'
+                            },
+                            {
+                                id: 'iva_19',
+                                label: 'IVA 19%',
+                                desc: 'Hoteles, Servicios Generales, Inmobiliario',
+                                badge: 'Recomendado hoteles'
+                            }
+                        ].map(tax => (
+                            <div
+                                key={tax.id}
+                                onClick={() => setConfig({ ...config, default_tax_type: tax.id })}
+                                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${config?.default_tax_type === tax.id
+                                    ? 'border-amber-500 bg-amber-50/50'
+                                    : 'border-gray-100 hover:border-gray-200'}`}
+                            >
+                                <div className="flex items-center justify-between mb-1">
+                                    <h4 className={`text-sm font-black ${config?.default_tax_type === tax.id ? 'text-amber-700' : 'text-gray-600'}`}>
+                                        {tax.label}
+                                    </h4>
+                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${config?.default_tax_type === tax.id ? 'bg-amber-200 text-amber-800' : 'bg-gray-100 text-gray-500'}`}>
+                                        {tax.badge}
+                                    </span>
+                                </div>
+                                <p className="text-[10px] text-gray-500 font-medium">{tax.desc}</p>
+                            </div>
+                        ))}
                     </div>
                 </div>
 

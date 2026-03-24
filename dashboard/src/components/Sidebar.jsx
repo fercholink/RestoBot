@@ -42,6 +42,7 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
         { id: 'payroll', label: 'Nómina Electrónica', roles: ['admin', 'gerente'] },
         { id: 'third_parties', label: 'Directorio DIAN', roles: ['admin', 'gerente'] },
         { id: 'reports', label: 'Informes Legales', roles: ['admin', 'gerente'] },
+        { id: 'config', label: '🏢 Estructura Empresa', roles: ['admin', 'gerente'] },
     ].filter(item => item.roles.includes(user?.role || 'cajero'));
 
     const hasPermission = (moduleName) => {

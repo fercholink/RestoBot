@@ -141,6 +141,25 @@ export async function emitInvoiceForOrder(order) {
                 ? order.items
                 : [{ product_name: 'Servicio General', quantity: 1, unit_price: order.total || order.total_price || 0 }]);
 
+        // 2.5 Leer impuesto por defecto del tenant (configurado en Estructura Empresa)
+        let tenantDefaultTaxType = 'ICO_8';
+        try {
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            if (authUser) {
+                const { data: prof } = await supabase.from('profiles').select('organization_id').eq('id', authUser.id).single();
+                if (prof?.organization_id) {
+                    const { data: taxCfg } = await supabase
+                        .from('tenant_accounting_config')
+                        .select('default_tax_type')
+                        .eq('organization_id', prof.organization_id)
+                        .maybeSingle();
+                    if (taxCfg?.default_tax_type === 'iva_19') tenantDefaultTaxType = 'IVA_19';
+                }
+            }
+        } catch (e) {
+            console.warn('[Factus] No se pudo leer default_tax_type del tenant, usando ICO_8:', e.message);
+        }
+
         const items = rawItems.map((item, idx) => {
             const totalWithTax = parseFloat(item.unit_price || item.price || item.product?.price || 0);
 
@@ -153,7 +172,7 @@ export async function emitInvoiceForOrder(order) {
                 } else if (name.includes('(exento)')) {
                     taxType = 'EXENTO';
                 } else {
-                    taxType = 'ICO_8'; // Default para restaurante en Colombia
+                    taxType = tenantDefaultTaxType; // Impuesto por defecto según configuración del tenant
                 }
             }
 

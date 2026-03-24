@@ -8,6 +8,7 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice, order }
     const [method, setMethod] = useState('efectivo');
     const [reference, setReference] = useState('');
     const [isElectronic, setIsElectronic] = useState(false);
+    const [tipAmount, setTipAmount] = useState(0);
     
     // Split Bill State
     const [splitMode, setSplitMode] = useState(null); // 'equal' or 'items' or null
@@ -39,7 +40,8 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice, order }
             setIsDropdownOpen(false);
             setIsElectronic(false);
             setIsThirdPartyModalOpen(false);
-            
+            setTipAmount(0);
+
             // Reset split
             setSplitMode(null);
             setNumSplits(2);
@@ -131,7 +133,7 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice, order }
         const finalRef = method === 'cargo_habitacion' ? selectedBooking : reference;
 
         // Pasamos el ID del tercero en lugar del objeto manual
-        onConfirm(orderId, method, finalRef, isElectronic ? { third_party_id: selectedThirdParty.id } : null, splitMode ? { type: splitMode, amount: currentSplitTotal, items: selectedItems } : null);
+        onConfirm(orderId, method, finalRef, isElectronic ? { third_party_id: selectedThirdParty.id } : null, splitMode ? { type: splitMode, amount: currentSplitTotal, items: selectedItems } : null, tipAmount || 0);
         onClose();
     };
 
@@ -161,7 +163,13 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice, order }
                             {splitMode ? 'Diferencia a Pagar' : 'Total a Pagar'}
                         </p>
                         <h3 className="text-4xl font-black text-secondary tracking-tighter">${currentSplitTotal.toLocaleString()}</h3>
-                        {splitMode && (
+                        {tipAmount > 0 && (
+                            <div className="mt-2 pt-2 border-t border-primary/10 space-y-0.5">
+                                <p className="text-[10px] text-gray-400 font-bold">Consumo: ${currentSplitTotal.toLocaleString()} + Propina: ${tipAmount.toLocaleString()}</p>
+                                <p className="text-sm font-black text-secondary">Gran total: ${(currentSplitTotal + tipAmount).toLocaleString()}</p>
+                            </div>
+                        )}
+                        {splitMode && !tipAmount && (
                             <p className="text-[10px] font-bold text-accent mt-1 italic">Viene de un total de ${totalPrice.toLocaleString()}</p>
                         )}
                     </div>
@@ -332,6 +340,42 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice, order }
                             )}
                         </div>
                     )}
+
+                    {/* ── Propina Voluntaria (Ley 1935/2018) ── */}
+                    <div className="space-y-3 border-t border-gray-100 pt-4">
+                        <div className="flex items-center justify-between">
+                            <p className="text-[10px] font-black text-secondary/60 uppercase tracking-widest">
+                                Propina Voluntaria — Máx 10% (Ley 1935/2018)
+                            </p>
+                            {tipAmount > 0 && (
+                                <button type="button" onClick={() => setTipAmount(0)} className="text-[10px] font-black text-rose-400 hover:text-rose-600 transition-colors">
+                                    Quitar
+                                </button>
+                            )}
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                            {[0, 5, 8, 10].map(pct => {
+                                const amt = pct === 0 ? 0 : Math.round(totalPrice * pct / 100);
+                                const isSelected = pct === 0 ? tipAmount === 0 : tipAmount === amt && amt > 0;
+                                return (
+                                    <button
+                                        key={pct}
+                                        type="button"
+                                        onClick={() => setTipAmount(amt)}
+                                        className={`py-2 rounded-xl text-[10px] font-black uppercase border-2 transition-all ${isSelected ? 'border-secondary bg-secondary/5 text-secondary' : 'border-gray-100 text-gray-400 hover:border-gray-200'}`}
+                                    >
+                                        {pct === 0 ? 'Sin propina' : `${pct}%`}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {tipAmount > 0 && (
+                            <div className="flex items-center justify-between bg-amber-50 border border-amber-100 p-3 rounded-xl">
+                                <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Propina (para el personal):</span>
+                                <span className="text-sm font-black text-amber-700">${tipAmount.toLocaleString()}</span>
+                            </div>
+                        )}
+                    </div>
 
                     {/* Sección de Facturación Electrónica */}
                     <div className="pt-4 border-t border-gray-100">

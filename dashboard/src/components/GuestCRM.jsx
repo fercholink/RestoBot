@@ -4,7 +4,7 @@ import {
     Users, Search, Star, X, ChevronRight,
     Award, Globe, Calendar, Phone, Mail,
     RefreshCw, Plus, Minus, Tag, History,
-    PenLine, Save, Bed
+    PenLine, Save, Bed, FileDown
 } from 'lucide-react';
 import { sileo } from 'sileo';
 
@@ -379,6 +379,62 @@ const GuestCRM = ({ selectedBranchId }) => {
         return acc;
     }, {});
 
+    const handleExportSIRE = async () => {
+        const foreignGuests = guests.filter(g => {
+            const nat = (g.nationality || '').toLowerCase().trim();
+            return nat && !['colombia', 'colombiana', 'colombiano'].includes(nat);
+        });
+
+        if (foreignGuests.length === 0) {
+            sileo.info({ title: 'Sin Extranjeros', description: 'No hay huéspedes con nacionalidad extranjera registrada.' });
+            return;
+        }
+
+        try {
+            const { data: bks, error } = await supabase
+                .from('bookings')
+                .select('guest_id, check_in, check_out, source, room:rooms(number, type)')
+                .in('guest_id', foreignGuests.map(g => g.id))
+                .order('check_in', { ascending: false });
+
+            if (error) throw error;
+
+            const headers = ['NOMBRES_Y_APELLIDOS', 'NACIONALIDAD', 'FECHA_NACIMIENTO', 'TIPO_DOCUMENTO', 'NUMERO_DOCUMENTO', 'FECHA_INGRESO', 'FECHA_SALIDA', 'NO_HABITACION', 'FUENTE'];
+            const rows = [];
+            for (const guest of foreignGuests) {
+                const guestBks = (bks || []).filter(b => b.guest_id === guest.id);
+                const bkList = guestBks.length > 0 ? guestBks : [null];
+                for (const bk of bkList) {
+                    rows.push([
+                        guest.full_name || '',
+                        guest.nationality || '',
+                        guest.birth_date ? guest.birth_date.split('T')[0] : '',
+                        '',
+                        '',
+                        bk?.check_in ? bk.check_in.split('T')[0] : '',
+                        bk?.check_out ? bk.check_out.split('T')[0] : '',
+                        bk?.room?.number || '',
+                        bk?.source || ''
+                    ]);
+                }
+            }
+
+            const csvContent = [headers, ...rows]
+                .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+                .join('\n');
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `SIRE_Extranjeros_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+            sileo.success({ title: 'SIRE Exportado', description: `${foreignGuests.length} extranjeros — ${rows.length} registros.` });
+        } catch (err) {
+            sileo.error({ title: 'Error SIRE', description: err.message });
+        }
+    };
+
     const handleGuestSaved = (updatedGuest) => {
         setGuests(prev => prev.map(g => g.id === updatedGuest.id ? updatedGuest : g));
         setSelectedGuest(updatedGuest);
@@ -397,9 +453,19 @@ const GuestCRM = ({ selectedBranchId }) => {
                         </h2>
                         <p className="text-xs text-gray-400 font-medium mt-1">Perfiles, preferencias y lealtad</p>
                     </div>
-                    <button onClick={fetchGuests} className="p-2 bg-gray-50 text-gray-400 rounded-xl hover:text-primary transition-all">
-                        <RefreshCw size={16} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleExportSIRE}
+                            title="Exportar huéspedes extranjeros — SIRE (Migración Colombia)"
+                            className="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all text-[10px] font-black uppercase tracking-widest"
+                        >
+                            <FileDown size={14} />
+                            SIRE
+                        </button>
+                        <button onClick={fetchGuests} className="p-2 bg-gray-50 text-gray-400 rounded-xl hover:text-primary transition-all">
+                            <RefreshCw size={16} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Stats de lealtad */}
