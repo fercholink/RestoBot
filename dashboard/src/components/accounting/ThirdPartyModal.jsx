@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import { Shield, Plus, Save, RefreshCw, Mail, Phone, MapPin } from 'lucide-react';
 import { sileo } from 'sileo';
 
@@ -32,6 +33,7 @@ export const calculateDV = (nit) => {
 };
 
 const ThirdPartyModal = ({ isOpen, onClose, thirdPartyToEdit = null, onSaved, initialDocNumber = '' }) => {
+    const { user } = useAuth();
     const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState({
         document_type: 'CC', document_number: initialDocNumber, verification_digit: '',
@@ -76,9 +78,25 @@ const ThirdPartyModal = ({ isOpen, onClose, thirdPartyToEdit = null, onSaved, in
 
     const handleSave = async (e) => {
         e.preventDefault();
+        if (!user?.organization_id) {
+            sileo.error({ title: "Error", description: "No se pudo identificar tu organización." });
+            return;
+        }
         setSaving(true);
         try {
-            const payload = { ...formData, updated_at: new Date().toISOString() };
+            // Sanitizar datos para evitar errores de tipo en la DB
+            const sanitizedFormData = {
+                ...formData,
+                // Convert empty string to null for numeric fields like verification_digit
+                verification_digit: formData.verification_digit === "" || formData.verification_digit === null ? null : parseInt(formData.verification_digit),
+                // Add other fields that might need similar sanitization if they are numeric in DB
+            };
+
+            const payload = { 
+                ...sanitizedFormData, 
+                organization_id: user.organization_id,
+                updated_at: new Date().toISOString() 
+            };
             if (formData.document_type !== 'NIT') {
                 payload.business_name = '';
             } else {
@@ -103,7 +121,7 @@ const ThirdPartyModal = ({ isOpen, onClose, thirdPartyToEdit = null, onSaved, in
             onClose();
         } catch (error) {
             console.error(error);
-            const msg = error.code === '23505' ? 'Ya existe un tercero con este documento.' : error.message;
+            const msg = error.code === '23505' ? 'Ya existe un tercero con este documento en tu propia base de datos.' : error.message;
             sileo.error({ title: 'Error al guardar', description: msg });
         } finally {
             setSaving(false);

@@ -11,7 +11,7 @@ const ENVIRONMENTS = {
 };
 
 // ----------------------------------------------------------------
-// Token Cache en memoria
+// Caché en memoria
 // ----------------------------------------------------------------
 let _tokenCache = {
     access_token: null,
@@ -19,6 +19,8 @@ let _tokenCache = {
     expires_at: null,
     environment: null
 };
+
+let _credentialsCache = null; // Caché de credenciales por sesión
 
 const _isTokenValid = (env) =>
     _tokenCache.access_token &&
@@ -271,31 +273,65 @@ const factusService = {
     },
 
     // ============================================================
-    // 4. CREDENCIALES (Supabase)
+    // 4. CREDENCIALES (Supabase - Multi-Tenant)
     // ============================================================
 
     saveCredentials: async (credentials) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("No autenticado");
+
+        const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single();
+        if (!profile?.organization_id) throw new Error("Usuario sin organización asignada");
+
         const { error } = await supabase
-            .from('app_settings')
+            .from('tenant_accounting_config')
             .upsert({
-                key: 'factus_credentials',
-                value: credentials,
-                description: 'Credenciales API Factus'
-            }, { onConflict: 'key' });
+                organization_id: profile.organization_id,
+                factus_client_id: credentials.client_id,
+                factus_client_secret: credentials.client_secret,
+                factus_email: credentials.email,
+                factus_password: credentials.password,
+                factus_environment: credentials.environment || 'sandbox',
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'organization_id' });
 
         if (error) throw error;
+        
+        // Actualizar caché
+        _credentialsCache = { ...credentials };
         _tokenCache = { access_token: null, refresh_token: null, expires_at: null, environment: null };
     },
 
     getCredentials: async () => {
+        // 1. Si ya tenemos en caché, devolver inmediatamente
+        if (_credentialsCache) return _credentialsCache;
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return null;
+
+        const { data: profile } = await supabase.from('profiles').select('organization_id').eq('id', user.id).single();
+        if (!profile?.organization_id) return null;
+
         const { data, error } = await supabase
-            .from('app_settings')
-            .select('value')
-            .eq('key', 'factus_credentials')
-            .single();
+            .from('tenant_accounting_config')
+            .select('factus_client_id, factus_client_secret, factus_email, factus_password, factus_environment')
+            .eq('organization_id', profile.organization_id)
+            .maybeSingle();
 
         if (error && error.code !== 'PGRST116') throw error;
-        return data?.value || null;
+        
+        if (!data || !data.factus_email) return null;
+
+        const creds = {
+            client_id: data.factus_client_id,
+            client_secret: data.factus_client_secret,
+            email: data.factus_email,
+            password: data.factus_password,
+            environment: data.factus_environment
+        };
+
+        _credentialsCache = creds;
+        return creds;
     },
 
     getTokenStatus: () => {

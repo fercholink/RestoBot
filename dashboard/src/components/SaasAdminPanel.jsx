@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { ShieldCheck, Search, CheckCircle2, XCircle, Building2, Server, Power, Loader2, Plus, Trash2, Edit2, Save, X, TrendingUp, Clock, Activity, LayoutGrid } from 'lucide-react';
+import { ShieldCheck, Search, CheckCircle2, XCircle, Building2, Server, Power, Loader2, Plus, Trash2, Edit2, Save, X, TrendingUp, Clock, Activity, LayoutGrid, RefreshCw } from 'lucide-react';
 import { sileo } from 'sileo';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -446,6 +446,28 @@ export default function SaasAdminPanel() {
                                                             >
                                                                 <Edit2 size={14}/>
                                                             </button>
+
+                                                            {/* BOTÓN SECRETO DE LIMPIEZA (FERCHO ONLY) */}
+                                                            {user?.email === 'fercho028890@gmail.com' && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        if (!confirm(`⚠️ ALERTA: ¿Seguro que quieres BORRAR TODOS los pedidos, facturas, reservaciones y contabilidad de "${org.name}"? Esta acción no se puede deshacer.`)) return;
+                                                                        try {
+                                                                            const { error } = await supabase.rpc('wipe_tenant_data', { p_org_id: org.id });
+                                                                            if (error) throw error;
+                                                                            sileo.success({ title: 'Limpieza Completada', description: `Se han purgado todos los módulos de ${org.name}.` });
+                                                                            fetchOrganizations();
+                                                                        } catch (err) {
+                                                                            sileo.error({ title: 'Fallo en la Limpieza', description: err.message });
+                                                                        }
+                                                                    }}
+                                                                    className="p-1.5 border border-amber-200 text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
+                                                                    title="LIMPIEZA TOTAL (SuperUser)"
+                                                                >
+                                                                    <RefreshCw size={14}/>
+                                                                </button>
+                                                            )}
+
                                                             <button
                                                                 onClick={() => handleDeleteOrg(org)}
                                                                 className={`p-1.5 border rounded-lg transition-all ${pendingDeleteId === org.id ? 'bg-red-500 text-white border-red-500 animate-pulse' : 'border-red-200 text-red-500 hover:bg-red-50'}`}

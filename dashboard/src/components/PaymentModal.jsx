@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { X, Banknote, Landmark, CheckCircle2, FileText, ChevronDown, Hotel, Search, Plus } from 'lucide-react';
+import { X, Banknote, Landmark, CheckCircle2, FileText, ChevronDown, Hotel, Search, Plus, Users, LayoutList, Split } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { sileo } from 'sileo';
 import ThirdPartyModal from './accounting/ThirdPartyModal';
 
-const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
+const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice, order }) => {
     const [method, setMethod] = useState('efectivo');
     const [reference, setReference] = useState('');
     const [isElectronic, setIsElectronic] = useState(false);
+    
+    // Split Bill State
+    const [splitMode, setSplitMode] = useState(null); // 'equal' or 'items' or null
+    const [numSplits, setNumSplits] = useState(2);
+    const [selectedItems, setSelectedItems] = useState([]);
+    const [currentSplitTotal, setCurrentSplitTotal] = useState(totalPrice);
 
     // Hotel Charge State
     const [activeBookings, setActiveBookings] = useState([]);
@@ -33,8 +39,34 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
             setIsDropdownOpen(false);
             setIsElectronic(false);
             setIsThirdPartyModalOpen(false);
+            
+            // Reset split
+            setSplitMode(null);
+            setNumSplits(2);
+            setSelectedItems([]);
+            setCurrentSplitTotal(totalPrice);
         }
     }, [isOpen]);
+
+    useEffect(() => {
+        if (splitMode === 'equal') {
+            setCurrentSplitTotal(totalPrice / numSplits);
+        } else if (splitMode === 'items') {
+            const sum = selectedItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+            setCurrentSplitTotal(sum);
+        } else {
+            setCurrentSplitTotal(totalPrice);
+        }
+    }, [splitMode, numSplits, selectedItems, totalPrice]);
+
+    const toggleItemSelection = (item) => {
+        const index = selectedItems.findIndex(i => i.id === item.id);
+        if (index > -1) {
+            setSelectedItems(selectedItems.filter(i => i.id !== item.id));
+        } else {
+            setSelectedItems([...selectedItems, item]);
+        }
+    };
 
     const handleThirdPartySaved = (newTp) => {
         fetchThirdParties();
@@ -99,7 +131,7 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
         const finalRef = method === 'cargo_habitacion' ? selectedBooking : reference;
 
         // Pasamos el ID del tercero en lugar del objeto manual
-        onConfirm(orderId, method, finalRef, isElectronic ? { third_party_id: selectedThirdParty.id } : null);
+        onConfirm(orderId, method, finalRef, isElectronic ? { third_party_id: selectedThirdParty.id } : null, splitMode ? { type: splitMode, amount: currentSplitTotal, items: selectedItems } : null);
         onClose();
     };
 
@@ -124,9 +156,83 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, orderId, totalPrice }) => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto custom-scrollbar">
-                    <div className="text-center bg-primary/5 p-6 rounded-2xl border border-primary/10">
-                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-1">Total a Pagar</p>
-                        <h3 className="text-4xl font-black text-secondary tracking-tighter">${totalPrice}</h3>
+                    <div className="text-center bg-primary/5 p-6 rounded-2xl border border-primary/10 relative overflow-hidden">
+                        <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-1">
+                            {splitMode ? 'Diferencia a Pagar' : 'Total a Pagar'}
+                        </p>
+                        <h3 className="text-4xl font-black text-secondary tracking-tighter">${currentSplitTotal.toLocaleString()}</h3>
+                        {splitMode && (
+                            <p className="text-[10px] font-bold text-accent mt-1 italic">Viene de un total de ${totalPrice.toLocaleString()}</p>
+                        )}
+                    </div>
+
+                    {/* Split Bill UI */}
+                    <div className="space-y-3">
+                        <p className="text-[10px] font-black text-secondary/60 uppercase tracking-widest px-1 flex justify-between items-center">
+                            <span>División de Cuenta</span>
+                            {splitMode && (
+                                <button type="button" onClick={() => setSplitMode(null)} className="text-rose-500 hover:text-rose-600 transition-colors">Cancelar</button>
+                            )}
+                        </p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setSplitMode('equal')}
+                                className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${splitMode === 'equal' ? 'border-secondary bg-secondary/5 text-secondary' : 'border-gray-100 hover:border-gray-200 text-gray-500'}`}
+                            >
+                                <Users size={18} />
+                                <span className="text-[10px] font-black uppercase tracking-wider">Por Partes</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setSplitMode('items')}
+                                className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${splitMode === 'items' ? 'border-secondary bg-secondary/5 text-secondary' : 'border-gray-100 hover:border-gray-200 text-gray-500'}`}
+                            >
+                                <LayoutList size={18} />
+                                <span className="text-[10px] font-black uppercase tracking-wider">Por Productos</span>
+                            </button>
+                        </div>
+
+                        {splitMode === 'equal' && (
+                            <div className="bg-gray-50 p-4 rounded-xl space-y-3 animate-in fade-in slide-in-from-top-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Número de Personas</label>
+                                <div className="flex items-center gap-4">
+                                    <input 
+                                        type="range" min="2" max="10" step="1" 
+                                        value={numSplits} 
+                                        onChange={(e) => setNumSplits(parseInt(e.target.value))}
+                                        className="flex-1 accent-secondary"
+                                    />
+                                    <span className="w-10 h-10 bg-white border border-gray-200 rounded-lg flex items-center justify-center font-black text-secondary">{numSplits}</span>
+                                </div>
+                                <p className="text-[10px] text-accent font-bold italic text-center">Cada persona paga ${(totalPrice / numSplits).toLocaleString()}</p>
+                            </div>
+                        )}
+
+                        {splitMode === 'items' && order?.items && (
+                            <div className="bg-gray-50 p-4 rounded-xl space-y-3 animate-in fade-in slide-in-from-top-2 max-h-60 overflow-y-auto custom-scrollbar">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">Seleccionar Productos para cobrar</label>
+                                <div className="space-y-2">
+                                    {order.items.map((item, idx) => {
+                                        const isSelected = selectedItems.some(i => i.id === item.id);
+                                        return (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => toggleItemSelection(item)}
+                                                className={`w-full flex justify-between items-center p-3 rounded-xl border transition-all ${isSelected ? 'bg-secondary text-white border-secondary' : 'bg-white text-secondary border-gray-100 hover:border-gray-200'}`}
+                                            >
+                                                <div className="flex flex-col items-start gap-0.5">
+                                                    <span className="text-xs font-bold">{item.product_name}</span>
+                                                    <span className={`text-[10px] ${isSelected ? 'text-white/70' : 'text-accent'}`}>Cant: {item.quantity}</span>
+                                                </div>
+                                                <span className="text-xs font-black">${(item.price * item.quantity).toLocaleString()}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="space-y-3">

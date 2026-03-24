@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutPanelLeft, Users, Utensils, Settings, Menu, X, LogOut, ChevronLeft, ChevronRight, Building2, Wallet, ShieldAlert, Zap, Megaphone, QrCode, ShieldCheck } from 'lucide-react';
+import { LayoutPanelLeft, Users, Utensils, Settings, Menu, X, LogOut, ChevronLeft, ChevronRight, Building2, Wallet, ShieldAlert, Zap, Megaphone, QrCode, ShieldCheck, BarChart3 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeRestaurantSubTab, setActiveRestaurantSubTab, activeHotelSubTab, setActiveHotelSubTab, activeAccountingSubTab, setActiveAccountingSubTab }) => {
@@ -11,6 +11,7 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
     // Solo definimos subitems para restaurante por ahora
     const restaurantSubItems = [
         { id: 'board', label: 'Monitor de Pedidos', roles: ['admin', 'cajero', 'gerente', 'cocina', 'mesero'] },
+        { id: 'mapa', label: 'Mapa de Mesas', roles: ['admin', 'cajero', 'gerente', 'mesero'] },
         { id: 'menu', label: 'Gestión de Carta', roles: ['admin', 'gerente'] },
         { id: 'turnos', label: 'Cajas y Turnos', roles: ['admin', 'cajero', 'gerente'] },
     ].filter(item => item.roles.includes(user?.role || 'cajero'));
@@ -60,6 +61,7 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
     };
 
     const menuItems = [
+        { id: 'analytics', label: 'Smart Analytics', icon: BarChart3, roles: ['admin', 'gerente', 'cajero', 'recepcion', 'analista'] },
         {
             id: 'restaurante',
             label: 'Gestión Restaurante',
@@ -140,12 +142,12 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
     const content = (
         <div className="flex flex-col h-full bg-secondary transition-all duration-300">
             {/* ... Header igual ... */}
-            <div className={`p-6 border-b border-white/10 text-white flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'}`}>
-                <LayoutPanelLeft className="text-primary" size={isCollapsed ? 28 : 24} />
-                {!isCollapsed && <span className="text-2xl font-black tracking-tighter">Nexus</span>}
+            <div className={`p-4 border-b border-white/10 text-white flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'}`}>
+                <LayoutPanelLeft className="text-primary" size={isCollapsed ? 24 : 18} />
+                {!isCollapsed && <span className="text-lg font-black tracking-tighter">Nexus</span>}
             </div>
 
-            <div className={`p-6 border-b border-white/5 bg-white/5 ${isCollapsed ? 'flex justify-center' : ''}`}>
+            <div className={`p-4 border-b border-white/5 bg-white/5 ${isCollapsed ? 'flex justify-center' : ''}`}>
                 {!isCollapsed ? (
                     <>
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Usuario</p>
@@ -166,13 +168,13 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
                     <div key={item.id}>
                         <button
                             onClick={() => handleItemClick(item)}
-                            className={`w-full flex items-center transition-all duration-200 border-l-4 ${isCollapsed ? 'justify-center px-0 py-5' : 'gap-4 px-6 py-4'} ${activeTab === item.id
+                            className={`w-full flex items-center transition-all duration-200 border-l-4 ${isCollapsed ? 'justify-center px-0 py-4' : 'gap-3 px-5 py-3'} ${activeTab === item.id
                                 ? 'bg-primary/10 text-primary border-primary'
                                 : 'text-gray-400 border-transparent hover:bg-white/5 hover:text-white'
                                 }`}
                             title={isCollapsed ? item.label : ''}
                         >
-                            <item.icon size={isCollapsed ? 24 : 22} strokeWidth={activeTab === item.id ? 2.5 : 2} />
+                            <item.icon size={isCollapsed ? 20 : 18} strokeWidth={activeTab === item.id ? 2.5 : 2} />
                             {!isCollapsed && (
                                 <div className="flex-1 flex justify-between items-center">
                                     <span className="font-bold text-sm tracking-wide">{item.label}</span>

@@ -3,6 +3,7 @@ import { X, Plus, Minus, ShoppingCart, Check, Trash2, PlusCircle, MinusCircle, A
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { sileo } from 'sileo';
+import { logInventoryChange } from '../lib/inventory';
 
 const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrder, orders = [], shiftId }) => {
     const { user } = useAuth();
@@ -102,7 +103,7 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
 
     const fetchActiveBookings = async () => {
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('bookings')
                 .select(`
                     id,
@@ -110,6 +111,12 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                     guest:guests(full_name, phone, document_id)
                 `)
                 .eq('status', 'ocupada');
+
+            if (user?.organization_id) {
+                query = query.eq('organization_id', user.organization_id);
+            }
+
+            const { data, error } = await query;
 
             if (error) throw error;
             setActiveBookings(data || []);
@@ -119,10 +126,22 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
     };
 
     const fetchData = async () => {
+        if (!user?.organization_id) return;
         setLoading(true);
         try {
-            const { data: prods } = await supabase.from('products').select('*').eq('available', true).order('name');
-            const { data: cats } = await supabase.from('categories').select('*').order('id');
+            const { data: prods } = await supabase
+                .from('products')
+                .select('*')
+                .eq('available', true)
+                .eq('organization_id', user.organization_id)
+                .order('name');
+
+            const { data: cats } = await supabase
+                .from('categories')
+                .select('*')
+                .eq('organization_id', user.organization_id)
+                .order('id');
+            
             if (prods) setProducts(prods);
             if (cats) setCategories(cats);
         } catch (error) {
@@ -464,14 +483,25 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
             const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
             if (itemsError) throw itemsError;
 
-            // 3. Actualizar Stock
+            // 3. Actualizar Stock y Log Kardex
             for (const item of cart) {
                 const current = products.find(p => p.id === item.id);
                 if (current) {
+                    const newStock = Math.max(0, current.stock - item.quantity);
                     await supabase
                         .from('products')
-                        .update({ stock: Math.max(0, current.stock - item.quantity) })
+                        .update({ stock: newStock })
                         .eq('id', item.id);
+
+                    // Registrar en Kardex
+                    await logInventoryChange({
+                        productId: item.id,
+                        branchId: user?.branch_id,
+                        quantityChanged: -item.quantity,
+                        newStock: newStock,
+                        reason: 'venta',
+                        userId: user?.id
+                    });
                 }
             }
 

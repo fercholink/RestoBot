@@ -4,6 +4,7 @@ import { Utensils, Settings, Wallet, LayoutGrid, Filter, Calendar, MapPin, Home,
 import OrderCard from './OrderCard';
 import MenuManagement from './MenuManagement';
 import ShiftManagement from './ShiftManagement';
+import TableMapDesigner from './TableMapDesigner';
 
 import { useAuth } from '../context/AuthContext';
 
@@ -90,6 +91,7 @@ const RestaurantManagement = ({
     // Sub-tabs filtradas por rol
     const allSubMenuItems = [
         { id: 'board', label: 'Monitor de Pedidos', icon: LayoutGrid, description: 'Vista de pedidos en tiempo real' },
+        { id: 'mapa', label: 'Mapa de Mesas', icon: MapPin, description: 'Mapa interactivo de mesas' },
         { id: 'menu', label: 'Gestión de Carta', icon: Settings, description: 'Administrar productos y menú' },
         { id: 'turnos', label: 'Cajas y Turnos', icon: Wallet, description: 'Control de turnos y caja' },
     ];
@@ -377,6 +379,19 @@ const RestaurantManagement = ({
                             className="h-full overflow-y-auto"
                         >
                             <ShiftManagement orders={orders} onPrint={onPrint} autoOpen={shouldAutoOpenShift} />
+                        </motion.div>
+                    )}
+
+                    {activeSubTab === 'mapa' && (
+                        <motion.div
+                            key="mapa"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: -20 }}
+                            transition={{ duration: 0.3 }}
+                            className="h-full overflow-y-auto"
+                        >
+                            <TableMapDesigner orders={orders} />
                         </motion.div>
                     )}
                 </AnimatePresence>

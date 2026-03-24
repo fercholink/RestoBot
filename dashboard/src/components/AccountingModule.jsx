@@ -29,26 +29,33 @@ const getOrderType = (order) => {
 const AccountingModule = ({ activeSubTab = 'summary', setActiveSubTab }) => {
     const [stats, setStats] = useState({
         totalIncome: 0,
+        totalExpenses: 0,
+        balance: 0,
         invoicesEmitted: 0,
         paidOrders: 0,
         pendingToInvoice: 0,
+        paymentMethods: {},
         loading: true
     });
     const [todayOrders, setTodayOrders] = useState([]);
     const [loadingTable, setLoadingTable] = useState(false);
+    
+    // Filtros de fecha
+    const [dateRange, setDateRange] = useState({
+        start: new Date().toISOString().split('T')[0],
+        end: new Date().toISOString().split('T')[0]
+    });
 
     useEffect(() => {
         if (activeSubTab === 'summary') fetchDailyData();
-    }, [activeSubTab]);
+    }, [activeSubTab, dateRange]);
 
     const fetchDailyData = async () => {
         setStats(prev => ({ ...prev, loading: true }));
         setLoadingTable(true);
 
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        const todayEnd = new Date();
-        todayEnd.setHours(23, 59, 59, 999);
+        const todayStart = new Date(dateRange.start + 'T00:00:00');
+        const todayEnd = new Date(dateRange.end + 'T23:59:59');
 
         try {
             // 1. Obtener órdenes e ingresos (Pedidos y Reservas facturadas hoy)
@@ -112,12 +119,23 @@ const AccountingModule = ({ activeSubTab = 'summary', setActiveSubTab }) => {
             // Estadísticas (Aplica solo para ingresos/orders por ahora)
             const paid = orders.filter(o => o.is_paid === true || o.status === 'pagado');
             const totalIncome = paid.reduce((sum, o) => sum + (o.total || o.total_price || 0), 0);
+            const totalExpenses = formattedExpenses.reduce((sum, e) => sum + Math.abs(e.total), 0);
+
+            // Desglose por medio de pago
+            const paymentMethods = paid.reduce((acc, o) => {
+                const method = o.payment_method || 'Sin especificar';
+                acc[method] = (acc[method] || 0) + (o.total || o.total_price || 0);
+                return acc;
+            }, {});
 
             setStats({
                 totalIncome,
+                totalExpenses,
+                balance: totalIncome - totalExpenses,
                 invoicesEmitted: paid.filter(o => o.factus_doc_number).length,
                 paidOrders: paid.length,
                 pendingToInvoice: paid.filter(o => !o.factus_doc_number && getOrderType(o) !== 'habitacion').length,
+                paymentMethods,
                 loading: false
             });
             setTodayOrders(allMovements);
@@ -177,77 +195,178 @@ const AccountingModule = ({ activeSubTab = 'summary', setActiveSubTab }) => {
                 {/* ══════════ RESUMEN DIARIO ══════════ */}
                 {activeSubTab === 'summary' && (
                     <>
-                        {/* Título + botón actualizar */}
-                        <div className="flex items-center justify-between mb-6">
-                            <div>
-                                <h3 className="text-lg font-black text-secondary">Resumen del Día</h3>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                    {new Date().toLocaleDateString('es-CO', {
-                                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                                    })}
-                                </p>
+                        {/* Título + Filtros + botón actualizar */}
+                        <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 mb-8 bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-secondary rounded-2xl text-white shadow-lg">
+                                    <Calculator size={24} />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-secondary tracking-tight">Análisis de Resultados</h3>
+                                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                                        Consolidado operacional y financiero
+                                    </p>
+                                </div>
                             </div>
-                            <button
-                                onClick={fetchDailyData}
-                                disabled={stats.loading}
-                                className="flex items-center gap-2 text-xs font-black text-secondary bg-white border border-gray-200 px-4 py-2 rounded-xl hover:border-secondary hover:shadow-sm transition-all disabled:opacity-50"
-                            >
-                                <RefreshCw size={13} className={stats.loading ? 'animate-spin' : ''} />
-                                Actualizar
-                            </button>
+
+                            <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
+                                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded-2xl border border-gray-100 flex-1 md:flex-none">
+                                    <div className="flex flex-col px-2">
+                                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Desde</span>
+                                        <input 
+                                            type="date" 
+                                            value={dateRange.start}
+                                            onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                                            className="bg-transparent text-xs font-black text-secondary outline-none rounded-md"
+                                        />
+                                    </div>
+                                    <div className="w-px h-8 bg-gray-200 mx-1" />
+                                    <div className="flex flex-col px-2">
+                                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Hasta</span>
+                                        <input 
+                                            type="date" 
+                                            value={dateRange.end}
+                                            onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                                            className="bg-transparent text-xs font-black text-secondary outline-none rounded-md"
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <button
+                                    onClick={fetchDailyData}
+                                    disabled={stats.loading}
+                                    className="h-14 flex items-center gap-2 text-xs font-black text-white bg-secondary px-6 py-2 rounded-2xl hover:shadow-xl transition-all disabled:opacity-50 active:scale-95"
+                                >
+                                    <RefreshCw size={14} className={stats.loading ? 'animate-spin' : ''} />
+                                    Procesar Informe
+                                </button>
+                            </div>
                         </div>
 
                         {/* Métricas */}
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                            {/* Ingresos */}
-                            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 rounded-2xl bg-emerald-100 text-emerald-600"><TrendingUp size={20} /></div>
-                                    {stats.loading && <RefreshCw size={13} className="animate-spin text-gray-300 mt-1" />}
-                                </div>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ingresos del Día</p>
-                                <h3 className="text-2xl font-black text-secondary">
-                                    ${stats.totalIncome.toLocaleString('es-CO')}
-                                </h3>
-                                <p className="text-[10px] text-gray-400 mt-1">{stats.paidOrders} pedido{stats.paidOrders !== 1 ? 's' : ''} pagado{stats.paidOrders !== 1 ? 's' : ''}</p>
-                            </div>
+                             {/* Ingresos */}
+                             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow group">
+                                 <div className="flex justify-between items-start mb-4">
+                                     <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-600 group-hover:scale-110 transition-transform"><TrendingUp size={20} /></div>
+                                     {stats.loading && <RefreshCw size={13} className="animate-spin text-gray-300 pointer-events-none" />}
+                                 </div>
+                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ventas Totales</p>
+                                 <h3 className="text-2xl font-black text-secondary">
+                                     ${stats.totalIncome.toLocaleString('es-CO')}
+                                 </h3>
+                                 <div className="mt-2 flex items-center gap-2">
+                                     <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">{stats.paidOrders} pedidos</span>
+                                 </div>
+                             </div>
+ 
+                             {/* Gastos */}
+                             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow group">
+                                 <div className="flex justify-between items-start mb-4">
+                                     <div className="p-3 rounded-2xl bg-rose-50 text-rose-600 group-hover:scale-110 transition-transform"><AlertCircle size={20} /></div>
+                                 </div>
+                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Egresos / Gastos</p>
+                                 <h3 className="text-2xl font-black text-secondary">
+                                     ${stats.totalExpenses.toLocaleString('es-CO')}
+                                 </h3>
+                                 <div className="mt-2 flex items-center gap-2">
+                                     <span className="text-[9px] font-black bg-rose-50 text-rose-600 px-2 py-0.5 rounded-full">Costos Operativos</span>
+                                 </div>
+                             </div>
+ 
+                             {/* Balance */}
+                             <div className={`bg-white p-6 rounded-3xl border shadow-sm hover:shadow-md transition-all group ${stats.balance >= 0 ? 'border-emerald-100' : 'border-rose-100'}`}>
+                                 <div className="flex justify-between items-start mb-4">
+                                     <div className={`p-3 rounded-2xl group-hover:scale-110 transition-transform ${stats.balance >= 0 ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
+                                         <Calculator size={20} />
+                                     </div>
+                                 </div>
+                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Balance Operativo</p>
+                                 <h3 className={`text-2xl font-black ${stats.balance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                     ${stats.balance.toLocaleString('es-CO')}
+                                 </h3>
+                                 <p className="text-[10px] text-gray-400 mt-1 font-bold">Utilidad Bruta Est.</p>
+                             </div>
+ 
+                             {/* Facturas DIAN */}
+                             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow group">
+                                 <div className="flex justify-between items-start mb-4">
+                                     <div className="p-3 rounded-2xl bg-purple-50 text-purple-600 group-hover:scale-110 transition-transform"><Receipt size={20} /></div>
+                                 </div>
+                                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Cumplimiento DIAN</p>
+                                 <h3 className="text-2xl font-black text-secondary">{stats.invoicesEmitted} / {stats.paidOrders}</h3>
+                                 <div className="mt-2 flex items-center gap-2">
+                                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                        <div 
+                                            className="h-full bg-purple-500 transition-all duration-1000" 
+                                            style={{ width: `${(stats.invoicesEmitted / (stats.paidOrders || 1)) * 100}%` }}
+                                        />
+                                    </div>
+                                 </div>
+                             </div>
+                        </div>
 
-                            {/* Pedidos pagados */}
-                            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 rounded-2xl bg-blue-100 text-blue-600"><Calculator size={20} /></div>
+                        {/* Desglose de Medios de Pago */}
+                        <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden relative group hover:shadow-premium transition-all">
+                                <div className="flex justify-between items-center mb-6">
+                                    <div>
+                                        <h3 className="text-lg font-black text-secondary tracking-tight">Ventas por Medio de Pago</h3>
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Distribución de recaudo</p>
+                                    </div>
+                                    <PieChart className="text-primary group-hover:rotate-12 transition-transform" size={24} />
                                 </div>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Pedidos Pagados</p>
-                                <h3 className="text-2xl font-black text-secondary">{stats.paidOrders}</h3>
-                                <p className="text-[10px] text-gray-400 mt-1">Total del día</p>
-                            </div>
-
-                            {/* Facturas DIAN */}
-                            <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 rounded-2xl bg-purple-100 text-purple-600"><CheckCircle size={20} /></div>
-                                </div>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Facturas DIAN</p>
-                                <h3 className="text-2xl font-black text-secondary">{stats.invoicesEmitted}</h3>
-                                <p className="text-[10px] text-gray-400 mt-1">Emitidas hoy</p>
-                            </div>
-
-                            {/* Sin facturar */}
-                            <div className={`bg - white p - 6 rounded - 3xl border shadow - sm transition - colors ${stats.pendingToInvoice > 0
-                                ? 'border-orange-200 border-l-4 border-l-orange-400'
-                                : 'border-gray-100'
-                                } `}>
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 rounded-2xl bg-orange-100 text-orange-500"><AlertCircle size={20} /></div>
-                                    {stats.pendingToInvoice > 0 && (
-                                        <span className="text-[10px] font-black text-orange-500 bg-orange-50 px-2 py-0.5 rounded-full mt-1">
-                                            Por facturar
-                                        </span>
+                                <div className="space-y-4">
+                                    {Object.entries(stats.paymentMethods).length === 0 ? (
+                                        <p className="text-center py-10 text-gray-400 font-bold uppercase tracking-widest text-xs">Sin datos de recaudo</p>
+                                    ) : (
+                                        Object.entries(stats.paymentMethods).sort((a,b) => b[1] - a[1]).map(([method, amount], idx) => (
+                                            <div key={method} className="space-y-1.5">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-black text-accent uppercase tracking-wider">{method}</span>
+                                                    <span className="text-sm font-black text-secondary">${amount.toLocaleString('es-CO')}</span>
+                                                </div>
+                                                <div className="w-full h-2 bg-gray-50 rounded-full overflow-hidden border border-gray-100">
+                                                    <div 
+                                                        className={`h-full rounded-full ${idx === 0 ? 'bg-primary shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]' : 'bg-secondary/40'}`} 
+                                                        style={{ width: `${(amount / stats.totalIncome) * 100}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))
                                     )}
                                 </div>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Sin Facturar</p>
-                                <h3 className="text-2xl font-black text-secondary">{stats.pendingToInvoice}</h3>
-                                <p className="text-[10px] text-gray-400 mt-1">Pagados sin DIAN</p>
+                                <div className="mt-8 pt-6 border-t border-gray-50 flex justify-between items-center">
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Recaudado</span>
+                                    <span className="text-xl font-black text-secondary">${stats.totalIncome.toLocaleString('es-CO')}</span>
+                                </div>
+                            </div>
+
+                            <div className="bg-secondary p-8 rounded-[2rem] shadow-premium relative overflow-hidden flex flex-col justify-between text-white min-h-[280px]">
+                                <div className="relative z-10">
+                                    <div className="p-3 bg-white/10 w-fit rounded-2xl mb-4 border border-white/10 backdrop-blur-md">
+                                        <TrendingUp size={24} className="text-primary" />
+                                    </div>
+                                    <h3 className="text-2xl font-black tracking-tight mb-2">Resumen Operativo</h3>
+                                    <p className="text-white/60 text-xs font-medium leading-relaxed max-w-[240px]">
+                                        Tu negocio ha generado un balance de 
+                                        <span className={`mx-1 font-black ${stats.balance >= 0 ? 'text-primary' : 'text-rose-400'}`}>
+                                            ${Math.abs(stats.balance).toLocaleString('es-CO')}
+                                        </span> 
+                                        {stats.balance >= 0 ? 'en utilidad bruta' : 'en pérdida operativa'} durante el periodo seleccionado.
+                                    </p>
+                                </div>
+                                <div className="relative z-10 flex gap-4 mt-8">
+                                    <div className="bg-white/10 rounded-2xl p-4 flex-1 backdrop-blur-sm border border-white/5">
+                                        <p className="text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Ticket Promedio</p>
+                                        <p className="text-xl font-black">${(stats.totalIncome / (stats.paidOrders || 1)).toLocaleString('es-CO', { maximumFractionDigits: 0 })}</p>
+                                    </div>
+                                    <div className="bg-white/10 rounded-2xl p-4 flex-1 backdrop-blur-sm border border-white/5">
+                                        <p className="text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Eficiencia IVA</p>
+                                        <p className="text-xl font-black">{((stats.invoicesEmitted / (stats.paidOrders || 1)) * 100).toFixed(0)}%</p>
+                                    </div>
+                                </div>
+                                <Building2 size={180} className="absolute -right-20 -bottom-10 text-white/[0.03] rotate-12" />
                             </div>
                         </div>
 

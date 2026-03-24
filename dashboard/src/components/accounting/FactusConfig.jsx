@@ -29,14 +29,10 @@ const FactusConfig = () => {
 
     const loadCredentials = async () => {
         try {
-            const { data, error } = await supabase
-                .from('app_settings')
-                .select('value')
-                .eq('key', 'factus_credentials')
-                .single();
+            const data = await factusService.getCredentials();
 
-            if (data?.value) {
-                setCredentials({ environment: 'sandbox', ...data.value });
+            if (data) {
+                setCredentials({ ...data });
                 setConnectionStatus('saved');
             }
         } catch (error) {

@@ -10,6 +10,48 @@ const statusIcons = {
     pagado: { icon: CheckCircle2, color: 'text-success', bg: 'bg-green-50' },
 };
 
+const OrderItem = ({ item, orderStatus, onTogglePrepared }) => {
+    const [isItemPrepared, setIsItemPrepared] = React.useState(false);
+    
+    return (
+        <div 
+            onClick={(e) => {
+                if (orderStatus === 'fabricacion') {
+                    e.stopPropagation();
+                    setIsItemPrepared(!isItemPrepared);
+                }
+            }}
+            className={`border-b border-gray-50 pb-1.5 last:border-0 cursor-pointer transition-colors ${isItemPrepared ? 'opacity-40' : ''}`}
+        >
+            <div className="flex justify-between text-[11px] font-bold">
+                <span className={`flex items-center gap-2 ${isItemPrepared ? 'line-through' : 'text-secondary'}`}>
+                    {orderStatus === 'fabricacion' && (
+                        <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${isItemPrepared ? 'bg-success border-success text-white' : 'bg-white border-gray-300'}`}>
+                            {isItemPrepared && <CheckCircle2 size={10} strokeWidth={4} />}
+                        </div>
+                    )}
+                    <span className="text-primary font-black">{item.quantity}x</span> {item.product_name}
+                </span>
+                <span className="text-secondary/70 font-black">${((item.price || item.unit_price) * item.quantity).toLocaleString()}</span>
+            </div>
+            {item.customizations && (
+                <div className="pl-6 mt-0.5 space-y-0.5">
+                    {item.customizations.excluded_ingredients?.map(ing => (
+                        <div key={ing} className="text-[8px] font-black text-red-500 uppercase flex items-center gap-1">
+                            <X size={8} strokeWidth={4} /> Sin {ing}
+                        </div>
+                    ))}
+                    {item.customizations.added_extras?.map(extra => (
+                        <div key={extra.name} className="text-[8px] font-black text-success uppercase flex items-center gap-1">
+                            <Plus size={8} strokeWidth={4} /> {extra.name}
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact = false, isMinimal = false }) => {
     const [isExpanded, setIsExpanded] = React.useState(false);
     const [elapsed, setElapsed] = React.useState('');
@@ -212,26 +254,7 @@ const OrderCard = ({ order, onStatusChange, onEdit, onDelete, onPrint, isCompact
 
             <div className="space-y-2 mb-3">
                 {order.items?.map((item, idx) => (
-                    <div key={idx} className="border-b border-gray-50 pb-1.5 last:border-0">
-                        <div className="flex justify-between text-[11px] font-bold">
-                            <span className="text-secondary"><span className="text-primary font-black">{item.quantity}x</span> {item.product_name}</span>
-                            <span className="text-secondary/70 font-black">${((item.price || item.unit_price) * item.quantity).toLocaleString()}</span>
-                        </div>
-                        {item.customizations && (
-                            <div className="pl-4 mt-0.5 space-y-0.5">
-                                {item.customizations.excluded_ingredients?.map(ing => (
-                                    <div key={ing} className="text-[8px] font-black text-red-500 uppercase flex items-center gap-1">
-                                        <X size={8} strokeWidth={4} /> Sin {ing}
-                                    </div>
-                                ))}
-                                {item.customizations.added_extras?.map(extra => (
-                                    <div key={extra.name} className="text-[8px] font-black text-success uppercase flex items-center gap-1">
-                                        <Plus size={8} strokeWidth={4} /> {extra.name}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    <OrderItem key={idx} item={item} orderStatus={order.status} />
                 ))}
             </div>
 

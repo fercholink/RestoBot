@@ -12,6 +12,7 @@
 }
 
 :root {
+    font-size: 14px; /* Reducción de escala global */
     font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
     background-color: #f8fafc;
     color: #2f3542;

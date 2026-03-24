@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import { FileText, Calendar, Download, Search, RefreshCw, Calculator, FileSpreadsheet } from 'lucide-react';
 import { sileo } from 'sileo';
 
 const LegalReports = () => {
+    const { user } = useAuth();
     const [reportType, setReportType] = useState('trial_balance'); // trial_balance | income_statement
     const [dateRange, setDateRange] = useState({
         start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
@@ -23,9 +25,10 @@ const LegalReports = () => {
                     debit,
                     credit,
                     account:accounting_accounts(code, name),
-                    entry:accounting_entries!inner(date, status)
+                    entry:accounting_entries!inner(date, status, organization_id)
                 `)
                 .eq('entry.status', 'posted')
+                .eq('entry.organization_id', user.organization_id)
                 .gte('entry.date', dateRange.start)
                 .lte('entry.date', dateRange.end);
 

@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, Trash2, Tag, Utensils, IndianRupee, Image as ImageIcon, CheckCircle2, XCircle, ChevronRight, MoreVertical, Filter, Save, X, AlertTriangle, Building2, Layers, Coffee, Pizza, Beef, PlusCircle, MinusCircle, Loader2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Tag, Utensils, IndianRupee, Image as ImageIcon, CheckCircle2, XCircle, ChevronRight, MoreVertical, Filter, Save, X, AlertTriangle, Building2, Layers, Coffee, Pizza, Beef, PlusCircle, MinusCircle, Loader2, ScanBarcode } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { logInventoryChange } from '../lib/inventory';
+import InventoryKardex from './InventoryKardex';
+import { History } from 'lucide-react';
 
 const MenuManagement = () => {
     const { user } = useAuth();
@@ -17,37 +20,28 @@ const MenuManagement = () => {
     const [editingProduct, setEditingProduct] = useState(null);
     const [editingCategory, setEditingCategory] = useState(null);
     const [selectedBranchForPrice, setSelectedBranchForPrice] = useState('Global');
+    const [showKardexFor, setShowKardexFor] = useState(null);
 
     const [tempIngredients, setTempIngredients] = useState([]);
     const [tempExtras, setTempExtras] = useState([]);
 
-    // Cargar datos iniciales
-    useEffect(() => {
-        fetchData();
-
-        // Suscripción Realtime
-        const categoryChannel = supabase.channel('cat-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, fetchData)
-            .subscribe();
-
-        const productChannel = supabase.channel('prod-changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, fetchData)
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(categoryChannel);
-            supabase.removeChannel(productChannel);
-        };
-    }, []);
-
-    const fetchData = async () => {
+    const fetchData = React.useCallback(async () => {
+        if (!organizationId) return;
         try {
-            const { data: cats } = await supabase.from('categories').select('*').order('id');
-            const { data: prods } = await supabase.from('products').select('*').order('id');
+            const { data: cats } = await supabase
+                .from('categories')
+                .select('*')
+                .eq('organization_id', organizationId)
+                .order('id');
+            
+            const { data: prods } = await supabase
+                .from('products')
+                .select('*')
+                .eq('organization_id', organizationId)
+                .order('id');
 
             if (cats) {
                 setCategories(cats);
-                // Si la categoría activa actual no existe en los nuevos datos (o es null), seleccionar la primera
                 setActiveCategory(prev => {
                     if (prev && cats.find(c => c.id == prev)) return prev;
                     return cats.length > 0 ? cats[0].id : null;
@@ -59,7 +53,38 @@ const MenuManagement = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [organizationId]);
+
+    // Cargar datos iniciales
+    useEffect(() => {
+        if (organizationId) {
+            fetchData();
+
+            // Suscripción Realtime (filtrado por canal si es posible, o recarga total)
+            const categoryChannel = supabase.channel(`cat-changes-${organizationId}`)
+                .on('postgres_changes', { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'categories',
+                    filter: `organization_id=eq.${organizationId}`
+                }, fetchData)
+                .subscribe();
+
+            const productChannel = supabase.channel(`prod-changes-${organizationId}`)
+                .on('postgres_changes', { 
+                    event: '*', 
+                    schema: 'public', 
+                    table: 'products',
+                    filter: `organization_id=eq.${organizationId}`
+                }, fetchData)
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(categoryChannel);
+                supabase.removeChannel(productChannel);
+            };
+        }
+    }, [organizationId, fetchData]);
 
     const CATEGORY_EMOJIS = [
         '🍔', '🍟', '🍕', '🌭', '🌮', '🌯', '🥙', '🥗', '🍝', '🍜',
@@ -95,7 +120,8 @@ const MenuManagement = () => {
     const filteredProducts = products.filter(p =>
         p.category_id == activeCategory &&
         (p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (p.description && p.description.toLowerCase().includes(searchTerm.toLowerCase())))
+            (p.description && p.description.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (p.barcode && p.barcode.includes(searchTerm)))
     );
 
     // --- DB ACTIONS ---
@@ -123,19 +149,28 @@ const MenuManagement = () => {
     };
 
     const handleDeleteProduct = async (productId) => {
-        if (window.confirm('¿Estás seguro de eliminar este producto?')) {
-            // Actualización Optimista: Eliminar de la lista visualmente ya
-            const previousProducts = [...products];
-            setProducts(prev => prev.filter(p => p.id !== productId));
+        if (!window.confirm('¿Estás seguro de eliminar este producto?')) return;
 
-            try {
-                const { error } = await supabase.from('products').delete().eq('id', productId);
-                if (error) throw error;
-            } catch (error) {
-                // Revertir
-                setProducts(previousProducts);
-                alert("Error eliminando: " + error.message);
+        const previousProducts = [...products];
+        setProducts(prev => prev.filter(p => p.id !== productId));
+
+        try {
+            const { error: deleteError } = await supabase.from('products').delete().eq('id', productId);
+            
+            if (deleteError) {
+                // Error de llave foránea (ya tiene órdenes)
+                if (deleteError.message.includes('violates foreign key constraint')) {
+                    setProducts(previousProducts); // El producto vuelve a aparecer
+                    if (window.confirm('No se puede eliminar el producto porque tiene órdenes registradas en el historial. ¿Deseas desactivarlo y marcarlo como "Agotado" para que no aparezca en pantalla, manteniendo la integridad del historial?')) {
+                        await toggleAvailability(productId);
+                    }
+                    return;
+                }
+                throw deleteError;
             }
+        } catch (error) {
+            setProducts(previousProducts);
+            alert("Error eliminando: " + error.message);
         }
     };
 
@@ -155,7 +190,7 @@ const MenuManagement = () => {
         const tempId = editingCategory ? editingCategory.id : `temp-${Date.now()}`;
 
         if (editingCategory) {
-            setCategories(prev => prev.map(c => c.id === tempId ? { ...c, name, icon } : c));
+            setCategories(prev => prev.map(c => c.id == tempId ? { ...c, name, icon } : c));
         } else {
             setCategories(prev => [...prev, { id: tempId, name, icon }]);
         }
@@ -170,7 +205,8 @@ const MenuManagement = () => {
                 const { error: err } = await supabase
                     .from('categories')
                     .update({ name, icon })
-                    .eq('id', editingCategory.id);
+                    .eq('id', editingCategory.id)
+                    .select();
                 error = err;
             } else {
                 const { error: err } = await supabase
@@ -205,7 +241,12 @@ const MenuManagement = () => {
 
         try {
             const { error } = await supabase.from('categories').delete().eq('id', categoryId);
-            if (error) throw error;
+            if (error) {
+                if (error.message.includes('foreign key')) {
+                    throw new Error('No se puede eliminar la categoría porque tiene productos asignados. Mueve los productos a otra categoría primero.');
+                }
+                throw error;
+            }
         } catch (error) {
             setCategories(previousCategories);
             alert("Error eliminando categoría: " + error.message);
@@ -223,6 +264,7 @@ const MenuManagement = () => {
         const stockThreshold = parseInt(formData.get('productStockThreshold') || 5);
         const image = formData.get('productImage');
         const description = formData.get('productDescription') || '';
+        const barcode = formData.get('productBarcode') || '';
 
         // Precios por sede
         const branchPrices = {
@@ -241,6 +283,7 @@ const MenuManagement = () => {
             price,
             category_id: categoryId, // Note: DB uses snake_case
             description,
+            barcode,
             stock,
             stock_threshold: stockThreshold,
             branch_prices: branchPrices,
@@ -259,7 +302,7 @@ const MenuManagement = () => {
         };
 
         if (editingProduct) {
-            setProducts(prev => prev.map(p => p.id === editingProduct.id ? tempProduct : p));
+            setProducts(prev => prev.map(p => p.id == editingProduct.id ? tempProduct : p));
         } else {
             setProducts(prev => [...prev, tempProduct]);
         }
@@ -276,16 +319,57 @@ const MenuManagement = () => {
                 const { error: err } = await supabase
                     .from('products')
                     .update(productData)
-                    .eq('id', editingProduct.id);
+                    .eq('id', editingProduct.id)
+                    .select();
                 error = err;
             } else {
-                const { error: err } = await supabase
+                const { data: inserted, error: err } = await supabase
                     .from('products')
-                    .insert([productData]);
+                    .insert([productData])
+                    .select()
+                    .single();
+                
+                if (inserted) {
+                    setProducts(prev => prev.map(p => p.id === tempProduct.id ? inserted : p));
+                }
                 error = err;
             }
 
             if (error) throw error;
+
+            // Log de Inventario si se cambió el stock manualmente
+            const newStockVal = stock;
+            const prevStockVal = editingProduct?.stock || 0;
+            if (editingProduct && prevStockVal !== newStockVal) {
+                await logInventoryChange({
+                    productId: editingProduct.id,
+                    branchId: user?.branch_id,
+                    quantityChanged: newStockVal - prevStockVal,
+                    newStock: newStockVal,
+                    reason: 'ajuste',
+                    userId: user?.id
+                });
+            } else if (!editingProduct && newStockVal > 0) {
+                const { data: created } = await supabase
+                    .from('products')
+                    .select('id')
+                    .eq('name', name)
+                    .eq('organization_id', organizationId)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (created) {
+                    await logInventoryChange({
+                        productId: created.id,
+                        branchId: user?.branch_id,
+                        quantityChanged: newStockVal,
+                        newStock: newStockVal,
+                        reason: 'ajuste',
+                        userId: user?.id
+                    });
+                }
+            }
         } catch (err) {
             setProducts(previousProducts); // Revert
             alert("Error guardando producto: " + err.message);
@@ -467,8 +551,16 @@ const MenuManagement = () => {
                                                     <button
                                                         onClick={() => handleDeleteProduct(product.id)}
                                                         className="p-2 bg-gray-50 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                                        title="Eliminar"
                                                     >
                                                         <Trash2 size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setShowKardexFor(product)}
+                                                        className="p-2 bg-gray-50 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
+                                                        title="Ver Historial (Kardex)"
+                                                    >
+                                                        <History size={16} />
                                                     </button>
                                                 </div>
                                                 <div className="flex items-center gap-1 text-[10px] font-black uppercase text-gray-400">
@@ -505,7 +597,7 @@ const MenuManagement = () => {
                             </button>
                             <Beef className="absolute -right-8 -bottom-8 text-white/5 w-48 h-48" />
                         </div>
-                        <form onSubmit={handleSaveProduct} className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
+                        <form key={editingProduct?.id || 'new'} onSubmit={handleSaveProduct} className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
 
                             {/* Columna 1: Info Básica */}
                             <div className="space-y-6">
@@ -539,6 +631,19 @@ const MenuManagement = () => {
                                         </select>
                                     </div>
                                     <div className="space-y-2">
+                                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Código de Barras / Barcode</label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                name="productBarcode"
+                                                className="w-full pl-4 pr-10 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:outline-none font-bold"
+                                                defaultValue={editingProduct?.barcode}
+                                                placeholder="EAN-13 / QR / SKU"
+                                            />
+                                            <ScanBarcode className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Precio Base</label>
                                         <input
                                             type="number"
@@ -548,6 +653,34 @@ const MenuManagement = () => {
                                             required
                                         />
                                     </div>
+
+                                    {/* Inventario Movido a Básicos */}
+                                    <div className="p-4 bg-emerald-50/30 rounded-2xl border border-emerald-100/50 space-y-4">
+                                        <h5 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 flex items-center gap-2">
+                                            <Package size={12} /> Gestión de Existencias
+                                        </h5>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Stock Inicial</label>
+                                                <input
+                                                    type="number"
+                                                    name="productStock"
+                                                    className="w-full px-4 py-2 bg-white border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:outline-none font-bold text-secondary"
+                                                    defaultValue={editingProduct?.stock || 0}
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Aviso Crítico</label>
+                                                <input
+                                                    type="number"
+                                                    name="productStockThreshold"
+                                                    className="w-full px-4 py-2 bg-white border border-rose-100 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:outline-none font-bold text-rose-500"
+                                                    defaultValue={editingProduct?.stock_threshold || 5}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Sedes Activas</label>
                                         <div className="grid grid-cols-1 gap-2">
@@ -587,31 +720,6 @@ const MenuManagement = () => {
                                                 <X size={12} className="cursor-pointer text-gray-400 hover:text-red-500 transition-colors" onClick={() => setTempIngredients(tempIngredients.filter((_, idx) => idx !== i))} />
                                             </span>
                                         ))}
-                                    </div>
-
-                                    <h4 className="text-xs font-black uppercase tracking-widest text-secondary border-b border-gray-100 pb-2 mt-8 flex items-center gap-2">
-                                        <AlertTriangle size={14} className="text-warning" />
-                                        Inventario
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest">Stock Actual</label>
-                                            <input
-                                                type="number"
-                                                name="productStock"
-                                                className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/10 text-xs font-bold"
-                                                defaultValue={editingProduct?.stock || 0}
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest">Umbral Alerta</label>
-                                            <input
-                                                type="number"
-                                                name="productStockThreshold"
-                                                className="w-full px-3 py-2 bg-warning/5 border border-warning/20 rounded-xl focus:ring-2 focus:ring-warning/20 text-xs font-black text-warning"
-                                                defaultValue={editingProduct?.stock_threshold || 5}
-                                            />
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -709,7 +817,7 @@ const MenuManagement = () => {
                                 <Tag className="absolute -right-8 -bottom-8 text-white/5 w-48 h-48" />
                             </div>
 
-                            <form onSubmit={handleSaveCategory} className="p-8 space-y-6">
+                            <form key={editingCategory?.id || 'new'} onSubmit={handleSaveCategory} className="p-8 space-y-6">
                                 {/* Nombre de la categoría */}
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">
@@ -771,6 +879,13 @@ const MenuManagement = () => {
                     </div>
                 )
             }
+
+            {showKardexFor && (
+                <InventoryKardex 
+                    product={showKardexFor} 
+                    onClose={() => setShowKardexFor(null)} 
+                />
+            )}
         </div >
     );
 };
