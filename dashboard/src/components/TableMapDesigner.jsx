@@ -25,9 +25,12 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { sileo } from 'sileo';
 import { useCallback } from 'react';
+import { db } from '../lib/db';
+import { useOfflineSync } from '../hooks/useOfflineSync';
 
 const TableMapDesigner = ({ orders = [] }) => {
     const { user } = useAuth();
+    const { isOnline } = useOfflineSync();
     const [areas, setAreas] = useState([]);
     const [activeArea, setActiveArea] = useState(null);
     const [tables, setTables] = useState([]);
@@ -65,53 +68,67 @@ const TableMapDesigner = ({ orders = [] }) => {
         if (!user) return;
         setLoading(true);
         try {
-            // Fetch Areas
-            let areasQuery = supabase
-                .from('areas')
-                .select('*')
-                .order('name');
-            
-            if (user?.organization_id) {
-                areasQuery = areasQuery.eq('organization_id', user.organization_id);
-            }
-            if (user?.branch?.id) {
-                areasQuery = areasQuery.eq('branch_id', user.branch.id);
-            }
+            console.log('Fetching Table Map Data...', { isOnline, orgId: user.organization_id });
+            if (isOnline) {
+                // Fetch Areas
+                let areasQuery = supabase.from('areas').select('*').order('name');
+                if (user?.organization_id) areasQuery = areasQuery.eq('organization_id', user.organization_id);
+                if (user?.branch?.id) areasQuery = areasQuery.eq('branch_id', user.branch.id);
+                const { data: areasData, error: areasError } = await areasQuery;
+                if (areasError) throw areasError;
+                
+                // Fetch Tables
+                let tablesQuery = supabase.from('tables').select('*').order('number');
+                if (user?.organization_id) tablesQuery = tablesQuery.eq('organization_id', user.organization_id);
+                if (user?.branch?.id) tablesQuery = tablesQuery.eq('branch_id', user.branch.id);
+                const { data: tablesData, error: tablesError } = await tablesQuery;
+                if (tablesError) throw tablesError;
 
-            const { data: areasData, error: areasError } = await areasQuery;
-            
-            if (areasError) throw areasError;
-            setAreas(areasData || []);
-            
-            if (areasData?.length > 0 && !activeArea) {
-                setActiveArea(areasData[0]);
-            }
+                console.log('Supabase Data Received:', { areas: areasData?.length, tables: tablesData?.length });
 
-            // Fetch Tables
-            let tablesQuery = supabase
-                .from('tables')
-                .select('*')
-                .order('number');
-            
-            if (user?.organization_id) {
-                tablesQuery = tablesQuery.eq('organization_id', user.organization_id);
+                // Cache (Background)
+                try {
+                    if (areasData) await db.areas.bulkPut(areasData);
+                    if (tablesData) await db.tables.bulkPut(tablesData);
+                    console.log('[TableMap] ✅ Cache local actualizada');
+                } catch (dexieError) {
+                    console.warn('[TableMap] ⚠️ Fallo al actualizar caché local:', dexieError);
+                }
+                
+                if (areasData) {
+                    setAreas(areasData);
+                    if (areasData.length > 0 && !activeArea) {
+                        setActiveArea(areasData[0]);
+                    }
+                }
+                if (tablesData) {
+                    setTables(tablesData);
+                }
+            } else {
+                // Fallback Local
+                console.log('Offline: Loading from IndexedDB...');
+                const localAreas = await db.areas.where('organization_id').equals(user.organization_id).toArray();
+                const localTables = await db.tables.where('organization_id').equals(user.organization_id).toArray();
+                console.log('Local Data Loaded:', { areas: localAreas.length, tables: localTables.length });
+                setAreas(localAreas);
+                setTables(localTables);
+                if (localAreas.length > 0 && !activeArea) {
+                    setActiveArea(localAreas[0]);
+                }
             }
-            if (user?.branch?.id) {
-                tablesQuery = tablesQuery.eq('branch_id', user.branch.id);
-            }
-
-            const { data: tablesData, error: tablesError } = await tablesQuery;
-            
-            if (tablesError) throw tablesError;
-            setTables(tablesData || []);
-
         } catch (error) {
-            console.error('Error fetching table map data:', error);
-            sileo.error({ title: 'Error', description: 'No se pudieron cargar las áreas y mesas.' });
+            console.error('Error fetching table map data, falling back to local:', error);
+            const localAreas = await db.areas.where('organization_id').equals(user.organization_id || null).toArray();
+            const localTables = await db.tables.where('organization_id').equals(user.organization_id || null).toArray();
+            setAreas(localAreas);
+            setTables(localTables);
+            if (localAreas.length > 0 && !activeArea) {
+                setActiveArea(localAreas[0]);
+            }
         } finally {
             setLoading(false);
         }
-    }, [user, activeArea]);
+    }, [user, isOnline]); // Removed activeArea from dependencies to prevent re-fetch loop
 
     useEffect(() => {
         fetchData();
@@ -133,6 +150,7 @@ const TableMapDesigner = ({ orders = [] }) => {
             if (error) throw error;
             
             setAreas([...areas, data[0]]);
+            await db.areas.put(data[0]); // Update cache
             setActiveArea(data[0]);
             setNewAreaName('');
             setShowAreaModal(false);
@@ -147,7 +165,7 @@ const TableMapDesigner = ({ orders = [] }) => {
         if (!activeArea) return;
 
         // Colocación en rejilla simple para evitar amontonamiento
-        const tablesInArea = tables.filter(t => t.area_id === activeArea.id);
+        const tablesInArea = tables.filter(t => String(t.area_id) === String(activeArea.id));
         const col = tablesInArea.length % 6;
         const row = Math.floor(tablesInArea.length / 6);
 
@@ -173,6 +191,7 @@ const TableMapDesigner = ({ orders = [] }) => {
             
             if (error) throw error;
             setTables([...tables, data[0]]);
+            await db.tables.put(data[0]); // Update cache
             setSelectedTable(data[0]);
             setIsEditing(true);
         } catch (error) {
@@ -270,7 +289,7 @@ const TableMapDesigner = ({ orders = [] }) => {
         return orders.find(o => o.table_number === tableNumber && o.status !== 'pagado' && o.status !== 'cancelado');
     };
 
-    const activeAreaTables = tables.filter(t => t.area_id === activeArea?.id);
+    const activeAreaTables = tables.filter(t => String(t.area_id) === String(activeArea?.id));
 
     return (
         <div 

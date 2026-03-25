@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Wallet, Clock, ArrowRightLeft, CheckCircle2, AlertCircle, History, User, Building2, TrendingUp, TrendingDown, Landmark, Banknote, Save, X, Plus, Minus, Download, Send, XCircle, LayoutGrid, BarChart3 } from 'lucide-react';
+import { Wallet, Clock, ArrowRightLeft, CheckCircle2, AlertCircle, History, User, Building2, TrendingUp, TrendingDown, Landmark, Banknote, Save, X, Plus, Minus, Download, Send, XCircle, LayoutGrid, BarChart3, WifiOff } from 'lucide-react';
 import { sileo } from 'sileo';
 import SalesReportsAdvanced from './SalesReportsAdvanced';
+import { useOfflineSync } from '../hooks/useOfflineSync';
+import { db } from '../lib/db';
+import { OfflineManager } from '../services/OfflineManager';
 
 const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
     // Estado local para la UI
@@ -11,6 +14,7 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState('shifts'); // 'shifts' or 'reports'
     const { user } = useAuth();
+    const { isOnline } = useOfflineSync();
 
     // Turno activo: filtrar por user_id del usuario logueado
     const activeShift = shifts.find(s => s.status === 'abierto' && s.user_id === user?.id);
@@ -70,8 +74,9 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
 
             setShifts(allShifts);
         } catch (error) {
-            console.error('Error fetching shifts:', error);
-            sileo.error({ title: 'Error cargando turnos', description: error.message });
+            console.error('Error fetching shifts, fallback to local:', error);
+            const localShifts = await db.shifts.toArray();
+            setShifts(localShifts);
         } finally {
             setLoading(false);
         }
@@ -186,21 +191,7 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
             const cashierNameSafe = safeRender(user?.name, 'Cajero');
             const branchNameSafe = safeRender(user?.branch, 'Sede Principal');
 
-            const { error } = await supabase.from('shifts').insert([{
-                user_id: user.id,   // ← CLAVE: vincular turno al usuario
-                cashier_name: cashierNameSafe,
-                branch_name: branchNameSafe,
-                status: 'abierto',
-                start_time: new Date().toISOString(),
-                initial_cash: Number(initialCash),
-                expenses: []
-            }]);
-
-            if (error) throw error;
-
-            // Force immediate UI update locally
-            const newShiftStub = {
-                id: 'temp_' + Date.now(),
+            const shiftData = {
                 user_id: user.id,
                 cashier_name: cashierNameSafe,
                 branch_name: branchNameSafe,
@@ -209,11 +200,32 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
                 initial_cash: Number(initialCash),
                 expenses: []
             };
-            setShifts(prev => [newShiftStub, ...prev]);
+
+            if (isOnline) {
+                const { error } = await supabase.from('shifts').insert([shiftData]);
+                if (error) throw error;
+            } else {
+                // Modo Offline
+                const localId = `local_${Date.now()}`;
+                await db.shifts.add({ ...shiftData, id: localId });
+                await db.pending_sync.add({
+                    type: 'insert-shift',
+                    table: 'shifts',
+                    data: shiftData,
+                    status: 'pending',
+                    created_at: new Date().toISOString()
+                });
+                sileo.warning({ title: "Turno Abierto Localmente", description: "Se sincronizará al recuperar conexión." });
+            }
+
+            // Actualizar cache local para otros componentes
+            if (isOnline) {
+                const { data: latest } = await supabase.from('shifts').select('*').eq('user_id', user.id).eq('status', 'abierto').limit(1).maybeSingle();
+                if (latest) await db.shifts.put(latest);
+            }
 
             await syncShifts();
             setShowOpenModal(false);
-            sileo.success({ title: "Turno Abierto", description: "Tu caja ha sido inicializada." });
         } catch (error) {
             console.error('Error opening shift:', error);
             sileo.error({ title: "Error", description: 'Error al abrir turno: ' + (error.message || 'Error desconocido') });

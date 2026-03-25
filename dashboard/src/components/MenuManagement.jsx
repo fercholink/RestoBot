@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, Trash2, Tag, Utensils, IndianRupee, Image as ImageIcon, CheckCircle2, XCircle, ChevronRight, MoreVertical, Filter, Save, X, AlertTriangle, Building2, Layers, Coffee, Pizza, Beef, PlusCircle, MinusCircle, Loader2, ScanBarcode } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+    Plus, Search, Edit2, Trash2, Tag, Utensils, IndianRupee, 
+    Image as ImageIcon, CheckCircle2, XCircle, ChevronRight, 
+    MoreVertical, Filter, Save, X, AlertTriangle, Building2, 
+    Layers, Coffee, Pizza, Beef, PlusCircle, MinusCircle, 
+    Loader2, ScanBarcode, History, WifiOff, Package 
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { logInventoryChange } from '../lib/inventory';
 import InventoryKardex from './InventoryKardex';
-import { History } from 'lucide-react';
+import { useOfflineSync } from '../hooks/useOfflineSync';
+import { db } from '../lib/db';
+import { OfflineManager } from '../services/OfflineManager';
 
 const MenuManagement = () => {
     const { user } = useAuth();
@@ -12,6 +21,7 @@ const MenuManagement = () => {
     const [categories, setCategories] = useState([]);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { isOnline } = useOfflineSync();
 
     const [activeCategory, setActiveCategory] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -27,18 +37,30 @@ const MenuManagement = () => {
 
     const fetchData = React.useCallback(async () => {
         if (!organizationId) return;
+        setLoading(true);
         try {
-            const { data: cats } = await supabase
-                .from('categories')
-                .select('*')
-                .eq('organization_id', organizationId)
-                .order('id');
+            let cats, prods;
+            if (isOnline) {
+                const { data: c } = await supabase.from('categories').select('*').eq('organization_id', organizationId).order('id');
+                cats = c;
+            } else {
+                cats = await db.categories.where('organization_id').equals(organizationId).toArray();
+            }
             
-            const { data: prods } = await supabase
-                .from('products')
-                .select('*')
-                .eq('organization_id', organizationId)
-                .order('id');
+            if (isOnline) {
+                const { data: p } = await supabase.from('products').select('*').eq('organization_id', organizationId).order('id');
+                prods = p;
+                
+                // Cache (Background)
+                try {
+                    if (cats) await db.categories.bulkPut(cats);
+                    if (prods) await db.products.bulkPut(prods);
+                } catch (dexieError) {
+                    console.warn('[Menu] ⚠️ Fallo al actualizar caché local:', dexieError);
+                }
+            } else {
+                prods = await db.products.where('organization_id').equals(organizationId).toArray();
+            }
 
             if (cats) {
                 setCategories(cats);
@@ -49,11 +71,15 @@ const MenuManagement = () => {
             }
             if (prods) setProducts(prods);
         } catch (error) {
-            console.error("Error loading inventory:", error);
+            console.error("Error loading inventory, checking local DB:", error);
+            const c = await db.categories.where('organization_id').equals(organizationId).toArray();
+            const p = await db.products.where('organization_id').equals(organizationId).toArray();
+            setCategories(c);
+            setProducts(p);
         } finally {
             setLoading(false);
         }
-    }, [organizationId]);
+    }, [organizationId, isOnline]);
 
     // Cargar datos iniciales
     useEffect(() => {
@@ -585,113 +611,165 @@ const MenuManagement = () => {
 
             {/* Modal para Crear/Editar Producto */}
             {showProductModal && (
-                <div className="fixed inset-0 bg-secondary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in fade-in duration-200">
-                        <div className="bg-secondary p-8 text-white flex justify-between items-center relative overflow-hidden">
-                            <div className="relative z-10">
-                                <h3 className="text-2xl font-black tracking-tight">{editingProduct ? 'Editar Producto' : 'Nuevo Producto'}</h3>
-                                <p className="text-white/60 text-xs font-medium mt-1">Configuración técnica de elaboración y extras</p>
+                <div className="fixed inset-0 bg-secondary/60 backdrop-blur-md flex items-center justify-center z-50 p-4 sm:p-6 overflow-hidden">
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden border border-white/20"
+                    >
+                        {/* Header Premium */}
+                        <div className="bg-secondary p-6 sm:p-8 text-white relative overflow-hidden flex-shrink-0">
+                            <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent pointer-events-none" />
+                            <div className="relative z-10 flex justify-between items-center">
+                                <div>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="p-2 bg-primary rounded-xl shadow-lg shadow-primary/20">
+                                            <Utensils size={20} className="text-white" />
+                                        </div>
+                                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Catálogo Maestro</span>
+                                    </div>
+                                    <h3 className="text-3xl font-black tracking-tight leading-none">
+                                        {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
+                                    </h3>
+                                    <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mt-2 flex items-center gap-2">
+                                        <Layers size={12} /> Configuración avanzada de ingredientes y existencias
+                                    </p>
+                                </div>
+                                <button 
+                                    onClick={() => setShowProductModal(false)} 
+                                    className="p-3 hover:bg-white/10 rounded-2xl transition-all group active:scale-90 bg-white/5 backdrop-blur-sm"
+                                >
+                                    <X size={24} className="group-hover:rotate-90 transition-transform duration-300" />
+                                </button>
                             </div>
-                            <button onClick={() => setShowProductModal(false)} className="relative z-10 p-2 hover:bg-white/10 rounded-full transition-colors">
-                                <X size={24} />
-                            </button>
-                            <Beef className="absolute -right-8 -bottom-8 text-white/5 w-48 h-48" />
+                            <Beef className="absolute -right-12 -bottom-12 text-white/5 w-64 h-64 pointer-events-none" />
                         </div>
-                        <form key={editingProduct?.id || 'new'} onSubmit={handleSaveProduct} className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 max-h-[75vh] overflow-y-auto custom-scrollbar">
 
-                            {/* Columna 1: Info Básica */}
-                            <div className="space-y-6">
-                                <h4 className="text-xs font-black uppercase tracking-widest text-secondary border-b border-gray-100 pb-2 flex items-center gap-2">
-                                    <Tag size={14} className="text-primary" />
-                                    Básicos
-                                </h4>
-                                <div className="space-y-4">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Nombre</label>
-                                        <input
-                                            type="text"
-                                            name="productName"
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:outline-none font-bold"
-                                            defaultValue={editingProduct?.name}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Categoría</label>
-                                        <select
-                                            name="productCategory"
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:outline-none font-bold text-secondary appearance-none"
-                                            defaultValue={editingProduct?.category_id || activeCategory}
-                                            required
-                                        >
-                                            <option value="" disabled>Selecciona una categoría</option>
-                                            {categories.map(cat => (
-                                                <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Código de Barras / Barcode</label>
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                name="productBarcode"
-                                                className="w-full pl-4 pr-10 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:outline-none font-bold"
-                                                defaultValue={editingProduct?.barcode}
-                                                placeholder="EAN-13 / QR / SKU"
-                                            />
-                                            <ScanBarcode className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                        {/* Contenido con Scroll Moderno */}
+                        <form key={editingProduct?.id || 'new'} onSubmit={handleSaveProduct} className="flex-1 overflow-y-auto custom-scrollbar p-0">
+                            <div className="grid grid-cols-1 lg:grid-cols-12">
+                                
+                                {/* Columna Izquierda: Configuración Principal */}
+                                <div className="lg:col-span-7 p-8 space-y-8 border-r border-gray-50">
+                                    
+                                    {/* Sección: Identidad */}
+                                    <div className="space-y-6">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="w-1 h-6 bg-primary rounded-full" />
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-secondary">Identidad del Producto</h4>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Nombre Comercial</label>
+                                                <input
+                                                    type="text"
+                                                    name="productName"
+                                                    className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-[1.25rem] focus:ring-4 focus:ring-primary/10 focus:border-primary/30 focus:outline-none font-bold text-secondary transition-all"
+                                                    defaultValue={editingProduct?.name}
+                                                    required
+                                                    placeholder="Ej: Hamburguesa Angus"
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Categoría</label>
+                                                <div className="relative">
+                                                    <select
+                                                        name="productCategory"
+                                                        className="w-full px-5 py-4 bg-gray-50 border border-gray-100 rounded-[1.25rem] focus:ring-4 focus:ring-primary/10 focus:outline-none font-bold text-secondary appearance-none cursor-pointer"
+                                                        defaultValue={editingProduct?.category_id || activeCategory}
+                                                        required
+                                                    >
+                                                        <option value="" disabled>Selecciona...</option>
+                                                        {categories.map(cat => (
+                                                            <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
+                                                        ))}
+                                                    </select>
+                                                    <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 rotate-90 text-gray-300 pointer-events-none" size={18} />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Barcode / SKU</label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="text"
+                                                        name="productBarcode"
+                                                        className="w-full pl-5 pr-12 py-4 bg-gray-50 border border-gray-100 rounded-[1.25rem] focus:ring-4 focus:ring-primary/10 focus:outline-none font-bold text-secondary"
+                                                        defaultValue={editingProduct?.barcode}
+                                                        placeholder="Escanea o escribe..."
+                                                    />
+                                                    <ScanBarcode className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/40" size={20} />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Precio Base (PVP)</label>
+                                                <div className="relative">
+                                                    <input
+                                                        type="number"
+                                                        name="productPrice"
+                                                        className="w-full pl-10 pr-5 py-4 bg-primary/5 border border-primary/10 rounded-[1.25rem] focus:ring-4 focus:ring-primary/10 focus:outline-none font-black text-primary text-xl"
+                                                        defaultValue={editingProduct?.price}
+                                                        required
+                                                        placeholder="0.00"
+                                                    />
+                                                    <IndianRupee className="absolute left-4 top-1/2 -translate-y-1/2 text-primary" size={18} />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Precio Base</label>
-                                        <input
-                                            type="number"
-                                            name="productPrice"
-                                            className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:outline-none font-black text-primary"
-                                            defaultValue={editingProduct?.price}
-                                            required
-                                        />
-                                    </div>
 
-                                    {/* Inventario Movido a Básicos */}
-                                    <div className="p-4 bg-emerald-50/30 rounded-2xl border border-emerald-100/50 space-y-4">
-                                        <h5 className="text-[10px] font-black uppercase tracking-widest text-emerald-600 flex items-center gap-2">
-                                            <Package size={12} /> Gestión de Existencias
-                                        </h5>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-1">
-                                                <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Stock Inicial</label>
+                                    {/* Sección: Inventario Inteligente */}
+                                    <div className="bg-emerald-50/20 rounded-[2rem] border border-emerald-100/50 p-6 space-y-6">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-emerald-500 rounded-xl">
+                                                    <Package size={16} className="text-white" />
+                                                </div>
+                                                <h4 className="text-xs font-black uppercase tracking-widest text-emerald-700">Control de Existencias</h4>
+                                            </div>
+                                            <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[8px] font-black uppercase tracking-widest">En Tiempo Real</span>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-emerald-600/60 tracking-widest pl-1">Stock Disponible</label>
                                                 <input
                                                     type="number"
                                                     name="productStock"
-                                                    className="w-full px-4 py-2 bg-white border border-emerald-100 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:outline-none font-bold text-secondary"
+                                                    className="w-full px-5 py-4 bg-white border border-emerald-100 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:outline-none font-black text-secondary"
                                                     defaultValue={editingProduct?.stock || 0}
                                                 />
                                             </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Aviso Crítico</label>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black uppercase text-rose-600/60 tracking-widest pl-1">Alerta de Agotamiento</label>
                                                 <input
                                                     type="number"
                                                     name="productStockThreshold"
-                                                    className="w-full px-4 py-2 bg-white border border-rose-100 rounded-xl focus:ring-2 focus:ring-rose-500/20 focus:outline-none font-bold text-rose-500"
+                                                    className="w-full px-5 py-4 bg-white border border-rose-100 rounded-2xl focus:ring-4 focus:ring-rose-500/10 focus:outline-none font-black text-rose-500"
                                                     defaultValue={editingProduct?.stock_threshold || 5}
                                                 />
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest pl-1">Sedes Activas</label>
-                                        <div className="grid grid-cols-1 gap-2">
+                                    {/* Precios por Sede */}
+                                    <div className="space-y-4">
+                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 pl-1">Variación por Sedes</h4>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             {['Sede Norte', 'Sede Sur', 'Sede Centro'].map(branch => (
-                                                <div key={branch} className="flex items-center justify-between p-2 bg-gray-50 rounded-xl">
-                                                    <span className="text-[10px] font-bold text-gray-500">{branch}</span>
+                                                <div key={branch} className="flex items-center justify-between p-4 bg-gray-50/50 border border-gray-100 rounded-2xl hover:bg-white hover:shadow-md transition-all group">
+                                                    <div className="flex items-center gap-3">
+                                                        <Building2 size={16} className="text-gray-300 group-hover:text-primary transition-colors" />
+                                                        <span className="text-xs font-bold text-secondary">{branch}</span>
+                                                    </div>
                                                     <input
                                                         type="number"
                                                         name={`price${branch}`}
-                                                        placeholder="Precio"
-                                                        className="w-20 bg-white border border-gray-100 rounded-lg px-2 py-1 text-[10px] font-black"
+                                                        placeholder="$ 0.00"
+                                                        className="w-24 bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-black text-primary focus:ring-2 focus:ring-primary/20 outline-none"
                                                         defaultValue={editingProduct?.branch_prices?.[branch]}
                                                     />
                                                 </div>
@@ -699,100 +777,150 @@ const MenuManagement = () => {
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Columna 2: Receta / Ingredientes */}
-                            <div className="space-y-6">
-                                <h4 className="text-xs font-black uppercase tracking-widest text-secondary border-b border-gray-100 pb-2 flex items-center gap-2">
-                                    <Utensils size={14} className="text-primary" />
-                                    Ingredientes Base
-                                </h4>
-                                <div className="space-y-4">
-                                    <p className="text-[10px] text-gray-400 font-medium italic">Define qué incluye el producto por defecto.</p>
-                                    <div className="flex gap-2">
-                                        <input id="new-ing" type="text" placeholder="Ej. Cebolla" className="flex-1 px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs focus:ring-2 focus:ring-primary/20 outline-none" />
-                                        <button type="button" onClick={() => { handleAddIngredient(document.getElementById('new-ing').value); document.getElementById('new-ing').value = ''; }} className="p-2 bg-secondary text-white rounded-xl hover:brightness-110 transition-all"><Plus size={16} /></button>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {tempIngredients.map((ing, i) => (
-                                            <span key={i} className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 text-secondary rounded-xl text-[10px] font-black border border-gray-200 group">
-                                                {ing}
-                                                <X size={12} className="cursor-pointer text-gray-400 hover:text-red-500 transition-colors" onClick={() => setTempIngredients(tempIngredients.filter((_, idx) => idx !== i))} />
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Columna 3: Extras y Personalización */}
-                            <div className="space-y-6">
-                                <h4 className="text-xs font-black uppercase tracking-widest text-secondary border-b border-gray-100 pb-2 flex items-center gap-2">
-                                    <PlusCircle size={14} className="text-success" />
-                                    Extras Opcionales
-                                </h4>
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-5 gap-2">
-                                        <input id="extra-name" type="text" placeholder="Extra" className="col-span-2 px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[10px] outline-none" />
-                                        <input id="extra-price" type="number" placeholder="$ Precio" className="col-span-2 px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[10px] outline-none font-bold" />
-                                        <button type="button" onClick={() => { handleAddExtra(document.getElementById('extra-name').value, document.getElementById('extra-price').value); document.getElementById('extra-name').value = ''; document.getElementById('extra-price').value = ''; }} className="col-span-1 flex items-center justify-center bg-success text-white rounded-xl hover:brightness-110 transition-all"><Plus size={16} /></button>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {tempExtras.map((extra, i) => (
-                                            <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-2xl border border-gray-100 group">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] font-black text-secondary">{extra.name}</span>
-                                                    <span className="text-[10px] font-bold text-success">+${extra.price.toLocaleString()}</span>
-                                                </div>
-                                                <button onClick={() => setTempExtras(tempExtras.filter((_, idx) => idx !== i))} className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
-                                                    <Trash2 size={14} />
-                                                </button>
+                                {/* Columna Derecha: Elaboración y Visuales */}
+                                <div className="lg:col-span-5 bg-gray-50/30 p-8 space-y-8">
+                                    
+                                    {/* Visuales */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <div className="w-1 h-6 bg-accent rounded-full" />
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-secondary">Presentación Visual</h4>
+                                        </div>
+                                        <div className="p-1 bg-white rounded-3xl border border-gray-100 shadow-sm relative group overflow-hidden">
+                                            <div className="aspect-video rounded-[1.4rem] bg-gray-50 overflow-hidden flex items-center justify-center relative">
+                                                {editingProduct?.image ? (
+                                                    <img src={editingProduct.image} className="w-full h-full object-cover" alt="Preview" />
+                                                ) : (
+                                                    <div className="flex flex-col items-center text-gray-300">
+                                                        <ImageIcon size={48} strokeWidth={1} />
+                                                        <span className="text-[10px] font-black tracking-widest uppercase mt-2">Sin Imagen</span>
+                                                    </div>
+                                                )}
                                             </div>
-                                        ))}
+                                            <div className="p-4 bg-white">
+                                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest block mb-2">URL de la Imagen</label>
+                                                <input
+                                                    type="text"
+                                                    name="productImage"
+                                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-bold text-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                                                    placeholder="https://images.unsplash.com/..."
+                                                    defaultValue={editingProduct?.image}
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
 
-                                    <div className="space-y-4 pt-4">
-                                        <h4 className="text-xs font-black uppercase tracking-widest text-secondary border-b border-gray-100 pb-2 flex items-center gap-2">
-                                            <ImageIcon size={14} className="text-primary" />
-                                            Visuales
-                                        </h4>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">URL de Imagen</label>
-                                            <input
-                                                type="text"
-                                                name="productImage"
-                                                className="w-full px-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-medium"
-                                                placeholder="https://..."
-                                                defaultValue={editingProduct?.image}
+                                    {/* Ingredientes */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-secondary rounded-xl">
+                                                <Utensils size={14} className="text-white" />
+                                            </div>
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-secondary">Receta Base</h4>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <input 
+                                                id="new-ing" 
+                                                type="text" 
+                                                placeholder="Agregar ingrediente..." 
+                                                className="flex-1 px-5 py-3 bg-white border border-gray-100 rounded-2xl text-xs font-bold focus:ring-4 focus:ring-primary/10 outline-none transition-all shadow-sm" 
                                             />
+                                            <button 
+                                                type="button" 
+                                                onClick={() => { handleAddIngredient(document.getElementById('new-ing').value); document.getElementById('new-ing').value = ''; }} 
+                                                className="p-3 bg-secondary text-white rounded-2xl hover:bg-primary transition-all shadow-lg active:scale-95"
+                                            >
+                                                <Plus size={20} />
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2 pt-2">
+                                            {tempIngredients.map((ing, i) => (
+                                                <motion.span 
+                                                    initial={{ opacity: 0, scale: 0.8 }}
+                                                    animate={{ opacity: 1, scale: 1 }}
+                                                    key={i} 
+                                                    className="inline-flex items-center gap-2 pl-4 pr-2 py-2 bg-white text-secondary rounded-xl text-[10px] font-black border border-gray-100 shadow-sm hover:border-red-100 hover:text-red-500 transition-all cursor-default"
+                                                >
+                                                    {ing}
+                                                    <button type="button" onClick={() => setTempIngredients(tempIngredients.filter((_, idx) => idx !== i))} className="p-1 hover:bg-red-50 rounded-lg">
+                                                        <X size={12} />
+                                                    </button>
+                                                </motion.span>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Extras */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-success/10 rounded-xl">
+                                                <PlusCircle size={14} className="text-success" />
+                                            </div>
+                                            <h4 className="text-xs font-black uppercase tracking-widest text-secondary">Personalización (Extras)</h4>
+                                        </div>
+                                        <div className="grid grid-cols-12 gap-2">
+                                            <input id="extra-name" type="text" placeholder="Nombre" className="col-span-6 px-4 py-3 bg-white border border-gray-100 rounded-2xl text-[10px] font-bold outline-none shadow-sm" />
+                                            <input id="extra-price" type="number" placeholder="$ 0.00" className="col-span-4 px-4 py-3 bg-white border border-gray-100 rounded-2xl text-[10px] font-black text-success outline-none shadow-sm" />
+                                            <button 
+                                                type="button" 
+                                                onClick={() => { handleAddExtra(document.getElementById('extra-name').value, document.getElementById('extra-price').value); document.getElementById('extra-name').value = ''; document.getElementById('extra-price').value = ''; }} 
+                                                className="col-span-2 flex items-center justify-center bg-success text-white rounded-2xl hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-success/10"
+                                            >
+                                                <Plus size={20} />
+                                            </button>
+                                        </div>
+                                        <div className="space-y-3 pt-2">
+                                            {tempExtras.map((extra, i) => (
+                                                <motion.div 
+                                                    initial={{ opacity: 0, x: -10 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    key={i} 
+                                                    className="flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100 shadow-sm group hover:border-primary/20 transition-all"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-success/5 flex items-center justify-center">
+                                                            <Plus size={14} className="text-success" />
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] font-black text-secondary leading-none mb-1">{extra.name}</span>
+                                                            <span className="text-[10px] font-bold text-success">+${extra.price.toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
+                                                    <button type="button" onClick={() => setTempExtras(tempExtras.filter((_, idx) => idx !== i))} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </motion.div>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Footer del Modal */}
-                            {/* Footer del Modal (Sticky) */}
-                            <div className="p-6 bg-white/95 backdrop-blur-sm border-t border-gray-100 flex gap-4 sticky bottom-0 z-20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+                            {/* Sticky Footer Premium */}
+                            <div className="p-8 bg-white/80 backdrop-blur-xl border-t border-gray-100 flex flex-col sm:flex-row gap-4 sticky bottom-0 z-30 shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.1)]">
                                 <button
                                     type="button"
                                     onClick={() => { setShowProductModal(false); setEditingProduct(null); setTempIngredients([]); setTempExtras([]); }}
-                                    className="flex-1 py-4 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-2xl border-2 border-transparent hover:border-red-100 transition-all font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2"
+                                    className="px-8 py-5 bg-gray-100 hover:bg-red-50 text-gray-500 hover:text-red-500 rounded-3xl transition-all font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-3 order-2 sm:order-1"
                                 >
                                     <XCircle size={20} />
-                                    <span>Descartar</span>
+                                    <span>Descartar Cambios</span>
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 py-4 bg-secondary text-white rounded-2xl font-black shadow-premium hover:shadow-2xl hover:-translate-y-0.5 active:translate-y-0 transition-all text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3"
+                                    className="flex-[2] py-5 bg-secondary text-white rounded-3xl font-black shadow-2xl shadow-secondary/20 hover:shadow-secondary/40 hover:-translate-y-1 active:translate-y-0 transition-all text-[10px] uppercase tracking-[0.3em] flex items-center justify-center gap-4 order-1 sm:order-2 group"
                                 >
-                                    <Save size={20} className="text-primary" />
-                                    <span>{editingProduct ? 'Guardar Cambios' : 'Crear Producto'}</span>
+                                    <div className="p-1.5 bg-primary rounded-lg group-hover:rotate-12 transition-transform">
+                                        <Save size={18} className="text-white" />
+                                    </div>
+                                    <span>{editingProduct ? 'Sincronizar Cambios' : 'Confirmar y Publicar'}</span>
                                 </button>
                             </div>
                         </form>
-                    </div>
+                    </motion.div>
                 </div>
-            )
-            }
+            )}
 
             {/* Modal para Crear/Editar Categoría */}
             {

@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { sileo } from 'sileo';
 import { logInventoryChange } from '../lib/inventory';
+import { OfflineManager } from '../services/OfflineManager';
+import { db } from '../lib/db';
 
 const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrder, orders = [], shiftId }) => {
     const { user } = useAuth();
@@ -129,23 +131,39 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
         if (!user?.organization_id) return;
         setLoading(true);
         try {
-            const { data: prods } = await supabase
-                .from('products')
-                .select('*')
-                .eq('available', true)
-                .eq('organization_id', user.organization_id)
-                .order('name');
-
-            const { data: cats } = await supabase
-                .from('categories')
-                .select('*')
-                .eq('organization_id', user.organization_id)
-                .order('id');
+            let prods, cats;
+            if (navigator.onLine) {
+                const { data: p } = await supabase
+                    .from('products')
+                    .select('*')
+                    .eq('available', true)
+                    .eq('organization_id', user.organization_id)
+                    .order('name');
+                const { data: c } = await supabase
+                    .from('categories')
+                    .select('*')
+                    .eq('organization_id', user.organization_id)
+                    .order('id');
+                prods = p;
+                cats = c;
+                
+                // Cache local
+                if (prods) await db.products.bulkPut(prods);
+                if (cats) await db.categories.bulkPut(cats);
+            } else {
+                // Fallback local
+                prods = await db.products.where('organization_id').equals(user.organization_id).toArray();
+                cats = await db.categories.where('organization_id').equals(user.organization_id).toArray();
+            }
             
             if (prods) setProducts(prods);
             if (cats) setCategories(cats);
         } catch (error) {
-            console.error("Error loading menu:", error);
+            console.error("Error loading menu, checking local DB:", error);
+            const p = await db.products.where('organization_id').equals(user.organization_id).toArray();
+            const c = await db.categories.where('organization_id').equals(user.organization_id).toArray();
+            setProducts(p);
+            setCategories(c);
         } finally {
             setLoading(false);
         }
@@ -435,42 +453,35 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
             // O podríamos forzarlo siempre. Asumiremos que si selecciona "Cargo a Habitación" en el pago anticipado, es eso.
             // Pero simplifiquemos: Si es tipo Habitación, sugerimos Cargo a Habitación.
 
-            const { data: orderData, error: orderError } = await supabase
-                .from('orders')
-                .insert([{
-                    customer_name: finalCustomerName,
-                    table_number: finalTableNumber,
-                    status: 'nuevo',
-                    total: total,
-                    discount: discountAmount > 0 ? discountAmount : null,
-                    discount_reason: discountAmount > 0 ? discountReason : null,
-                    payment_method: paymentMethod,
-                    is_paid: isPaid,
-                    payment_reference: paymentRef,
-                    delivery_address: deliveryAddressStr,
-                    notes: orderType === 'domicilio' ? `Dir: ${deliveryAddressStr}` : (orderType === 'habitacion' ? 'Room Service' : ''),
-                    customer_phone: formattedPhone,
-                    delivery_info: {
-                        ...(orderType === 'domicilio' ? deliveryDetails : {}),
-                        booking_id: orderType === 'habitacion' ? selectedBookingRooms : null,
-                        created_by_id: user?.id,
-                        created_by_name: user?.name,
-                        created_by_role: user?.role
-                    },
-                    shift_id: shiftId,
-                    branch_id: user?.branch_id,
-                    organization_id: user?.organization_id || null,
-                    tax_data: null,
-                    created_at: new Date().toISOString()
-                }])
-                .select()
-                .single();
-
-            if (orderError) throw orderError;
+            const orderData = {
+                customer_name: finalCustomerName,
+                table_number: finalTableNumber,
+                status: 'nuevo',
+                total: total,
+                discount: discountAmount > 0 ? discountAmount : null,
+                discount_reason: discountAmount > 0 ? discountReason : null,
+                payment_method: paymentMethod,
+                is_paid: isPaid,
+                payment_reference: paymentRef,
+                delivery_address: deliveryAddressStr,
+                notes: orderType === 'domicilio' ? `Dir: ${deliveryAddressStr}` : (orderType === 'habitacion' ? 'Room Service' : ''),
+                customer_phone: formattedPhone,
+                delivery_info: {
+                    ...(orderType === 'domicilio' ? deliveryDetails : {}),
+                    booking_id: orderType === 'habitacion' ? selectedBookingRooms : null,
+                    created_by_id: user?.id,
+                    created_by_name: user?.name,
+                    created_by_role: user?.role
+                },
+                shift_id: shiftId,
+                branch_id: user?.branch_id,
+                organization_id: user?.organization_id || null,
+                tax_data: null,
+                created_at: new Date().toISOString()
+            };
 
             // 2. Crear Items
             const orderItems = cart.map(item => ({
-                order_id: orderData.id,
                 product_id: item.id,
                 product_name: item.name,
                 quantity: item.quantity,
@@ -480,8 +491,13 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
                 organization_id: user?.organization_id || null
             }));
 
-            const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
-            if (itemsError) throw itemsError;
+            // Usar el OfflineManager
+            const syncResult = await OfflineManager.saveOrder(orderData, orderItems);
+            const savedOrder = syncResult.data;
+
+            if (syncResult.mode === 'local') {
+                sileo.warning({ title: 'Pedido Guardado Localmente', description: 'Sin internet. Se sincronizará automáticamente al reconectar.' });
+            }
 
             // 3. Actualizar Stock y Log Kardex
             for (const item of cart) {
@@ -519,14 +535,14 @@ const NewOrderModal = ({ isOpen, onClose, onAddOrder, onUpdateOrder, editingOrde
             }
 
             // Feedback de éxito
-            if (isPaid) {
-                sileo.success({ title: 'Pedido creado y pagado', description: `Pedido #${orderData.order_number || orderData.id} registrado. Generando recibo...` });
+            if (isPaid && syncResult.mode === 'cloud') {
+                sileo.success({ title: 'Pedido creado y pagado', description: `Pedido #${savedOrder.order_number || savedOrder.id} registrado. Generando recibo...` });
             }
 
             // Si fue creado como pre-pagado, pasar los datos para imprimir recibo
             if (isPaid) {
                 const orderForPrint = {
-                    ...orderData,
+                    ...savedOrder,
                     items: cart.map(item => ({
                         product_name: item.name,
                         product_id: item.id,

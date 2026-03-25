@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    TrendingUp, TrendingDown, Users, DollarSign, Package, 
+import {
+    TrendingUp, TrendingDown, Users, DollarSign, Package,
     Clock, Award, Calendar, BarChart3, PieChart, Activity,
-    RefreshCw, ChevronDown
+    RefreshCw, ChevronDown, WifiOff
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../lib/db';
+import { useOfflineSync } from '../hooks/useOfflineSync';
 
 const AnalyticsPro = () => {
     const { user } = useAuth();
+    const { isOnline } = useOfflineSync();
     const organizationId = user?.organization_id;
     const [timeRange, setTimeRange] = useState('7d');
     const [loading, setLoading] = useState(true);
+    const [fromCache, setFromCache] = useState(false);
     const [analyticsData, setAnalyticsData] = useState({
         kpis: [],
         topProducts: [],
@@ -188,7 +192,47 @@ const AnalyticsPro = () => {
             });
 
         } catch (error) {
-            console.error("Error fetching analytics:", error);
+            console.warn('[Analytics] Fallo red, leyendo caché local:', error.message);
+            // Fallback offline: calcular KPIs desde IndexedDB
+            try {
+                const localOrders = organizationId
+                    ? await db.orders.where('organization_id').equals(organizationId).toArray()
+                    : await db.orders.toArray();
+                const localProds  = organizationId
+                    ? await db.products.where('organization_id').equals(organizationId).toArray()
+                    : await db.products.toArray();
+                const localCats   = organizationId
+                    ? await db.categories.where('organization_id').equals(organizationId).toArray()
+                    : await db.categories.toArray();
+
+                const paid = localOrders.filter(o => o.is_paid || o.status === 'pagado');
+                const totalRevenue = paid.reduce((s, o) => s + (o.total || o.total_price || 0), 0);
+                const avgTicket    = paid.length ? totalRevenue / paid.length : 0;
+
+                const inventoryByCategory = localCats.map(cat => {
+                    const prodsInCat = localProds.filter(p => p.category_id === cat.id);
+                    return { name: cat.name, count: prodsInCat.length, stock: prodsInCat.reduce((s, p) => s + (p.stock || 0), 0), products: prodsInCat };
+                }).filter(c => c.count > 0).sort((a, b) => b.stock - a.stock);
+
+                const channels = paid.reduce((acc, o) => { const t = o.type || 'mesa'; acc[t] = (acc[t] || 0) + 1; return acc; }, { mesa: 0, domicilio: 0, habitacion: 0 });
+
+                setFromCache(true);
+                setAnalyticsData({
+                    kpis: [
+                        { label: 'Ingresos (caché)', value: `$${totalRevenue.toLocaleString('es-CO')}`, change: 'Sin conexión', trend: 'neutral', icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                        { label: 'Pedidos (caché)',  value: paid.length.toString(),                     change: 'Sin conexión', trend: 'neutral', icon: Package,    color: 'text-blue-500',    bg: 'bg-blue-50' },
+                        { label: 'Ticket Promedio',  value: `$${avgTicket.toLocaleString('es-CO', { maximumFractionDigits: 0 })}`, change: 'Sin conexión', trend: 'neutral', icon: Activity, color: 'text-purple-500', bg: 'bg-purple-50' },
+                        { label: 'Productos',        value: localProds.length.toString(),               change: 'Sin conexión', trend: 'neutral', icon: Users,      color: 'text-amber-500',   bg: 'bg-amber-50' },
+                    ],
+                    topProducts: [],
+                    hourlyTraffic: [],
+                    saleChannels: channels,
+                    inventoryByCategory,
+                    projection: 0,
+                });
+            } catch (dbErr) {
+                console.error('[Analytics] También falló IndexedDB:', dbErr);
+            }
         } finally {
             setLoading(false);
         }
@@ -205,6 +249,13 @@ const AnalyticsPro = () => {
 
     return (
         <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar bg-gray-50/50">
+            {/* Banner modo offline */}
+            {(!isOnline || fromCache) && (
+                <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-2xl px-5 py-3 mb-6 text-xs font-bold">
+                    <WifiOff size={15} />
+                    <span>Mostrando datos del caché local — conéctate para actualizar las métricas en tiempo real.</span>
+                </div>
+            )}
             {/* Header con Filtros */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 md:mb-8 bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
                 <div>

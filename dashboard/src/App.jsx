@@ -25,9 +25,12 @@ import TableQRGenerator from './components/TableQRGenerator';
 import NotificationPanel from './components/NotificationPanel';
 import DigitalCheckIn from './components/DigitalCheckIn';
 import SaasAdminPanel from './components/SaasAdminPanel';
-import { LayoutGrid, Filter, Plus, Building2, ShieldCheck, Wallet, Activity } from 'lucide-react';
+import OfflineBanner from './components/OfflineBanner';
+import { LayoutGrid, Filter, Plus, ShieldCheck, Wallet, Activity } from 'lucide-react';
 import { Toaster, sileo } from 'sileo';
 import { emitInvoiceForOrder } from './services/invoiceHelper';
+import { useOfflineSync } from './hooks/useOfflineSync';
+import { db } from './lib/db';
 import "./styles/sileo.css";
 
 // Mock data para previsualizar antes de conectar n8n
@@ -83,6 +86,9 @@ function App() {
   const [paymentModal, setPaymentModal] = useState({ isOpen: false, orderId: null, totalPrice: 0, order: null });
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [printData, setPrintData] = useState({ order: null, type: 'comanda' });
+  
+  // Soporte Offline
+  const { isOnline } = useOfflineSync();
 
   // Estados de turno movidos arriba
   // const [hasActiveShift... ya definidos ex-inicio
@@ -246,13 +252,23 @@ function App() {
 
       if (error) {
         console.error('[fetchOrders] Error:', error);
-        throw error;
+        // Fallback local en caso de error de red
+        const localOrders = await db.orders.toArray();
+        setOrders(localOrders);
+        return;
       }
 
       console.log(`[fetchOrders] ✅ ${data?.length || 0} pedidos (rol: ${user?.role})`);
       setOrders(data || []);
+      
+      // Actualizar cache local
+      if (data) {
+        await db.orders.bulkPut(data);
+      }
     } catch (error) {
-      console.error("Error fetching orders:", error);
+      console.error("Error fetching orders, checking local DB:", error);
+      const localOrders = await db.orders.toArray();
+      setOrders(localOrders);
     }
   };
 
@@ -398,38 +414,50 @@ function App() {
       }
 
       // Delegar la actualización a n8n para activar triggers (ej. WhatsApp, Factus)
-      await updateOrderStatus(orderId, newStatus);
+      if (isOnline) {
+        await updateOrderStatus(orderId, newStatus);
+      } else {
+        throw new Error("Offline");
+      }
 
     } catch (error) {
-      console.error("Error actualizando estado vía n8n:", error);
+      console.error("Error actualizando estado (n8n o Red):", error);
 
-      // Fallback: Actualizar directamente en Supabase si n8n falla
-      try {
-        let updatePayload = { status: newStatus };
-
-        if (newStatus === 'pagado') {
-          const order = orders.find(o => o.id === orderId);
-          if (order && order.created_at) {
-            updatePayload.preparation_time_seconds = Math.max(0, differenceInSeconds(new Date(), parseISO(order.created_at)));
+      // Fallback 1: Actualizar directamente en Supabase si n8n falla pero hay red
+      if (isOnline) {
+        try {
+          let updatePayload = { status: newStatus };
+          const curOrder = orders.find(o => o.id === orderId);
+          if (newStatus === 'pagado' && curOrder?.created_at) {
+            updatePayload.preparation_time_seconds = Math.max(0, differenceInSeconds(new Date(), parseISO(curOrder.created_at)));
           }
+
+          const { error: sbError } = await supabase.from('orders').update(updatePayload).eq('id', orderId);
+          if (sbError) throw sbError;
+          
+          return;
+        } catch (sbErr) {
+          console.error("Error fallback Supabase:", sbErr);
         }
+      }
 
-        const { error: sbError } = await supabase
-          .from('orders')
-          .update(updatePayload)
-          .eq('id', orderId);
-
-        if (sbError) throw sbError;
-
-        // Si funcionó el fallback, no revertimos, pero avisamos (opcional, para no spammear quitamos el alert intrusivo)
-        console.warn("N8N no disponible. Estado actualizado directamente en Supabase.");
-
-        // Podríamos mostrar un toast aquí si tuviéramos un sistema de notificaciones, 
-        // pero por ahora el console.warn es suficiente para no bloquear el flujo.
-
-      } catch (fallbackError) {
-        console.error("Error fatal: Falló n8n y también Supabase", fallbackError);
-        sileo.error({ title: 'Error crítico', description: 'No se pudo actualizar el estado del pedido.' });
+      // Fallback 2: MODO OFFLINE - Guardar en cola de sincronización local
+      try {
+        await db.orders.update(orderId, { status: newStatus });
+        await db.pending_sync.add({
+          type: 'update-status',
+          table: 'orders',
+          data: { orderId, status: newStatus },
+          status: 'pending',
+          created_at: new Date().toISOString()
+        });
+        
+        if (!isOnline) {
+          sileo.warning({ title: 'Cambio guardado localmente', description: 'Se sincronizará cuando vuelva la conexión.' });
+        }
+      } catch (localErr) {
+        console.error("Error fatal local:", localErr);
+        sileo.error({ title: 'Error crítico', description: 'No se pudo guardar el cambio.' });
         fetchOrders(); // Revertir UI
       }
     }
@@ -734,6 +762,8 @@ function App() {
   return (
     <>
       <div id="main-app-container" className="flex min-h-screen bg-[#f8fafc] text-secondary">
+        {/* Banner Offline / Sincronización */}
+        <OfflineBanner />
         <Sidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
