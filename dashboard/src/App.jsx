@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { differenceInSeconds, parseISO } from 'date-fns';
 import { updateOrderStatus } from './api';
 import { useAuth } from './context/AuthContext';
@@ -105,26 +105,30 @@ function App() {
 
 
 
-  // Ajustar pestaña inicial y UI según el rol
+  // Ajustar pestaña inicial y UI según el rol - SOLO AL INICIO (para evitar resets al enfocar pestaña)
+  const isInitializedRef = useRef(false);
   useEffect(() => {
-    if (user) {
+    if (user && !isInitializedRef.current) {
       const role = user.role;
       if (role === 'admin' || role === 'gerente') {
-        // Admin/Gerente: Smart Analytics por defecto
         setActiveTab('analytics');
       } else if (role === 'cajero') {
-        // Cajero: Sidebar colapsado y pestaña Caja por defecto
         setIsSidebarCollapsed(true);
         setActiveTab('restaurante');
         setActiveRestaurantSubTab('turnos');
       } else {
-        // TODOS los demás roles (cocina, mesero, etc.): Board directo, sidebar colapsado
         setIsSidebarCollapsed(true);
         setActiveTab('restaurante');
         setActiveRestaurantSubTab('board');
       }
+      isInitializedRef.current = true;
     }
   }, [user]);
+
+  // Si el usuario cambia de verdad (logout/login con otro ID), reiniciamos el flag
+  useEffect(() => {
+    if (!user) isInitializedRef.current = false;
+  }, [user?.id]);
 
   // --- SUPABASE INTEGRATION FOR ORDERS ---
 

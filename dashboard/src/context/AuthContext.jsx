@@ -94,7 +94,9 @@ export const AuthProvider = ({ children }) => {
 
 
     const handleUserSession = async (session) => {
-        setLoading(true);
+        // Solo mostramos el spinner de carga si no tenemos un usuario ya en memoria (evita flashes al enfocar la pestaña)
+        if (!user) setLoading(true);
+        
         const sessionUser = session?.user ?? null;
 
         if (sessionUser) {
