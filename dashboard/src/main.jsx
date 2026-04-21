@@ -12,8 +12,8 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   import('virtual:pwa-register').then(({ registerSW }) => {
     registerSW({
       onNeedRefresh() {
-        console.log('[PWA] Nueva versión disponible — recargando...');
-        window.location.reload();
+        console.log('[PWA] Nueva versión disponible — actualización silenciosa preparada.');
+        // window.location.reload(); // Eliminado para evitar recargas automáticas que interrumpan al usuario
       },
       onOfflineReady() {
         console.log('[PWA] App lista para funcionar sin conexión');

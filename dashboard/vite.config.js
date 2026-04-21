@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
       VitePWA({
-        registerType: 'autoUpdate',
+        registerType: 'prompt',
         // El SW solo actúa en producción (en dev interfiere con los módulos de Vite)
         devOptions: {
           enabled: false

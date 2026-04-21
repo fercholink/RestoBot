@@ -66,10 +66,13 @@ const MOCK_ORDERS = [
 function App() {
   const { user, loading } = useAuth();
   const { ordersVersion } = useRealtime();
-  const [activeTab, setActiveTab] = useState('analytics'); // Smart Analytics por defecto
+  // Restauramos el estado desde localStorage para evitar que se pierda la ubicación al recargar o volver de otra pestaña
+  const [activeTab, setActiveTab] = useState(() => localStorage.getItem('nexus_active_tab') || 'analytics');
 
-  // Eliminamos el useEffect que guardaba la pestaña en localStorage
-  // para cumplir con el requerimiento de que la selección sea manual al recargar.
+  // Guardar la pestaña activa cada vez que cambie
+  useEffect(() => {
+    localStorage.setItem('nexus_active_tab', activeTab);
+  }, [activeTab]);
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showShiftWarning, setShowShiftWarning] = useState(false);
@@ -80,9 +83,14 @@ function App() {
   const [activeShift, setActiveShift] = useState(null); // Estado para el turno activo
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [activeRestaurantSubTab, setActiveRestaurantSubTab] = useState(user?.role === 'cajero' ? 'turnos' : 'board');
-  const [activeHotelSubTab, setActiveHotelSubTab] = useState('habitaciones');
-  const [activeAccountingSubTab, setActiveAccountingSubTab] = useState('summary');
+  const [activeRestaurantSubTab, setActiveRestaurantSubTab] = useState(() => localStorage.getItem('nexus_rest_subtab') || (user?.role === 'cajero' ? 'turnos' : 'board'));
+  const [activeHotelSubTab, setActiveHotelSubTab] = useState(() => localStorage.getItem('nexus_hotel_subtab') || 'habitaciones');
+  const [activeAccountingSubTab, setActiveAccountingSubTab] = useState(() => localStorage.getItem('nexus_acc_subtab') || 'summary');
+
+  // Persistir sub-pestañas
+  useEffect(() => { localStorage.setItem('nexus_rest_subtab', activeRestaurantSubTab); }, [activeRestaurantSubTab]);
+  useEffect(() => { localStorage.setItem('nexus_hotel_subtab', activeHotelSubTab); }, [activeHotelSubTab]);
+  useEffect(() => { localStorage.setItem('nexus_acc_subtab', activeAccountingSubTab); }, [activeAccountingSubTab]);
   const [paymentModal, setPaymentModal] = useState({ isOpen: false, orderId: null, totalPrice: 0, order: null });
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [printData, setPrintData] = useState({ order: null, type: 'comanda' });
@@ -105,21 +113,26 @@ function App() {
 
 
 
-  // Ajustar pestaña inicial y UI según el rol - SOLO AL INICIO (para evitar resets al enfocar pestaña)
+  // Ajustar pestaña inicial y UI según el rol - SOLO AL INICIO (si no hay persistencia)
   const isInitializedRef = useRef(false);
   useEffect(() => {
     if (user && !isInitializedRef.current) {
+      const savedTab = localStorage.getItem('nexus_active_tab');
       const role = user.role;
-      if (role === 'admin' || role === 'gerente') {
-        setActiveTab('analytics');
-      } else if (role === 'cajero') {
-        setIsSidebarCollapsed(true);
-        setActiveTab('restaurante');
-        setActiveRestaurantSubTab('turnos');
-      } else {
-        setIsSidebarCollapsed(true);
-        setActiveTab('restaurante');
-        setActiveRestaurantSubTab('board');
+
+      // Solo forzamos pestaña por defecto si no hay una guardada
+      if (!savedTab) {
+        if (role === 'admin' || role === 'gerente') {
+          setActiveTab('analytics');
+        } else if (role === 'cajero') {
+          setIsSidebarCollapsed(true);
+          setActiveTab('restaurante');
+          setActiveRestaurantSubTab('turnos');
+        } else {
+          setIsSidebarCollapsed(true);
+          setActiveTab('restaurante');
+          setActiveRestaurantSubTab('board');
+        }
       }
       isInitializedRef.current = true;
     }
