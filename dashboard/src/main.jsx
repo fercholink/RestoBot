@@ -12,11 +12,13 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   import('virtual:pwa-register').then(({ registerSW }) => {
     registerSW({
       onNeedRefresh() {
-        console.log('[PWA] Nueva versión disponible — actualización silenciosa preparada.');
-        // window.location.reload(); // Eliminado para evitar recargas automáticas que interrumpan al usuario
+        console.log('[PWA] Nueva versión disponible. Recarga automática BLOQUEADA por Antigravity.');
       },
       onOfflineReady() {
-        console.log('[PWA] App lista para funcionar sin conexión');
+        console.log('[PWA] App lista para funcionar offline.');
+      },
+      onRegistered(registration) {
+        console.log('[PWA] Service Worker registrado correctamente.');
       }
     });
   }).catch(e => console.warn('[PWA] No se pudo registrar SW:', e));

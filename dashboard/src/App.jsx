@@ -63,6 +63,9 @@ const MOCK_ORDERS = [
   }
 ];
 
+// Log de Auditoría: Detecta si la página se recarga por completo en el navegador
+console.warn(`[Auditoría] 🚀 Nexus App Inicializada: ${new Date().toLocaleTimeString()} (Si ves esto al cambiar de pestaña, hay una recarga real)`);
+
 function App() {
   const { user, loading } = useAuth();
   const { ordersVersion } = useRealtime();

@@ -451,7 +451,7 @@ export default function SaasAdminPanel() {
                                                             </button>
 
                                                             {/* BOTÓN SECRETO DE LIMPIEZA (FERCHO ONLY) */}
-                                                            {user?.email === 'fercho028890@gmail.com' && (
+                                                            {['fercho028890@gmail.com', 'ricardo@admin.com'].includes(user?.email) && (
                                                                 <button
                                                                     onClick={async () => {
                                                                         if (pendingWipeId !== org.id) {

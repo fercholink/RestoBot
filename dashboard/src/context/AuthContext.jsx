@@ -71,7 +71,7 @@ export const AuthProvider = ({ children }) => {
 
         // ─── BYPASS DE EMERGENCIA ───
         // Si el correo es el del dueño, forzamos superadmin y admin
-        const isOwner = sessionUser.email?.toLowerCase() === 'fercho028890@gmail.com';
+        const isOwner = ['fercho028890@gmail.com', 'ricardo@admin.com'].includes(sessionUser.email?.toLowerCase());
         const finalRole = isOwner ? 'admin' : resolvedRole;
         const finalIsSuperAdmin = isOwner ? true : (profileData.is_superadmin || false);
 

@@ -18,6 +18,8 @@ export default defineConfig(({ mode }) => {
           enabled: false
         },
         workbox: {
+          skipWaiting: false, // NO forzar la actualización inmediata
+          clientsClaim: false, // NO tomar el control de clientes antiguos automáticamente
           // Cachear el shell de la app y assets estáticos
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
           // Rutas de navegación → siempre servir index.html (SPA)
