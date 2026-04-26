@@ -1,11 +1,10 @@
 import axios from 'axios';
 
-// La URL de n8n vendrá de las variables de entorno o será dinámica
-const N8N_API_URL = import.meta.env.DEV ? '' : (import.meta.env.VITE_N8N_URL || 'https://tu-n8n-easypanel.com');
-
+// Siempre rutas relativas — en dev Vite proxea /webhook → n8n,
+// en prod el servidor Express hace lo mismo. La URL de n8n nunca queda en el bundle.
 const api = axios.create({
-    baseURL: N8N_API_URL,
-    timeout: 10000, // 10 segundos timeout
+    baseURL: '',
+    timeout: 10000,
     headers: {
         'Content-Type': 'application/json',
     },
