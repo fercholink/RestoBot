@@ -15,6 +15,7 @@ import TapeChart from './TapeChart';
 import HousekeepingApp from './HousekeepingApp';
 import HotelAnalytics from './HotelAnalytics';
 import GuestCRM from './GuestCRM';
+import HotelMapDesigner from './HotelMapDesigner';
 import { useAuth } from '../context/AuthContext';
 
 // Helper Component for Cleaning Timer
@@ -147,8 +148,8 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
             const { data: floorsData, error: floorsError } = await supabase
                 .from('floors')
                 .select('*')
-                .eq('branch_id', selectedBranchId);
-            // .order('level'); // Removed to avoid error if column missing
+                .eq('branch_id', selectedBranchId)
+                .order('name', { ascending: true }); // Ensure floors don't jump randomly
 
             if (floorsError) throw floorsError;
             const processedFloors = floorsData || [];
@@ -156,8 +157,9 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
             // 2. Cargar Habitaciones (Independiente para asegurar que llegan todas)
             const { data: roomsData, error: roomsError } = await supabase
                 .from('rooms')
-                .select('*') // No dependemos de join
-                .eq('branch_id', selectedBranchId);
+                .select('*')
+                .eq('branch_id', selectedBranchId)
+                .order('number', { ascending: true }); // Prevent random jumping when updating status
 
             if (roomsError) throw roomsError;
             const allRooms = roomsData || [];
@@ -1205,6 +1207,8 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
                         ))
                     )}
                 </div>
+            ) : activeSubTab === 'mapa' ? (
+                <HotelMapDesigner floors={floors} rooms={rooms} bookings={bookings} onRoomUpdated={loadBranchData} selectedBranchId={selectedBranchId} />
             ) : activeSubTab === 'floors' ? (
                 <FloorManager branchId={selectedBranchId} onFloorUpdated={loadBranchData} />
             ) : activeSubTab === 'calendario' ? (

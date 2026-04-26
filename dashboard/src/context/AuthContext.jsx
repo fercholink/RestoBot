@@ -94,8 +94,9 @@ export const AuthProvider = ({ children }) => {
 
 
     const handleUserSession = async (session) => {
-        // Solo mostramos el spinner de carga si no tenemos un usuario ya en memoria (evita flashes al enfocar la pestaña)
-        if (!user) setLoading(true);
+        // El estado 'loading' inicia en true. Una vez que se resuelve la sesión inicial,
+        // se pone en false. Las actualizaciones posteriores (como refresco de token al cambiar de pestaña)
+        // actúan en segundo plano sin reiniciar el 'loading', evitando recargas innecesarias.
         
         const sessionUser = session?.user ?? null;
 

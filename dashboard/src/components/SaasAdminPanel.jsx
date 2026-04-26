@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, Search, CheckCircle2, XCircle, Building2, Server, Power, Loader2, Plus, Trash2, Edit2, Save, X, TrendingUp, Clock, Activity, LayoutGrid, RefreshCw } from 'lucide-react';
+import { useAdminLog } from '../hooks/useAdminLog';
+import { Search, CheckCircle2, XCircle, Building2, Server, Power, Loader2, Plus, Trash2, Edit2, Save, X, TrendingUp, Clock, Activity, LayoutGrid, RefreshCw, ScrollText } from 'lucide-react';
 import { sileo } from 'sileo';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-// Lista oficial de módulos que el SaaS ofrece comercialmente
 const ALL_MODULES = [
     { id: 'restaurante', label: 'Restaurante / POS', color: 'bg-orange-500' },
     { id: 'hotel', label: 'Gestión Hotelera', color: 'bg-blue-500' },
@@ -18,15 +18,37 @@ const ALL_MODULES = [
     { id: 'operaciones', label: 'Seguridad y Logs', color: 'bg-slate-700' },
 ];
 
+const ACTION_STYLE = {
+    CREATE:         'bg-emerald-100 text-emerald-700',
+    UPDATE:         'bg-blue-100 text-blue-700',
+    DELETE:         'bg-red-100 text-red-700',
+    MODULE_TOGGLE:  'bg-purple-100 text-purple-700',
+    SUSPEND:        'bg-orange-100 text-orange-700',
+    ACTIVATE:       'bg-teal-100 text-teal-700',
+};
+
+const MODULE_STYLE = {
+    saas:       'bg-slate-100 text-slate-600',
+    reservas:   'bg-blue-50 text-blue-600',
+    usuarios:   'bg-indigo-50 text-indigo-600',
+    restaurante:'bg-orange-50 text-orange-600',
+    rooms:      'bg-cyan-50 text-cyan-600',
+    billing:    'bg-emerald-50 text-emerald-600',
+    productos:  'bg-amber-50 text-amber-600',
+};
+
+const IS_OWNER = (email) => email === 'fercho028890@gmail.com';
+
 export default function SaasAdminPanel() {
     const { user } = useAuth();
+    const { log } = useAdminLog();
     const [organizations, setOrganizations] = useState([]);
     const [orgMetrics, setOrgMetrics] = useState({});
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeTab, setActiveTab] = useState('list'); // 'list' or 'dashboard'
+    const [activeTab, setActiveTab] = useState('list');
     const [pendingWipeId, setPendingWipeId] = useState(null);
-    
+
     // Modal Crear
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [creating, setCreating] = useState(false);
@@ -43,14 +65,24 @@ export default function SaasAdminPanel() {
     // Guard sincrónico para evitar múltiples envíos del formulario de creación
     const isSubmittingRef = useRef(false);
 
+    // Logs tab state
+    const [logs, setLogs] = useState([]);
+    const [logsLoading, setLogsLoading] = useState(false);
+    const [logOrgFilter, setLogOrgFilter] = useState('');
+    const [logModuleFilter, setLogModuleFilter] = useState('');
+    const [logSearch, setLogSearch] = useState('');
+
     useEffect(() => {
         fetchOrganizations();
     }, []);
 
+    useEffect(() => {
+        if (activeTab === 'logs') fetchLogs();
+    }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
     const fetchOrganizations = async () => {
         setLoading(true);
         try {
-            // 1. Fetch Orgs
             const { data: orgData, error: orgError } = await supabase
                 .from('organizations')
                 .select('*')
@@ -59,7 +91,6 @@ export default function SaasAdminPanel() {
             if (orgError) throw orgError;
             setOrganizations(orgData || []);
 
-            // 2. Fetch Aggregated Metrics from Orders
             const { data: orderData, error: orderError } = await supabase
                 .from('orders')
                 .select('organization_id, total, total_price, status, created_at')
@@ -67,7 +98,6 @@ export default function SaasAdminPanel() {
 
             if (orderError) throw orderError;
 
-            // Group by Org
             const metrics = (orderData || []).reduce((acc, order) => {
                 const orgId = order.organization_id;
                 if (!acc[orgId]) {
@@ -75,7 +105,6 @@ export default function SaasAdminPanel() {
                 }
                 acc[orgId].totalOrders += 1;
                 acc[orgId].totalRevenue += (order.total || order.total_price || 0);
-                
                 const orderDate = new Date(order.created_at);
                 if (!acc[orgId].lastActivity || orderDate > new Date(acc[orgId].lastActivity)) {
                     acc[orgId].lastActivity = order.created_at;
@@ -84,12 +113,28 @@ export default function SaasAdminPanel() {
             }, {});
 
             setOrgMetrics(metrics);
-
         } catch (error) {
             console.error('Error fetching orgs or metrics:', error);
             sileo.error({ title: 'Error de Datos', description: 'No se pudieron cargar los inquilinos o sus métricas.' });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchLogs = async () => {
+        setLogsLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('admin_activity_log')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(500);
+            if (error) throw error;
+            setLogs(data || []);
+        } catch (err) {
+            sileo.error({ title: 'Error cargando logs', description: err.message });
+        } finally {
+            setLogsLoading(false);
         }
     };
 
@@ -108,6 +153,13 @@ export default function SaasAdminPanel() {
                 .eq('id', editingOrg.id);
             if (error) throw error;
             sileo.success({ title: 'Tenant actualizado', description: `"${fd.get('name')}" guardado correctamente.` });
+            log({
+                action: 'UPDATE', module: 'saas', entity_type: 'organization', entity_id: editingOrg.id,
+                description: `Datos de organización actualizados: "${fd.get('name')}"`,
+                organization_id: editingOrg.id, organization_name: editingOrg.name,
+                old_value: { name: editingOrg.name, contact_email: editingOrg.contact_email, status: editingOrg.status },
+                new_value: { name: fd.get('name'), contact_email: fd.get('contact_email'), status: fd.get('status') },
+            });
             setIsEditModalOpen(false);
             setEditingOrg(null);
             fetchOrganizations();
@@ -127,12 +179,18 @@ export default function SaasAdminPanel() {
         }
         setPendingDeleteId(null);
         setOrganizations(prev => prev.filter(o => o.id !== org.id));
+        log({
+            action: 'DELETE', module: 'saas', entity_type: 'organization', entity_id: org.id,
+            description: `Organización "${org.name}" eliminada de la plataforma`,
+            organization_id: org.id, organization_name: org.name,
+            old_value: { name: org.name, status: org.status, modules: org.active_modules },
+        });
         try {
             const { error } = await supabase.rpc('delete_saas_tenant', { p_org_id: org.id });
             if (error) throw error;
             sileo.success({ title: 'Tenant eliminado', description: `"${org.name}" fue eliminado de la plataforma.` });
         } catch (err) {
-            fetchOrganizations(); 
+            fetchOrganizations();
             sileo.error({ title: 'Error al eliminar', description: err.message });
         }
     };
@@ -142,7 +200,7 @@ export default function SaasAdminPanel() {
             const currentModules = org.active_modules || [];
             let newModules = [...currentModules];
             const isRemoving = newModules.includes(moduleId);
-            
+
             if (isRemoving) {
                 newModules = newModules.filter(m => m !== moduleId);
             } else {
@@ -158,7 +216,15 @@ export default function SaasAdminPanel() {
 
             if (error) throw error;
             sileo.success({ title: 'Plan Actualizado', description: `Módulo ${isRemoving ? 'removido' : 'habilitado'} para ${org.name}.` });
-            
+
+            log({
+                action: 'MODULE_TOGGLE', module: 'saas', entity_type: 'organization', entity_id: org.id,
+                description: `Módulo "${moduleId}" ${isRemoving ? 'removido de' : 'habilitado para'} ${org.name}`,
+                organization_id: org.id, organization_name: org.name,
+                old_value: { modules: currentModules },
+                new_value: { modules: newModules },
+            });
+
             supabase.from('global_logs').insert([{
                 organization_id: org.id,
                 action_type: 'MODULE_TOGGLED',
@@ -168,7 +234,7 @@ export default function SaasAdminPanel() {
         } catch (error) {
             console.error('Error en Toggle:', error);
             sileo.error({ title: 'Error', description: 'El cambio no pudo guardarse remotamente.' });
-            fetchOrganizations(); 
+            fetchOrganizations();
         }
     };
 
@@ -180,10 +246,18 @@ export default function SaasAdminPanel() {
             const { error } = await supabase.from('organizations').update({ status: newStatus }).eq('id', org.id);
             if (error) throw error;
             sileo.success({ title: 'Estado Alterado', description: `${org.name} quedó ${newStatus === 'active' ? 'Activado' : 'Suspendido'}.` });
+            log({
+                action: newStatus === 'active' ? 'ACTIVATE' : 'SUSPEND',
+                module: 'saas', entity_type: 'organization', entity_id: org.id,
+                description: `Organización "${org.name}" ${newStatus === 'active' ? 'activada' : 'suspendida'}`,
+                organization_id: org.id, organization_name: org.name,
+                old_value: { status: currentStatus },
+                new_value: { status: newStatus },
+            });
         } catch (error) {
             console.error('Error al cambiar estado:', error);
             sileo.error({ title: 'Error', description: 'No se pudo cambiar el estado en la base de datos.' });
-            fetchOrganizations(); 
+            fetchOrganizations();
         }
     };
 
@@ -203,6 +277,11 @@ export default function SaasAdminPanel() {
             if (error) throw error;
 
             sileo.success({ title: 'Tenant Creado', description: 'La nueva organización ha sido inicializada con éxito.' });
+            log({
+                action: 'CREATE', module: 'saas', entity_type: 'organization',
+                description: `Nuevo tenant creado: "${formData.name}" (${formData.email})`,
+                new_value: { name: formData.name, email: formData.email, modules: formData.modules },
+            });
             setIsAddModalOpen(false);
             setFormData({ name: '', email: '', password: '', modules: [] });
             fetchOrganizations();
@@ -218,17 +297,27 @@ export default function SaasAdminPanel() {
     const handleFormModuleToggle = (modId) => {
         setFormData(prev => ({
             ...prev,
-            modules: prev.modules.includes(modId) 
+            modules: prev.modules.includes(modId)
                 ? prev.modules.filter(m => m !== modId)
                 : [...prev.modules, modId]
         }));
     };
 
-    const filteredOrgs = organizations.filter(org => 
-        (org.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    const filteredOrgs = organizations.filter(org =>
+        (org.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (org.contact_email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (org.id || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const filteredLogs = logs.filter(l => {
+        const matchOrg = !logOrgFilter || l.organization_id === logOrgFilter;
+        const matchModule = !logModuleFilter || l.module === logModuleFilter;
+        const matchSearch = !logSearch ||
+            (l.description || '').toLowerCase().includes(logSearch.toLowerCase()) ||
+            (l.user_email || '').toLowerCase().includes(logSearch.toLowerCase()) ||
+            (l.organization_name || '').toLowerCase().includes(logSearch.toLowerCase());
+        return matchOrg && matchModule && matchSearch;
+    });
 
     const totalTenants = organizations.length;
     const activeTenants = organizations.filter(o => o.status === 'active' || !o.status).length;
@@ -237,21 +326,29 @@ export default function SaasAdminPanel() {
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 flex flex-col gap-6">
-            
+
             {/* View Toggle */}
             <div className="flex bg-gray-100 p-1 rounded-2xl w-fit shadow-inner mb-2">
-                <button 
+                <button
                     onClick={() => setActiveTab('list')}
                     className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'list' ? 'bg-white text-secondary shadow-sm' : 'text-gray-400 hover:text-secondary'}`}
                 >
                     Inquilinos
                 </button>
-                <button 
+                <button
                     onClick={() => setActiveTab('dashboard')}
                     className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'dashboard' ? 'bg-white text-secondary shadow-sm' : 'text-gray-400 hover:text-secondary'}`}
                 >
                     Panorama Global
                 </button>
+                {IS_OWNER(user?.email) && (
+                    <button
+                        onClick={() => setActiveTab('logs')}
+                        className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${activeTab === 'logs' ? 'bg-white text-secondary shadow-sm' : 'text-gray-400 hover:text-secondary'}`}
+                    >
+                        <ScrollText size={12} /> Logs
+                    </button>
+                )}
             </div>
 
             {/* Header / Stats Panel */}
@@ -283,20 +380,161 @@ export default function SaasAdminPanel() {
                         <h3 className="text-2xl font-black text-secondary">{loading ? '-' : hotelPacks}</h3>
                     </div>
                 </div>
-                
                 <div className="bg-gradient-to-br from-secondary to-[#1a202c] rounded-2xl p-5 border border-gray-800 shadow-lg flex flex-col justify-center">
                     <p className="text-xs font-bold text-white/50 uppercase flex items-center gap-2">
-                        <Activity size={14} className="text-primary"/> Ingresos Globales
+                        <Activity size={14} className="text-primary" /> Ingresos Globales
                     </p>
                     <h3 className="text-2xl font-black text-white mt-1">${totalGlobalRevenue.toLocaleString()}</h3>
                 </div>
             </div>
 
-            {activeTab === 'dashboard' ? (
+            {/* ── LOGS TAB ─────────────────────────────────────────── */}
+            {activeTab === 'logs' && IS_OWNER(user?.email) && (
+                <div className="bg-white rounded-[2rem] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col">
+                    <div className="p-6 md:p-8 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50/50">
+                        <div>
+                            <h2 className="text-xl font-black text-secondary tracking-tight flex items-center gap-2">
+                                <ScrollText size={20} className="text-primary" /> Logs de Actividad Admin
+                            </h2>
+                            <p className="text-sm font-medium text-gray-500">Auditoría completa de acciones sobre inquilinos, reservas y usuarios.</p>
+                        </div>
+                        <button
+                            onClick={fetchLogs}
+                            disabled={logsLoading}
+                            className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                        >
+                            <RefreshCw size={15} className={logsLoading ? 'animate-spin' : ''} />
+                            Actualizar
+                        </button>
+                    </div>
+
+                    {/* Filters */}
+                    <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap gap-3 bg-gray-50/30">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                            <input
+                                type="text"
+                                placeholder="Buscar descripción, correo..."
+                                className="pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-secondary focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all w-64"
+                                value={logSearch}
+                                onChange={e => setLogSearch(e.target.value)}
+                            />
+                        </div>
+                        <select
+                            value={logOrgFilter}
+                            onChange={e => setLogOrgFilter(e.target.value)}
+                            className="py-2 px-3 bg-white border border-gray-200 rounded-xl text-sm font-medium text-secondary focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+                        >
+                            <option value="">Todas las organizaciones</option>
+                            {organizations.map(o => (
+                                <option key={o.id} value={o.id}>{o.name}</option>
+                            ))}
+                        </select>
+                        <select
+                            value={logModuleFilter}
+                            onChange={e => setLogModuleFilter(e.target.value)}
+                            className="py-2 px-3 bg-white border border-gray-200 rounded-xl text-sm font-medium text-secondary focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all"
+                        >
+                            <option value="">Todos los módulos</option>
+                            {['saas', 'reservas', 'usuarios', 'restaurante', 'rooms', 'billing', 'productos'].map(m => (
+                                <option key={m} value={m}>{m}</option>
+                            ))}
+                        </select>
+                        {(logSearch || logOrgFilter || logModuleFilter) && (
+                            <button
+                                onClick={() => { setLogSearch(''); setLogOrgFilter(''); setLogModuleFilter(''); }}
+                                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold text-gray-400 hover:text-secondary hover:bg-gray-100 transition-colors"
+                            >
+                                <X size={12} /> Limpiar
+                            </button>
+                        )}
+                        <span className="ml-auto text-xs font-bold text-gray-400 self-center">
+                            {filteredLogs.length} registros
+                        </span>
+                    </div>
+
+                    {/* Table */}
+                    <div className="overflow-x-auto">
+                        {logsLoading ? (
+                            <div className="p-16 flex flex-col items-center justify-center text-gray-400 gap-3">
+                                <Loader2 size={28} className="animate-spin text-primary" />
+                                <p className="font-bold text-sm">Cargando logs...</p>
+                            </div>
+                        ) : filteredLogs.length === 0 ? (
+                            <div className="p-16 text-center text-gray-400 font-bold text-sm">
+                                {logs.length === 0 ? 'Sin registros de actividad aún.' : 'No hay registros para los filtros activos.'}
+                            </div>
+                        ) : (
+                            <table className="w-full text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-50 border-b border-gray-100">
+                                        <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400">Fecha</th>
+                                        <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400">Organización</th>
+                                        <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400">Usuario</th>
+                                        <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400">Módulo</th>
+                                        <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400">Acción</th>
+                                        <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400">Descripción</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {filteredLogs.map(entry => (
+                                        <tr key={entry.id} className="hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-5 py-3 whitespace-nowrap">
+                                                <p className="text-xs font-bold text-secondary">
+                                                    {format(new Date(entry.created_at), "dd/MM/yy", { locale: es })}
+                                                </p>
+                                                <p className="text-[10px] font-bold text-gray-400">
+                                                    {format(new Date(entry.created_at), "HH:mm:ss", { locale: es })}
+                                                </p>
+                                            </td>
+                                            <td className="px-5 py-3">
+                                                <p className="text-xs font-bold text-secondary truncate max-w-[130px]">
+                                                    {entry.organization_name || '—'}
+                                                </p>
+                                            </td>
+                                            <td className="px-5 py-3">
+                                                <p className="text-xs font-bold text-secondary truncate max-w-[160px]">
+                                                    {entry.user_name || entry.user_email || '—'}
+                                                </p>
+                                                <p className="text-[10px] font-medium text-gray-400 truncate max-w-[160px]">
+                                                    {entry.user_name ? entry.user_email : ''}
+                                                </p>
+                                            </td>
+                                            <td className="px-5 py-3">
+                                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${MODULE_STYLE[entry.module] || 'bg-gray-100 text-gray-500'}`}>
+                                                    {entry.module}
+                                                </span>
+                                            </td>
+                                            <td className="px-5 py-3">
+                                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${ACTION_STYLE[entry.action] || 'bg-gray-100 text-gray-500'}`}>
+                                                    {entry.action}
+                                                </span>
+                                            </td>
+                                            <td className="px-5 py-3 max-w-xs">
+                                                <p className="text-xs font-medium text-gray-600 line-clamp-2">
+                                                    {entry.description}
+                                                </p>
+                                                {entry.entity_id && (
+                                                    <p className="text-[10px] font-bold text-gray-300 mt-0.5 font-mono">
+                                                        {entry.entity_type} · {entry.entity_id.split('-')[0]}…
+                                                    </p>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ── DASHBOARD TAB ──────────────────────────────────────── */}
+            {activeTab === 'dashboard' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-premium">
                         <h3 className="text-lg font-black text-secondary uppercase tracking-tight mb-6 flex items-center gap-2">
-                            <TrendingUp className="text-primary" size={20}/> Top 5 Empresas (Ventas)
+                            <TrendingUp className="text-primary" size={20} /> Top 5 Empresas (Ventas)
                         </h3>
                         <div className="space-y-6">
                             {organizations
@@ -310,7 +548,7 @@ export default function SaasAdminPanel() {
                                             <span className="text-xs font-bold text-gray-500">${org.revenue.toLocaleString()}</span>
                                         </div>
                                         <div className="w-full bg-gray-100 h-2.5 rounded-full overflow-hidden">
-                                            <div 
+                                            <div
                                                 className="bg-primary h-full rounded-full transition-all duration-1000"
                                                 style={{ width: `${totalGlobalRevenue > 0 ? (org.revenue / totalGlobalRevenue) * 100 : 0}%` }}
                                             ></div>
@@ -323,7 +561,7 @@ export default function SaasAdminPanel() {
 
                     <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-premium">
                         <h3 className="text-lg font-black text-secondary uppercase tracking-tight mb-6 flex items-center gap-2">
-                            <LayoutGrid className="text-indigo-500" size={20}/> Distribución de Módulos
+                            <LayoutGrid className="text-indigo-500" size={20} /> Distribución de Módulos
                         </h3>
                         <div className="grid grid-cols-2 gap-4">
                             {ALL_MODULES.map(mod => {
@@ -341,7 +579,10 @@ export default function SaasAdminPanel() {
                         </div>
                     </div>
                 </div>
-            ) : (
+            )}
+
+            {/* ── LIST TAB ───────────────────────────────────────────── */}
+            {activeTab === 'list' && (
                 <div className="bg-white rounded-[2rem] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden flex flex-col">
                     <div className="p-6 md:p-8 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gray-50/50">
                         <div>
@@ -359,7 +600,7 @@ export default function SaasAdminPanel() {
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
                             </div>
-                            <button 
+                            <button
                                 onClick={() => setIsAddModalOpen(true)}
                                 className="bg-primary hover:bg-primary-dark text-white font-bold px-5 py-3 rounded-xl flex items-center justify-center gap-2 transition-colors w-full sm:w-auto flex-shrink-0"
                             >
@@ -418,7 +659,7 @@ export default function SaasAdminPanel() {
                                                         </div>
                                                     </div>
                                                 </td>
-                                                
+
                                                 <td className="px-6 py-5">
                                                     <div className="space-y-1">
                                                         <div className="flex items-center gap-2">
@@ -427,31 +668,30 @@ export default function SaasAdminPanel() {
                                                         </div>
                                                         {orgMetrics[org.id]?.lastActivity && (
                                                             <p className="text-[9px] font-bold text-blue-500 uppercase flex items-center gap-1">
-                                                                <Clock size={10}/> Activo: {format(new Date(orgMetrics[org.id].lastActivity), "HH:mm, dd/MM", { locale: es })}
+                                                                <Clock size={10} /> Activo: {format(new Date(orgMetrics[org.id].lastActivity), "HH:mm, dd/MM", { locale: es })}
                                                             </p>
                                                         )}
                                                     </div>
                                                 </td>
-                                                
+
                                                 <td className="px-6 py-5">
                                                     <div className="flex flex-col gap-2">
                                                         <div className="flex items-center gap-2">
                                                             <button
                                                                 onClick={() => handleToggleStatus(org)}
-                                                                className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 border rounded-lg transition-all w-max ${isActive ? 'text-rose-600 border-rose-200 hover:bg-rose-50' : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50' }`}
+                                                                className={`text-xs font-bold flex items-center gap-1 px-3 py-1.5 border rounded-lg transition-all w-max ${isActive ? 'text-rose-600 border-rose-200 hover:bg-rose-50' : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50'}`}
                                                             >
-                                                                <Power size={14}/> {isActive ? 'Suspender' : 'Activar'}
+                                                                <Power size={14} /> {isActive ? 'Suspender' : 'Activar'}
                                                             </button>
                                                             <button
                                                                 onClick={() => { setEditingOrg(org); setIsEditModalOpen(true); }}
                                                                 className="p-1.5 border border-gray-200 text-gray-400 hover:text-secondary rounded-lg transition-all"
                                                                 title="Editar Datos"
                                                             >
-                                                                <Edit2 size={14}/>
+                                                                <Edit2 size={14} />
                                                             </button>
 
-                                                            {/* BOTÓN SECRETO DE LIMPIEZA (FERCHO ONLY) */}
-                                                            {['fercho028890@gmail.com', 'ricardo@admin.com'].includes(user?.email) && (
+                                                            {IS_OWNER(user?.email) && (
                                                                 <button
                                                                     onClick={async () => {
                                                                         if (pendingWipeId !== org.id) {
@@ -473,7 +713,7 @@ export default function SaasAdminPanel() {
                                                                     className={`p-1.5 border rounded-lg transition-all ${pendingWipeId === org.id ? 'bg-amber-500 text-white border-amber-500 animate-pulse' : 'border-amber-200 text-amber-500 hover:bg-amber-50'}`}
                                                                     title="LIMPIEZA TOTAL (SuperUser)"
                                                                 >
-                                                                    <RefreshCw size={14}/>
+                                                                    <RefreshCw size={14} />
                                                                 </button>
                                                             )}
 
@@ -482,7 +722,7 @@ export default function SaasAdminPanel() {
                                                                 className={`p-1.5 border rounded-lg transition-all ${pendingDeleteId === org.id ? 'bg-red-500 text-white border-red-500 animate-pulse' : 'border-red-200 text-red-500 hover:bg-red-50'}`}
                                                                 title="Eliminar Organización"
                                                             >
-                                                                <Trash2 size={14}/>
+                                                                <Trash2 size={14} />
                                                             </button>
                                                         </div>
                                                     </div>
@@ -498,13 +738,13 @@ export default function SaasAdminPanel() {
                                                                     onClick={() => handleToggleModule(org, mod.id)}
                                                                     className={`
                                                                         relative px-3 py-1.5 rounded-lg text-xs font-black tracking-tight border transition-all duration-300 flex items-center gap-1.5 overflow-hidden
-                                                                        ${isLicensed 
-                                                                            ? `bg-gray-800 text-white border-transparent shadow-md hover:ring-2 hover:ring-gray-800/30 hover:bg-gray-900` 
+                                                                        ${isLicensed
+                                                                            ? `bg-gray-800 text-white border-transparent shadow-md hover:ring-2 hover:ring-gray-800/30 hover:bg-gray-900`
                                                                             : `bg-white text-gray-400 border-gray-200 hover:border-gray-300 hover:text-gray-600`}
                                                                     `}
                                                                 >
                                                                     {isLicensed && <span className={`absolute left-0 top-0 bottom-0 w-1 ${mod.color}`}></span>}
-                                                                    {isLicensed ? <CheckCircle2 size={14} className="text-green-400"/> : <XCircle size={14}/>}
+                                                                    {isLicensed ? <CheckCircle2 size={14} className="text-green-400" /> : <XCircle size={14} />}
                                                                     <span>{mod.label}</span>
                                                                 </button>
                                                             );
@@ -596,42 +836,42 @@ export default function SaasAdminPanel() {
                                 <XCircle size={20} />
                             </button>
                         </div>
-                        
+
                         <form onSubmit={handleCreateTenant} className="p-6">
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 mb-1">Nombre de la Empresa</label>
-                                    <input 
-                                        type="text" 
-                                        required 
+                                    <input
+                                        type="text"
+                                        required
                                         className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 text-secondary"
                                         placeholder="Ej: Hotel Las Gaviotas"
                                         value={formData.name}
-                                        onChange={e => setFormData({...formData, name: e.target.value})}
+                                        onChange={e => setFormData({ ...formData, name: e.target.value })}
                                     />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 mb-1">Correo Administrador</label>
-                                        <input 
-                                            type="email" 
-                                            required 
+                                        <input
+                                            type="email"
+                                            required
                                             className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 text-secondary"
                                             placeholder="admin@hotel.com"
                                             value={formData.email}
-                                            onChange={e => setFormData({...formData, email: e.target.value})}
+                                            onChange={e => setFormData({ ...formData, email: e.target.value })}
                                         />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-gray-700 mb-1">Contraseña Segura</label>
-                                        <input 
-                                            type="password" 
-                                            required 
+                                        <input
+                                            type="password"
+                                            required
                                             minLength={8}
                                             className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary bg-gray-50 text-secondary"
                                             placeholder="••••••••"
                                             value={formData.password}
-                                            onChange={e => setFormData({...formData, password: e.target.value})}
+                                            onChange={e => setFormData({ ...formData, password: e.target.value })}
                                         />
                                     </div>
                                 </div>
@@ -655,7 +895,7 @@ export default function SaasAdminPanel() {
                                                     </div>
                                                     <span className="truncate">{mod.label}</span>
                                                 </button>
-                                            )
+                                            );
                                         })}
                                     </div>
                                 </div>

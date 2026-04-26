@@ -16,9 +16,9 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
         { id: 'turnos', label: 'Cajas y Turnos', roles: ['admin', 'cajero', 'gerente'] },
     ].filter(item => item.roles.includes(user?.role || 'cajero'));
 
-    // Definimos subitems para Hotel
     const hotelSubItems = [
         { id: 'habitaciones', label: 'Habitaciones', roles: ['admin', 'gerente', 'recepcion'] },
+        { id: 'mapa', label: '📍 Mapa Interactivo', roles: ['admin', 'gerente', 'recepcion'] },
         { id: 'cinta', label: '📊 Cinta de Reservas', roles: ['admin', 'gerente', 'recepcion'] },
         { id: 'calendario', label: 'Calendario', roles: ['admin', 'gerente', 'recepcion'] },
         { id: 'limpieza', label: '🧹 Amas de Llaves', roles: ['admin', 'gerente', 'recepcion', 'limpieza'] },
