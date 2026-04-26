@@ -157,6 +157,33 @@ const OperationsHub = () => {
 
     const [selectedLog, setSelectedLog] = useState(null);
 
+    const downloadCSV = () => {
+        if (!filteredLogs.length) return;
+        
+        const headers = ["ID", "Fecha", "Módulo", "Acción", "Descripción", "Usuario", "Email"];
+        const rows = filteredLogs.map(log => [
+            log.id,
+            new Date(log.created_at).toLocaleString(),
+            log.module,
+            log.action,
+            log.description,
+            log.user_name,
+            log.user_email
+        ]);
+        
+        const csvContent = "data:text/csv;charset=utf-8," 
+            + headers.join(",") + "\n"
+            + rows.map(e => e.join(",")).join("\n");
+            
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `auditoria_nexus_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="space-y-8 pb-20 animate-in fade-in duration-500">
             {/* Modal de Detalles Técnicos */}
@@ -274,10 +301,18 @@ const OperationsHub = () => {
                                 <option value="security">Seguridad</option>
                             </select>
                             <button 
-                                onClick={fetchLogs}
-                                className="p-2 bg-white border border-gray-200 rounded-xl text-gray-400 hover:text-secondary transition-all shadow-sm"
+                                onClick={downloadCSV}
+                                className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-primary hover:border-primary/30 transition-all shadow-sm"
+                                title="Exportar a CSV"
                             >
-                                <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                                <FileText size={16} />
+                            </button>
+                            <button 
+                                onClick={fetchLogs}
+                                className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-primary hover:border-primary/30 transition-all shadow-sm"
+                                title="Refrescar"
+                            >
+                                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
                             </button>
                         </div>
                     </div>
