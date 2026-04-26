@@ -6,7 +6,7 @@ import {
     ChevronLeft, Inbox, ArrowRight, Receipt, XCircle
 } from 'lucide-react';
 import factusService from '../../services/factusService';
-import { emitInvoiceForOrder } from '../../services/invoiceHelper';
+import { emitInvoiceForOrder, mapItemsForFactus, mapDocType } from '../../services/invoiceHelper';
 import FactusConfig from './FactusConfig';
 import SupportDocuments from './SupportDocuments';
 import ReceptionDocuments from './ReceptionDocuments';
@@ -77,7 +77,7 @@ const ElectronicInvoicing = () => {
         setProcessingId(order.id);
         let loadingToast = null;
         try {
-            loadingToast = sileo.loading({ title: 'Emitiendo factura...', description: `Procesando pedido #${order.id} en Factus...` });
+            sileo.info({ title: 'Emitiendo factura...', description: `Procesando pedido #${order.id} en Factus...` });
 
             const result = await emitInvoiceForOrder(order);
 
@@ -90,9 +90,15 @@ const ElectronicInvoicing = () => {
                 fetchOrders();
             } else {
                 sileo.error({ title: 'Error al Emitir Factura', description: result.error });
+                window.alert(`Error de Validación Factus:\n${result.error}`);
             }
+        } catch (error) {
+            console.error('Unexpected error in handleEmitInvoice:', error);
+            const errorMsg = error.message || 'Ocurrió un error al procesar la factura.';
+            sileo.error({ title: 'Error Inesperado', description: errorMsg });
+            // Mostrar alert para que el usuario vea el detalle completo si el toast lo corta
+            window.alert(`Detalle del Error:\n${errorMsg}`);
         } finally {
-            try { loadingToast?.close(); } catch { /* ignore */ }
             setProcessingId(null);
         }
     };
@@ -100,42 +106,69 @@ const ElectronicInvoicing = () => {
     const handleCreateCreditNote = async (order) => {
         if (!window.confirm(`¿Estás seguro de emitir una Nota de Crédito para la factura ${order.factus_doc_number}? Esta acción anulará la factura ante la DIAN.`)) return;
 
-        const loadingToast = sileo.loading({ title: 'Anulando...', description: 'Generando Nota Crédito en Factus...' });
+        sileo.info({ title: 'Anulando...', description: 'Generando Nota Crédito en Factus...' });
         setProcessingId(order.id);
 
         try {
-            // Ejemplo de payload base para nota crédito de anulación total
+            // 1. Obtener rangos para Notas Crédito
+            const rangesResp = await factusService.getRanges();
+            const rangesList = Array.isArray(rangesResp?.data) ? rangesResp.data : (Array.isArray(rangesResp?.data?.data) ? rangesResp.data.data : []);
+            
+            // Buscar rango de Nota de Crédito
+            const selectedRange = rangesList.find(r => r.document === '91' || r.document?.id === '91' || r.document_type === '91' || r.document === '04') || rangesList[0];
+            
+            if (!selectedRange) throw new Error('No se encontró un rango de numeración para Notas de Crédito.');
+
+            // 2. Construir payload (Anulación total)
+            const legalOrg = order.tax_data?.document_type === 'NIT' ? 1 : 2;
+            const docTypeMapped = mapDocType(order.tax_data, legalOrg);
+
             const payload = {
-                document_type_id: 11, // 11 para nota de ajuste o código correspondiente según manual Factus (Notas crédito = código 91)
-                number: `${order.factus_doc_number}`,
-                reference_billing: [{
-                    identification: order.factus_id,
-                    date: new Date().toISOString().split('T')[0],
-                    concept_code: "2" // 2: Anulación de factura electrónica
-                }],
-                // (Los demás datos cliente, ítems, se enviarían según documentación de la API)
-                items: order.order_items?.map(item => ({
-                    code_reference: String(item.product_id),
-                    name: item.product_name,
-                    quantity: item.quantity,
-                    discount_rate: 0,
-                    price: item.price,
-                    tax_rate: "0.00", // Simplificado
-                    is_excluded: 0
-                })) || []
+                numbering_range_id: Number(selectedRange.id || selectedRange.numbering_range_id),
+                reference_code: `NC-${order.id}-${Date.now()}`,
+                observation: `Anulación total de factura ${order.factus_doc_number} - Pedido #${order.id}`,
+                payment_form: "1",
+                payment_method_code: "10",
+                billing_reference: {
+                    number: order.factus_doc_number,
+                    uuid: order.factus_id, // Factus a veces pide el UUID/ID interno
+                    issue_date: order.created_at.split('T')[0]
+                },
+                customer: {
+                    identification: order.tax_data?.identification || '222222222222',
+                    dv: order.tax_data?.dv ? Number(order.tax_data.dv) : undefined,
+                    company: order.tax_data?.names || order.customer_name || 'Consumidor Final',
+                    trade_name: order.tax_data?.names || order.customer_name || 'Consumidor Final',
+                    names: order.tax_data?.names || order.customer_name || 'Consumidor Final',
+                    address: order.tax_data?.address || 'Colombia',
+                    email: order.tax_data?.email || 'factura@contabilidad.com',
+                    phone: order.tax_data?.phone || '3000000000',
+                    legal_organization_id: legalOrg,
+                    tribute_id: legalOrg === 1 ? 18 : 21,
+                    identification_document_id: docTypeMapped,
+                    municipality_id: '68001'
+                },
+                items: mapItemsForFactus(order.order_items || [])
             };
 
-            // Simulación o llamada real
-            // await factusService.createCreditNote(payload);
+            // 3. Llamada real
+            const result = await factusService.createCreditNote(payload);
+            const bill = result?.data?.bill || result?.bill;
 
-            // Simulamos éxito
-            await new Promise(r => setTimeout(r, 1500));
+            if (!bill?.number) throw new Error('La nota crédito se emitió pero no se recibió un número de confirmación.');
 
-            // Actualizamos el estado en la base de datos (Ej: status = 'anulado' o factus_doc_number = NULL)
-            // Aquí lo marcamos para que se note
-            sileo.success({ title: 'Nota Crédito Emitida', description: `La factura ${order.factus_doc_number} fue anulada correctamente.` });
+            // 4. Actualizar estado en BD
+            const { error: updateError } = await supabase
+                .from('orders')
+                .update({
+                    factus_status: 'anulado',
+                    notes: (order.notes || '') + ` | Nota Crédito: ${bill.number}`
+                })
+                .eq('id', order.id);
 
-            // Opcional: recargar u ocultar la fila
+            if (updateError) console.error('Error actualizando estado en BD:', updateError.message);
+
+            sileo.success({ title: 'Nota Crédito Emitida', description: `La factura ${order.factus_doc_number} fue anulada con el documento ${bill.number}.` });
             fetchOrders();
         } catch (error) {
             console.error('Error generando nota crédito:', error);

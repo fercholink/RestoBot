@@ -88,9 +88,9 @@ const _parseFactusError = (data, status) => {
             parts.push(errors.join('\n'));
         }
         const result = parts.join('\n');
-        return result || `Error HTTP ${status} de Factus`;
-    } catch {
-        return `Error HTTP ${status}: ${JSON.stringify(data)}`;
+        return (result || 'Error Desconocido') + `\n\nDEBUG_DATA: ${JSON.stringify(data)}`;
+    } catch (e) {
+        return `Error Crítico Parsing: ${e.message}\n\nDEBUG_DATA: ${JSON.stringify(data)}`;
     }
 };
 
@@ -272,6 +272,21 @@ const factusService = {
 
         if (!response.ok) throw new Error(data.message || 'Error consultando rangos');
         return data;
+    },
+
+    getMunicipalities: async () => {
+        const { baseUrl } = await _getBaseUrl();
+        const token = await factusService.getToken();
+
+        const response = await _fetchWithTimeout(`${baseUrl}/v1/municipalities`, {
+            headers: {
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) return null;
+        return await response.json();
     },
 
     // ============================================================

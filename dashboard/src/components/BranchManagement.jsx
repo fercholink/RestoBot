@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, MapPin, Phone, Plus, Edit2, Power, Search, Save, X, FileText, Globe, Trash2, Loader2 } from 'lucide-react';
+import { Building2, MapPin, Phone, Plus, Edit2, Power, Search, Save, X, FileText, Globe, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { sileo } from 'sileo';
@@ -13,10 +13,55 @@ const BranchManagement = () => {
     const [showModal, setShowModal] = useState(false);
     const [editingBranch, setEditingBranch] = useState(null);
     const [pendingDeleteId, setPendingDeleteId] = useState(null);
+    const [orgConfig, setOrgConfig] = useState(null);
 
     useEffect(() => {
-        fetchBranches();
-    }, []);
+        if (currentUser) {
+            fetchBranches();
+            fetchOrgConfig();
+        }
+    }, [currentUser]);
+
+    const fetchOrgConfig = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('tenant_accounting_config')
+                .select('*')
+                .eq('organization_id', currentUser.organization_id)
+                .maybeSingle();
+            
+            if (error) throw error;
+            setOrgConfig(data);
+        } catch (error) {
+            console.error('Error fetching org config:', error);
+        }
+    };
+
+    const handleImportOrgData = () => {
+        if (!orgConfig) {
+            sileo.info({ title: 'Configuración no encontrada', description: 'Primero configura los datos de tu empresa en el módulo de Contabilidad.' });
+            return;
+        }
+
+        // Obtener el formulario y rellenar los campos
+        const form = document.querySelector('form');
+        if (form) {
+            const fields = {
+                name: orgConfig.business_name || '',
+                city: orgConfig.city || '',
+                phone: orgConfig.phone || '',
+                address: orgConfig.address || '',
+                nit: orgConfig.document_number || '',
+            };
+
+            Object.entries(fields).forEach(([name, value]) => {
+                const input = form.querySelector(`[name="${name}"]`);
+                if (input) input.value = value;
+            });
+            
+            sileo.success({ title: 'Datos importados', description: 'Se han cargado los datos de la empresa correctamente.' });
+        }
+    };
 
     const fetchBranches = async () => {
         setLoading(true);
@@ -242,9 +287,21 @@ const BranchManagement = () => {
                                 <h3 className="text-2xl font-black tracking-tight">{editingBranch ? 'Editar Sede' : 'Nueva Sede'}</h3>
                                 <p className="text-white/60 text-xs font-medium mt-1">Datos de facturación y contacto</p>
                             </div>
-                            <button onClick={() => { setShowModal(false); setEditingBranch(null); }} className="relative z-10 p-2 hover:bg-white/10 rounded-full transition-colors">
-                                <X size={24} />
-                            </button>
+                            <div className="flex items-center gap-2 relative z-10">
+                                {!editingBranch && orgConfig && (
+                                    <button 
+                                        type="button"
+                                        onClick={handleImportOrgData}
+                                        className="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 border border-white/5"
+                                        title="Copiar datos de la empresa principal"
+                                    >
+                                        <RefreshCw size={12} /> Importar Empresa
+                                    </button>
+                                )}
+                                <button onClick={() => { setShowModal(false); setEditingBranch(null); }} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                                    <X size={24} />
+                                </button>
+                            </div>
                             <Building2 className="absolute -right-8 -bottom-8 text-white/5 w-40 h-40" />
                         </div>
                         <form onSubmit={handleSaveBranch} className="p-8 space-y-6">

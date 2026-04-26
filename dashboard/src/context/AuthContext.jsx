@@ -75,6 +75,21 @@ export const AuthProvider = ({ children }) => {
         const finalRole = isOwner ? 'admin' : resolvedRole;
         const finalIsSuperAdmin = isOwner ? true : (profileData.is_superadmin || false);
 
+        // ─── PASO 2.2: FETCHAR NOMBRE DE LA SEDE ───
+        let branchData = { name: 'Sede Principal', id: profileData.branch_id || metadata.branch_id };
+        if (branchData.id) {
+            try {
+                const { data: bData } = await supabase
+                    .from('branches')
+                    .select('name')
+                    .eq('id', branchData.id)
+                    .maybeSingle();
+                if (bData) branchData.name = bData.name;
+            } catch (err) {
+                console.warn("[Auth] No se pudo cargar nombre de sede:", err.message);
+            }
+        }
+
         return {
             ...sessionUser,
             ...metadata,
@@ -87,7 +102,7 @@ export const AuthProvider = ({ children }) => {
                 ...organizationData,
                 active_modules: activeModules
             } : { active_modules: activeModules },
-            branch: { name: profileData.branch_id ? 'Sede' : 'Sede Principal', id: profileData.branch_id || metadata.branch_id },
+            branch: branchData,
             name: profileData.full_name || metadata.name || sessionUser.email?.split('@')[0] || 'Usuario'
         };
     };

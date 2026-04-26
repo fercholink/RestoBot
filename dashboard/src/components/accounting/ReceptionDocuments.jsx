@@ -17,7 +17,7 @@ const ReceptionDocuments = () => {
         }
 
         setProcessing(true);
-        const loadingToast = sileo.loading({ title: 'Emitiendo evento...', description: `Enviando el evento ${eventName} a la DIAN.` });
+        sileo.info({ title: 'Emitiendo evento...', description: `Enviando el evento ${eventName} a la DIAN.` });
 
         try {
             // Ejemplo de Payload de Factus para enviar eventos (Acuses, Recibo bien, Aceptación expresa)
@@ -26,16 +26,16 @@ const ReceptionDocuments = () => {
                 event_type_id: eventCode, // ej: "030", "032", "033"
             };
 
-            // Simulación o llamada real
-            // await factusService.emitEvent(payload);
-            await new Promise(r => setTimeout(r, 1500));
+            // 3. Llamada real
+            const result = await factusService.emitEvent(payload);
+            const status = result?.status || 'success';
 
             sileo.success({ title: '¡Éxito!', description: `El evento ${eventName} fue emitido exitosamente.` });
             setHistory(prev => [{
                 id: Date.now(),
                 type: eventCode,
                 desc: eventName,
-                status: 'success',
+                status: status,
                 date: new Date().toLocaleDateString('es-CO'),
                 cufe: cufes.trim().substring(0, 20) + '...'
             }, ...prev]);

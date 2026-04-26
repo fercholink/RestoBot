@@ -269,24 +269,36 @@ const HotelManagement = ({ activeSubTab = 'habitaciones' }) => {
         }
     }, [currentUser]);
 
-    // Crea una sede por defecto si no existe ninguna
+    // Crea una sede por defecto si no existe ninguna, tomando datos de la empresa
     const createDefaultBranch = async () => {
         try {
+            // Intentar traer los datos de la empresa configurados en contabilidad
+            const { data: orgConfig } = await supabase
+                .from('tenant_accounting_config')
+                .select('*')
+                .eq('organization_id', currentUser?.organization_id)
+                .maybeSingle();
+
+            const branchData = {
+                name: orgConfig?.business_name || 'Sede Principal',
+                address: orgConfig?.address || 'Dirección Principal',
+                city: orgConfig?.city || '',
+                phone: orgConfig?.phone || '0000000000',
+                nit: orgConfig?.document_number || '',
+                active: true,
+                organization_id: currentUser?.organization_id || null
+            };
+
             const { data, error } = await supabase
                 .from('branches')
-                .insert([{
-                    name: 'Sede Principal',
-                    address: 'Dirección Principal',
-                    phone: '0000000000',
-                    active: true,
-                    organization_id: currentUser?.organization_id || null
-                }])
+                .insert([branchData])
                 .select();
 
             if (error) throw error;
             if (data && data.length > 0) {
                 setBranches(data);
                 setSelectedBranchId(data[0].id);
+                sileo.info({ title: 'Sede Inicial Creada', description: 'Se creó una sede por defecto con los datos de tu empresa.' });
             }
         } catch (error) {
             console.error("Error creando sede por defecto:", error);
