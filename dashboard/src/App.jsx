@@ -29,7 +29,9 @@ import OfflineBanner from './components/OfflineBanner';
 import { LayoutGrid, Filter, Plus, ShieldCheck, Wallet, Activity } from 'lucide-react';
 import { Toaster, sileo } from 'sileo';
 import { emitInvoiceForOrder } from './services/invoiceHelper';
+import { useAdminLog } from './hooks/useAdminLog';
 import { useOfflineSync } from './hooks/useOfflineSync';
+
 import { db } from './lib/db';
 import "./styles/sileo.css";
 
@@ -68,7 +70,9 @@ console.warn(`[Auditoría] 🚀 Nexus App Inicializada: ${new Date().toLocaleTim
 
 function App() {
   const { user, loading } = useAuth();
+  const { log: adminLog } = useAdminLog();
   const { ordersVersion } = useRealtime();
+
   // Restauramos el estado desde localStorage para evitar que se pierda la ubicación al recargar o volver de otra pestaña
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem('nexus_active_tab') || 'analytics');
 
@@ -436,7 +440,18 @@ function App() {
       // Delegar la actualización a n8n para activar triggers (ej. WhatsApp, Factus)
       if (isOnline) {
         await updateOrderStatus(orderId, newStatus);
+        
+        // Audit Log
+        adminLog({
+          action: 'Cambio de Estado',
+          module: 'restaurante',
+          entity_type: 'pedido',
+          entity_id: orderId,
+          description: `cambió el estado del pedido #${orderId} de ${order?.status} a ${newStatus}`,
+          new_value: { status: newStatus }
+        });
       } else {
+
         throw new Error("Offline");
       }
 
@@ -643,6 +658,16 @@ function App() {
 
       setOrders(prev => prev.filter(o => o.id !== orderId));
       sileo.success({ title: 'Pedido eliminado', description: `Pedido #${orderId} eliminado y stock devuelto.` });
+      
+      // Audit Log
+      adminLog({
+        action: 'Eliminación de Pedido',
+        module: 'restaurante',
+        entity_type: 'pedido',
+        entity_id: orderId,
+        description: `eliminó permanentemente el pedido #${orderId} y devolvió el stock`,
+      });
+
     } catch (error) {
       console.error("Error eliminando pedido:", error);
       sileo.error({ title: 'Error al eliminar', description: error.message });
@@ -714,6 +739,17 @@ function App() {
 
       // Actualización optimista de la UI
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updates } : o));
+
+      // Audit Log
+      adminLog({
+        action: 'Confirmación de Pago',
+        module: 'restaurante',
+        entity_type: 'pedido',
+        entity_id: orderId,
+        description: `confirmó el pago del pedido #${orderId} vía ${method}`,
+        new_value: updates
+      });
+
 
       // Cerrar modal localmente y actualizar UI
       setPaymentModal({ ...paymentModal, isOpen: false });

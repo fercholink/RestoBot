@@ -185,7 +185,14 @@ const BranchManagement = () => {
                     />
                 </div>
                 <button
-                    onClick={() => { setEditingBranch(null); setShowModal(true); }}
+                    onClick={() => { 
+                        setEditingBranch(null); 
+                        setShowModal(true);
+                        // Trigger auto-import if orgConfig is available
+                        if (orgConfig) {
+                            setTimeout(() => handleImportOrgData(), 200);
+                        }
+                    }}
                     className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-secondary text-white px-6 py-3 rounded-2xl font-black text-sm shadow-premium hover:brightness-110 active:scale-95 transition-all"
                 >
                     <Plus size={20} />

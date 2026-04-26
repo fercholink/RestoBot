@@ -6,10 +6,13 @@ import {
     Eye, EyeOff, Crown, Users, ChefHat, CreditCard, ConciergeBell,
     BarChart3, Briefcase
 } from 'lucide-react';
+import { getBranches, resetPassword } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import RoleManagement from './RoleManagement';
+import { useAdminLog } from '../hooks/useAdminLog';
 import { DEFAULT_PERMISSIONS, getDefaultPermissions } from '../config/roles';
+
 
 // ─── Mapa de Iconos para roles ──────────────────────────────────────────────
 const ICON_MAP = {
@@ -36,6 +39,8 @@ const INITIAL_PERMISSIONS = Object.fromEntries(
 // ─── Componente Principal ─────────────────────────────────────────────────────
 const UserManagement = () => {
     const { user: currentUser } = useAuth();
+    const { log: adminLog } = useAdminLog();
+
 
     // ── Sub-Tab principal: 'usuarios' | 'roles' ──
     const [mainTab, setMainTab] = useState('usuarios');
@@ -55,6 +60,8 @@ const UserManagement = () => {
     const [editingUser, setEditingUser] = useState(null);
     const [showPassModal, setShowPassModal] = useState(false);
     const [selectedUserForPass, setSelectedUserForPass] = useState(null);
+    const [newPass, setNewPass] = useState('');
+    const [isResetting, setIsResetting] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [activeTab, setActiveTab] = useState('info'); // 'info' | 'permisos'
     const [selectedRoleTemplate, setSelectedRoleTemplate] = useState(null);
@@ -230,6 +237,37 @@ const UserManagement = () => {
     };
 
     // ─── Guardar Usuario ─────────────────────────────────────────────────────────
+    const handleResetPassword = async () => {
+        if (!newPass || newPass.length < 6) {
+            showToast('La contraseña debe tener al menos 6 caracteres', 'error');
+            return;
+        }
+
+        setIsResetting(true);
+        try {
+            await resetPassword(selectedUserForPass.id, newPass);
+            
+            // Log activity
+            adminLog({
+                action: 'user_password_reset',
+                description: `Reseteo de contraseña para usuario: ${selectedUserForPass.email}`,
+                module: 'usuarios',
+                entity_type: 'profile',
+                entity_id: selectedUserForPass.id,
+                new_value: { email: selectedUserForPass.email }
+            });
+
+            showToast('Contraseña actualizada correctamente');
+            setShowPassModal(false);
+            setNewPass('');
+        } catch (error) {
+            console.error('Error resetting password:', error);
+            showToast('Error al actualizar la contraseña: ' + error.message, 'error');
+        } finally {
+            setIsResetting(false);
+        }
+    };
+
     const handleSaveUser = async (e) => {
         e.preventDefault();
         setIsSaving(true);
@@ -258,6 +296,17 @@ const UserManagement = () => {
 
                 if (error) throw error;
                 showToast(`✅ Usuario ${formUser.full_name} actualizado correctamente`);
+
+                // Audit Log
+                adminLog({
+                    action: 'Actualización de Usuario',
+                    module: 'usuarios',
+                    entity_type: 'profile',
+                    entity_id: editingUser.id,
+                    description: `actualizó los datos del usuario ${formUser.full_name}`,
+                    new_value: profileData
+                });
+
 
             } else {
                 // ── CREAR NUEVO USUARIO ──
@@ -974,31 +1023,41 @@ const UserManagement = () => {
                                     </button>
                                 </div>
                                 <div className="p-6 space-y-4">
-                                    <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl flex gap-3">
-                                        <AlertCircle size={18} className="text-blue-500 shrink-0 mt-0.5" />
-                                        <div className="text-xs text-blue-700 font-medium leading-relaxed">
-                                            <p className="font-black mb-1">Opciones para cambiar contraseña:</p>
-                                            <ul className="list-disc list-inside space-y-1 text-blue-600">
-                                                <li>El usuario puede usar "Olvidé mi contraseña" en el login</li>
-                                                <li>Usar el Dashboard de Supabase → Authentication → Users</li>
-                                                <li>Implementar Edge Function con privilegios Admin</li>
-                                            </ul>
+                                    <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex gap-3">
+                                        <AlertCircle size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                                        <div className="text-[10px] text-amber-700 font-medium leading-relaxed">
+                                            <p className="font-black mb-1">Aviso de Seguridad:</p>
+                                            <p>Al cambiar la contraseña, el acceso anterior del usuario se revocará. Asegúrese de comunicarle la nueva clave de forma segura.</p>
                                         </div>
                                     </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Nueva Contraseña</label>
+                                        <div className="relative">
+                                            <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={16} />
+                                            <input
+                                                type={showPassword ? 'text' : 'password'}
+                                                className="w-full pl-11 pr-12 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-bold text-sm"
+                                                placeholder="Mínimo 6 caracteres"
+                                                value={newPass}
+                                                onChange={e => setNewPass(e.target.value)}
+                                            />
+                                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <button
-                                        onClick={() => {
-                                            window.open('https://supabase.com/dashboard', '_blank');
-                                            setShowPassModal(false);
-                                        }}
-                                        className="w-full py-3 bg-secondary text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:brightness-110 transition-all flex items-center justify-center gap-2"
+                                        onClick={handleResetPassword}
+                                        disabled={isResetting}
+                                        className="w-full bg-secondary text-white py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                                     >
-                                        <Shield size={14} /> Abrir Admin de Supabase
-                                    </button>
-                                    <button
-                                        onClick={() => setShowPassModal(false)}
-                                        className="w-full py-2.5 text-gray-400 font-bold text-xs hover:text-secondary transition-colors"
-                                    >
-                                        Cerrar
+                                        {isResetting ? (
+                                            <><div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Procesando...</>
+                                        ) : (
+                                            <><Check size={14} /> Confirmar Cambio</>
+                                        )}
                                     </button>
                                 </div>
                             </div>

@@ -170,17 +170,29 @@ export async function emitInvoiceForOrder(order) {
         }
 
         // 1.2 Resolver Municipio ID (Bucaramanga o el que corresponda)
-        let municipalityId = '68001'; // Default DANE
+        // DANE Bucaramanga: 68001. En Factus ID suele ser diferente.
+        let municipalityId = 149; // Default ID para Bucaramanga en Factus (comúnmente 149 u 835)
+        
         try {
             const munResp = await factusService.getMunicipalities();
             const munList = Array.isArray(munResp?.data) ? munResp.data : (Array.isArray(munResp) ? munResp : []);
+            
+            // Búsqueda más agresiva de Bucaramanga
             const bcaramanga = munList.find(m => 
                 String(m.name).toLowerCase().includes('bucaramanga') || 
                 String(m.code).includes('68001')
             );
-            if (bcaramanga) municipalityId = String(bcaramanga.id);
+            
+            if (bcaramanga) {
+                municipalityId = Number(bcaramanga.id);
+            } else if (munList.length > 0) {
+                // Si no encontramos Bucaramanga explícitamente, pero tenemos lista, 
+                // intentamos buscar por el código DANE 68001 en cualquier campo
+                const fallbackMun = munList.find(m => String(m.code) === '68001' || String(m.id) === '149');
+                if (fallbackMun) municipalityId = Number(fallbackMun.id);
+            }
         } catch (e) {
-            console.warn('[Factus] No se pudo consultar lista de municipios, usando default:', e.message);
+            console.warn("No se pudo obtener lista de municipios, usando fallback 149 (Bucaramanga)", e);
         }
 
         // 1.5 Resolver datos del tercero si viene referenciado por ID

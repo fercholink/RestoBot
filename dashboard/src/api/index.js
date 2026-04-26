@@ -13,5 +13,6 @@ const api = axios.create({
 export const getOrders = () => api.get('/webhook/orders');
 export const updateOrderStatus = (orderId, status) => api.post('/webhook/orders/update', { orderId, status });
 export const getCustomers = () => api.get('/webhook/customers');
+export const resetPassword = (userId, password) => api.post('/webhook/reset-password-admin', { userId, password });
 
 export default api;

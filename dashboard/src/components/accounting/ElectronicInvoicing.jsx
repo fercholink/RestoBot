@@ -146,7 +146,7 @@ const ElectronicInvoicing = () => {
                     legal_organization_id: legalOrg,
                     tribute_id: legalOrg === 1 ? 18 : 21,
                     identification_document_id: docTypeMapped,
-                    municipality_id: '68001'
+                    municipality_id: 149 // Bucaramanga Default ID in Factus
                 },
                 items: mapItemsForFactus(order.order_items || [])
             };
