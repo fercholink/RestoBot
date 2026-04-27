@@ -573,6 +573,7 @@ const ChannelInbox = ({ rooms = [], branches = [], selectedBranchId }) => {
                     commission_amount:  cb.commission_amount || null,
                     payment_status:     cb.payment_status || null,
                     parsed_data:        cb.parsed_data || null,
+                },
             };
 
             const { data: newBooking, error: bError } = await supabase
