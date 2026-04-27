@@ -497,7 +497,7 @@ const ChannelInbox = ({ rooms = [], branches = [], selectedBranchId }) => {
                 .order('created_at', { ascending: false });
 
             if (selectedBranchId) {
-                query = query.eq('branch_id', selectedBranchId);
+                query = query.or(`branch_id.eq.${selectedBranchId},branch_id.is.null`);
             }
 
             const { data, error } = await query;
@@ -621,10 +621,14 @@ const ChannelInbox = ({ rooms = [], branches = [], selectedBranchId }) => {
                 console.warn('[ChannelInbox] guest creation failed (non-blocking):', guestErr.message);
             }
 
-            // 3. Marcar channel_booking como confirmada
+            // 3. Marcar channel_booking como confirmada y asignarla a la sucursal
             await supabase
                 .from('channel_bookings')
-                .update({ status: 'confirmada', booking_id: Number(newBooking.id) })
+                .update({ 
+                    status: 'confirmada', 
+                    booking_id: Number(newBooking.id),
+                    branch_id: selectedBranchId ? Number(selectedBranchId) : null
+                })
                 .eq('id', cb.id);
 
             sileo.success({ title: '✅ Reserva Confirmada', description: `${cb.guest_name} asignado correctamente.` });
