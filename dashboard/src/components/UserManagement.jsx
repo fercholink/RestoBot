@@ -6,7 +6,7 @@ import {
     Eye, EyeOff, Crown, Users, ChefHat, CreditCard, ConciergeBell,
     BarChart3, Briefcase
 } from 'lucide-react';
-import { getBranches, resetPassword } from '../api';
+import { resetPassword } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import RoleManagement from './RoleManagement';

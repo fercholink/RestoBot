@@ -16,12 +16,13 @@ const OperationsHub = () => {
     const [filter, setFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [isCleaning, setIsCleaning] = useState(false);
-    const [stats, setStats] = useState({
-        actionsToday: 0,
-        securityAlerts: 0,
-        activeSessions: 0,
-        systemEvents: 0
-    });
+
+    const stats = {
+        actionsToday: logs.filter(l => new Date(l.created_at).toDateString() === new Date().toDateString()).length,
+        securityAlerts: logs.filter(l => l.module === 'security' || (l.action || '').toLowerCase().includes('fallido')).length,
+        activeSessions: new Set(logs.filter(l => new Date(l.created_at) > new Date(Date.now() - 3600000)).map(l => l.user_email)).size,
+        systemEvents: logs.length
+    };
 
     const fetchLogs = useCallback(async () => {
         setLoading(true);

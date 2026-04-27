@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, MapPin, Phone, Plus, Edit2, Power, Search, Save, X, FileText, Globe, Trash2, Loader2, RefreshCw, User } from 'lucide-react';
+import { Building2, MapPin, Phone, Plus, Edit2, Power, Search, Save, X, Trash2, Loader2, RefreshCw, Settings, Activity, ClipboardList } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { sileo } from 'sileo';
@@ -170,6 +170,8 @@ const BranchManagement = () => {
         b.address?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
+    if (!currentUser) return null;
+    
     return (
         <div className="space-y-8 pb-20 animate-in fade-in duration-500">
             {/* Header */}
@@ -287,17 +289,17 @@ const BranchManagement = () => {
 
             {/* Modal de Sede */}
             {showModal && (
-                <div className="fixed inset-0 bg-secondary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in fade-in duration-300 my-8">
-                        <div className="bg-secondary p-8 text-white flex justify-between items-center relative overflow-hidden">
+                <div className="fixed inset-0 bg-secondary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 sm:p-6">
+                    <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-3xl flex flex-col max-h-[95vh] overflow-hidden animate-in zoom-in fade-in duration-300">
+                        <div className="bg-secondary p-6 text-white flex justify-between items-center relative overflow-hidden shrink-0">
                             <div className="relative z-10">
                                 <div className="flex items-center gap-3 mb-1">
                                     <div className="p-2 bg-white/10 rounded-xl backdrop-blur-md">
-                                        <Building2 size={20} className="text-primary" />
+                                        <Building2 size={18} className="text-primary" />
                                     </div>
-                                    <h3 className="text-2xl font-black tracking-tight">{editingBranch ? 'Configuración de Sede' : 'Alta de Nueva Sede'}</h3>
+                                    <h3 className="text-xl font-black tracking-tight">{editingBranch ? 'Configuración de Sede' : 'Alta de Nueva Sede'}</h3>
                                 </div>
-                                <p className="text-white/50 text-xs font-bold uppercase tracking-widest pl-12">Perfil Operativo y Tributario</p>
+                                <p className="text-white/50 text-[10px] font-bold uppercase tracking-widest pl-11">Perfil Operativo y Tributario</p>
                             </div>
                             <div className="flex items-center gap-3 relative z-10">
                                 {!editingBranch && orgConfig && (
@@ -315,29 +317,29 @@ const BranchManagement = () => {
                             </div>
                             <Building2 className="absolute -right-8 -bottom-8 text-white/5 w-48 h-48" />
                         </div>
-                        <form onSubmit={handleSaveBranch} className="p-8 space-y-8">
+                        <form onSubmit={handleSaveBranch} className="p-6 space-y-6 overflow-y-auto">
                             {/* SECCIÓN 1: IDENTIDAD Y CONTACTO */}
                             <div className="space-y-4">
                                 <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
-                                    <User size={14} className="text-primary" />
+                                    <Settings size={14} className="text-primary" />
                                     <h4 className="text-[10px] font-black uppercase text-secondary tracking-widest">Identidad y Contacto</h4>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="space-y-1 md:col-span-2">
-                                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Nombre Comercial de la Sede</label>
-                                        <input name="name" type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-bold transition-all" defaultValue={editingBranch?.name} required placeholder="Ej. Restaurante Sede Norte" />
+                                        <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Nombre Comercial de la Sede</label>
+                                        <input name="name" type="text" className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-bold transition-all" defaultValue={editingBranch?.name} required placeholder="Ej. Restaurante Sede Norte" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Ciudad / Municipio</label>
-                                        <input name="city" type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none text-sm font-bold transition-all" defaultValue={editingBranch?.city} placeholder="Bucaramanga" />
+                                        <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Ciudad / Municipio</label>
+                                        <input name="city" type="text" className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none text-sm font-bold transition-all" defaultValue={editingBranch?.city} placeholder="Bucaramanga" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Teléfono Principal</label>
-                                        <input name="phone" type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none text-sm font-bold transition-all" defaultValue={editingBranch?.phone} placeholder="+57 300..." />
+                                        <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Teléfono Principal</label>
+                                        <input name="phone" type="text" className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none text-sm font-bold transition-all" defaultValue={editingBranch?.phone} placeholder="+57 300..." />
                                     </div>
                                     <div className="space-y-1 md:col-span-2">
-                                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Dirección Física Completa</label>
-                                        <input name="address" type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none text-sm font-bold transition-all" defaultValue={editingBranch?.address} placeholder="Calle 123 #45-67..." />
+                                        <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Dirección Física Completa</label>
+                                        <input name="address" type="text" className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none text-sm font-bold transition-all" defaultValue={editingBranch?.address} placeholder="Calle 123 #45-67..." />
                                     </div>
                                 </div>
                             </div>
@@ -345,33 +347,33 @@ const BranchManagement = () => {
                             {/* SECCIÓN 2: DATOS LEGALES Y FACTURACIÓN */}
                             <div className="space-y-4">
                                 <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
-                                    <FileText size={14} className="text-primary" />
+                                    <ClipboardList size={14} className="text-primary" />
                                     <h4 className="text-[10px] font-black uppercase text-secondary tracking-widest">Información Tributaria (DIAN)</h4>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">NIT / Identificación</label>
-                                        <input name="nit" type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-mono text-sm font-bold transition-all" defaultValue={editingBranch?.nit} placeholder="900.000.000-1" />
+                                        <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">NIT / Identificación</label>
+                                        <input name="nit" type="text" className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-mono text-sm font-bold transition-all" defaultValue={editingBranch?.nit} placeholder="900.000.000-1" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Resolución DIAN No.</label>
-                                        <input name="resolution" type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-mono text-sm font-bold transition-all" defaultValue={editingBranch?.resolution} placeholder="No. 187600..." />
+                                        <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Resolución DIAN No.</label>
+                                        <input name="resolution" type="text" className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-mono text-sm font-bold transition-all" defaultValue={editingBranch?.resolution} placeholder="No. 187600..." />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Fecha Expedición</label>
-                                        <input name="resolution_date" type="date" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none text-sm font-bold transition-all" defaultValue={editingBranch?.resolution_date} />
+                                        <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Fecha Expedición</label>
+                                        <input name="resolution_date" type="date" className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none text-sm font-bold transition-all" defaultValue={editingBranch?.resolution_date} />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Prefijo (Ej. POS)</label>
-                                        <input name="resolution_prefix" type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-black text-sm uppercase transition-all" defaultValue={editingBranch?.resolution_prefix} placeholder="POS" />
+                                        <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Prefijo (Ej. POS)</label>
+                                        <input name="resolution_prefix" type="text" className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-black text-sm uppercase transition-all" defaultValue={editingBranch?.resolution_prefix} placeholder="POS" />
                                     </div>
                                     <div className="space-y-1 md:col-span-2">
-                                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Rango Autorizado de Numeración</label>
-                                        <input name="resolution_range" type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none text-sm font-bold transition-all" defaultValue={editingBranch?.resolution_range} placeholder="Ej. Del 1 al 10.000" />
+                                        <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Rango Autorizado de Numeración</label>
+                                        <input name="resolution_range" type="text" className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none text-sm font-bold transition-all" defaultValue={editingBranch?.resolution_range} placeholder="Ej. Del 1 al 10.000" />
                                     </div>
                                     <div className="space-y-1 md:col-span-3">
-                                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Pie de Página en Factura (Términos/Legal)</label>
-                                        <textarea name="invoice_footer" rows="2" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none text-xs font-medium transition-all" defaultValue={editingBranch?.invoice_footer} placeholder="Gracias por su compra. Esta factura se asimila en sus efectos..." />
+                                        <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Pie de Página en Factura (Términos/Legal)</label>
+                                        <textarea name="invoice_footer" rows="2" className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none text-xs font-medium transition-all" defaultValue={editingBranch?.invoice_footer} placeholder="Gracias por su compra. Esta factura se asimila en sus efectos..." />
                                     </div>
                                 </div>
                             </div>
@@ -379,38 +381,38 @@ const BranchManagement = () => {
                             {/* SECCIÓN 3: CONECTIVIDAD OTA */}
                             <div className="space-y-4">
                                 <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
-                                    <Globe size={14} className="text-blue-500" />
+                                    <Activity size={14} className="text-blue-500" />
                                     <h4 className="text-[10px] font-black uppercase text-secondary tracking-widest">Booking.com Channel Manager</h4>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Hotel / Property ID</label>
-                                        <input name="booking_property_id" type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-mono text-sm font-bold transition-all" defaultValue={editingBranch?.booking_property_id} placeholder="Property ID" />
+                                        <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Hotel / Property ID</label>
+                                        <input name="booking_property_id" type="text" className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-mono text-sm font-bold transition-all" defaultValue={editingBranch?.booking_property_id} placeholder="Property ID" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Machine XML User</label>
-                                        <input name="booking_machine_id" type="text" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-mono text-sm font-bold transition-all" defaultValue={editingBranch?.booking_machine_id} placeholder="XML User" />
+                                        <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Machine XML User</label>
+                                        <input name="booking_machine_id" type="text" className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-mono text-sm font-bold transition-all" defaultValue={editingBranch?.booking_machine_id} placeholder="XML User" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Machine XML Password</label>
-                                        <input name="booking_machine_password" type="password" className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-mono text-sm font-bold transition-all" defaultValue={editingBranch?.booking_machine_password} placeholder="••••••••" />
+                                        <label className="text-[8px] font-black uppercase text-gray-400 tracking-widest pl-1">Machine XML Password</label>
+                                        <input name="booking_machine_password" type="password" className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-primary/20 focus:bg-white outline-none font-mono text-sm font-bold transition-all" defaultValue={editingBranch?.booking_machine_password} placeholder="••••••••" />
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="flex flex-col md:flex-row gap-4 pt-6 border-t border-gray-100">
+                            <div className="flex flex-col md:flex-row gap-3 pt-4 border-t border-gray-100">
                                 <button
                                     type="submit"
                                     disabled={saving}
-                                    className="flex-[2] bg-primary text-white py-4 rounded-2xl font-black shadow-premium hover:brightness-110 active:scale-95 transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    className="flex-[2] bg-primary text-white py-3 rounded-xl font-black shadow-premium hover:brightness-110 active:scale-95 transition-all text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                                 >
-                                    {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                                    {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                                     {saving ? 'Procesando...' : (editingBranch ? 'Actualizar Sede' : 'Registrar Sede')}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => { setShowModal(false); setEditingBranch(null); }}
-                                    className="flex-1 py-4 bg-gray-100 text-secondary rounded-2xl font-black hover:bg-gray-200 transition-all text-sm uppercase tracking-widest"
+                                    className="flex-1 py-3 bg-gray-100 text-secondary rounded-xl font-black hover:bg-gray-200 transition-all text-[11px] uppercase tracking-widest"
                                 >
                                     Cerrar
                                 </button>
