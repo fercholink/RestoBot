@@ -565,7 +565,6 @@ const ChannelInbox = ({ rooms = [], branches = [], selectedBranchId }) => {
                 check_out:          cb.check_out,
                 status:             'reservada',
                 total_price:        cb.total_amount || 0,
-                price_per_night:    nights > 0 ? Math.round((cb.total_amount || 0) / nights) : 0,
                 source:             cb.channel,                    // ← nuevo campo PMS Pro
                 ota_reservation_id: cb.external_id || null,        // ← nuevo campo PMS Pro
                 metadata:           {                              // ← nuevo campo PMS Pro
