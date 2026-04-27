@@ -561,8 +561,8 @@ const ChannelInbox = ({ rooms = [], branches = [], selectedBranchId }) => {
             // 1. Crear booking real con campos PMS Pro
             const bookingPayload = {
                 room_id:            Number(roomId),
-                check_in:           cb.check_in,
-                check_out:          cb.check_out,
+                check_in:           cb.check_in.includes('T') ? cb.check_in : `${cb.check_in}T12:00:00`,
+                check_out:          cb.check_out.includes('T') ? cb.check_out : `${cb.check_out}T12:00:00`,
                 status:             'reservada',
                 total_price:        cb.total_amount || 0,
                 source:             cb.channel,                    // ← nuevo campo PMS Pro
