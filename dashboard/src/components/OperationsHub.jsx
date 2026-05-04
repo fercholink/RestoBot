@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
     Activity, ShieldAlert, Monitor, Terminal, User, FileText, Lock, Unlock, 
     AlertTriangle, CheckCircle2, Info, Search, Filter, Clock, Trash2, 
-    Database, RefreshCw, Eye, ShieldCheck, Server
+    Database, RefreshCw, Eye, ShieldCheck, Server, X
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -17,12 +17,12 @@ const OperationsHub = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isCleaning, setIsCleaning] = useState(false);
 
-    const stats = {
-        actionsToday: logs.filter(l => new Date(l.created_at).toDateString() === new Date().toDateString()).length,
-        securityAlerts: logs.filter(l => l.module === 'security' || (l.action || '').toLowerCase().includes('fallido')).length,
-        activeSessions: new Set(logs.filter(l => new Date(l.created_at) > new Date(Date.now() - 3600000)).map(l => l.user_email)).size,
-        systemEvents: logs.length
-    };
+    const [stats, setStats] = useState({
+        actionsToday: 0,
+        securityAlerts: 0,
+        activeSessions: 0,
+        systemEvents: 0
+    });
 
     const fetchLogs = useCallback(async () => {
         setLoading(true);
@@ -189,64 +189,74 @@ const OperationsHub = () => {
         <div className="space-y-8 pb-20 animate-in fade-in duration-500">
             {/* Modal de Detalles Técnicos */}
             {selectedLog && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-secondary/80 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-premium overflow-hidden flex flex-col max-h-[80vh]">
-                        <div className="p-8 border-b border-gray-100 flex justify-between items-center">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-secondary/40 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-canvas w-full max-w-2xl rounded-[24px] shadow-airbnb overflow-hidden flex flex-col max-h-[85vh] border border-hairline">
+                        <div className="p-8 border-b border-hairline flex justify-between items-center bg-surface-soft/30">
                             <div>
-                                <h3 className="text-sm font-black text-secondary tracking-tight">Detalles Técnicos del Evento</h3>
-                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{selectedLog.action} • {selectedLog.id}</p>
+                                <span className="text-[11px] font-bold text-accent uppercase tracking-widest mb-1 block">Trazabilidad Técnica</span>
+                                <h3 className="text-xl font-bold text-secondary tracking-tight">{selectedLog.action}</h3>
                             </div>
-                            <button onClick={() => setSelectedLog(null)} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
-                                <X size={20} className="text-gray-400" />
+                            <button onClick={() => setSelectedLog(null)} className="p-3 hover:bg-white rounded-full transition-all border border-hairline shadow-sm group">
+                                <X size={20} className="text-accent group-hover:rotate-90 transition-transform" />
                             </button>
                         </div>
-                        <div className="p-8 overflow-y-auto space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
+                        <div className="p-8 overflow-y-auto space-y-8 custom-scrollbar">
+                            <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                                        <Clock size={12} /> Marca de Tiempo
+                                    <p className="text-[11px] font-bold uppercase text-accent tracking-widest flex items-center gap-2">
+                                        <Clock size={14} className="text-primary" /> Fecha y Hora
                                     </p>
-                                    <p className="text-xs font-bold text-secondary">{new Date(selectedLog.created_at).toLocaleString()}</p>
+                                    <p className="text-[13px] font-bold text-secondary">{new Date(selectedLog.created_at).toLocaleString()}</p>
                                 </div>
                                 <div className="space-y-2">
-                                    <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest flex items-center gap-2">
-                                        <User size={12} /> Usuario Responsable
+                                    <p className="text-[11px] font-bold uppercase text-accent tracking-widest flex items-center gap-2">
+                                        <User size={14} className="text-primary" /> Operador
                                     </p>
-                                    <p className="text-xs font-bold text-secondary">{selectedLog.user_name} ({selectedLog.user_email})</p>
+                                    <p className="text-[13px] font-bold text-secondary truncate">{selectedLog.user_name} <span className="text-accent font-medium opacity-60">({selectedLog.user_email})</span></p>
                                 </div>
                             </div>
 
-                            <div className="space-y-4">
+                            <div className="space-y-6">
                                 {selectedLog.old_value && (
-                                    <div className="space-y-2">
-                                        <p className="text-[9px] font-black uppercase text-red-500 tracking-widest">Valor Anterior</p>
-                                        <pre className="bg-gray-50 p-4 rounded-2xl text-[10px] font-mono text-gray-600 overflow-x-auto border border-gray-100">
-                                            {JSON.stringify(selectedLog.old_value, null, 2)}
-                                        </pre>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-danger" />
+                                            <p className="text-[11px] font-bold uppercase text-danger tracking-widest">Valor Previo</p>
+                                        </div>
+                                        <div className="relative group">
+                                            <pre className="bg-danger/5 p-6 rounded-[20px] text-[12px] font-mono text-danger/80 overflow-x-auto border border-danger/10 shadow-inner">
+                                                {JSON.stringify(selectedLog.old_value, null, 2)}
+                                            </pre>
+                                        </div>
                                     </div>
                                 )}
                                 {selectedLog.new_value && (
-                                    <div className="space-y-2">
-                                        <p className="text-[9px] font-black uppercase text-emerald-500 tracking-widest">Nuevo Valor / Payload</p>
-                                        <pre className="bg-emerald-50/50 p-4 rounded-2xl text-[10px] font-mono text-emerald-700 overflow-x-auto border border-emerald-100">
-                                            {JSON.stringify(selectedLog.new_value, null, 2)}
-                                        </pre>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-success" />
+                                            <p className="text-[11px] font-bold uppercase text-success tracking-widest">Estado Actualizado</p>
+                                        </div>
+                                        <div className="relative group">
+                                            <pre className="bg-success/5 p-6 rounded-[20px] text-[12px] font-mono text-success/80 overflow-x-auto border border-success/10 shadow-inner">
+                                                {JSON.stringify(selectedLog.new_value, null, 2)}
+                                            </pre>
+                                        </div>
                                     </div>
                                 )}
                                 {!selectedLog.old_value && !selectedLog.new_value && (
-                                    <div className="py-10 text-center">
-                                        <Info className="mx-auto text-gray-200 mb-2" size={32} />
-                                        <p className="text-xs font-bold text-gray-400">No hay datos estructurados adicionales para este evento.</p>
+                                    <div className="py-16 text-center bg-surface-soft/30 rounded-[24px] border border-hairline border-dashed">
+                                        <Info className="mx-auto text-accent/20 mb-4" size={48} />
+                                        <p className="text-[13px] font-bold text-accent uppercase tracking-widest">No hay metadatos adicionales</p>
                                     </div>
                                 )}
                             </div>
                         </div>
-                        <div className="p-8 bg-gray-50 border-t border-gray-100">
+                        <div className="p-8 bg-surface-soft/30 border-t border-hairline">
                             <button 
                                 onClick={() => setSelectedLog(null)}
-                                className="w-full py-4 bg-secondary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 transition-all"
+                                className="w-full py-4 bg-secondary text-white rounded-full font-bold text-[11px] uppercase tracking-widest shadow-airbnb active:scale-[0.98] transition-all"
                             >
-                                Entendido
+                                Cerrar Detalles
                             </button>
                         </div>
                     </div>
@@ -254,47 +264,48 @@ const OperationsHub = () => {
             )}
 
             {/* KPI Operational Cards */}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
-                    { label: 'Acciones Hoy', value: stats.actionsToday, icon: Activity, color: 'text-primary' },
-                    { label: 'Alertas Seguridad', value: stats.securityAlerts, icon: ShieldAlert, color: 'text-red-500' },
-                    { label: 'Usuarios Activos', value: stats.activeSessions, icon: Monitor, color: 'text-blue-500' },
-                    { label: 'Total Eventos', value: stats.systemEvents, icon: Terminal, color: 'text-secondary' },
+                    { label: 'Acciones Hoy', value: stats.actionsToday, icon: Activity, color: 'text-primary', bg: 'bg-primary/5' },
+                    { label: 'Alertas Seguridad', value: stats.securityAlerts, icon: ShieldAlert, color: 'text-danger', bg: 'bg-danger/5' },
+                    { label: 'Usuarios Activos', value: stats.activeSessions, icon: Monitor, color: 'text-blue-500', bg: 'bg-blue-500/5' },
+                    { label: 'Eventos Globales', value: stats.systemEvents, icon: Terminal, color: 'text-secondary', bg: 'bg-secondary/5' },
                 ].map((kpi, i) => (
-                    <div key={i} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between group hover:shadow-premium transition-all">
+                    <div key={i} className="bg-canvas p-6 rounded-[24px] border border-hairline shadow-sm flex items-center justify-between group hover:shadow-airbnb hover:-translate-y-1 transition-all duration-300">
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">{kpi.label}</p>
-                            <p className="text-2xl font-black text-secondary">{kpi.value}</p>
+                            <p className="text-[11px] font-bold uppercase tracking-widest text-accent mb-2">{kpi.label}</p>
+                            <p className="text-3xl font-bold text-secondary tracking-tight">{kpi.value}</p>
                         </div>
-                        <div className={`p-3 rounded-2xl bg-gray-50 group-hover:bg-gray-100 transition-colors ${kpi.color}`}>
-                            <kpi.icon size={24} />
+                        <div className={`w-14 h-14 rounded-[18px] ${kpi.bg} flex items-center justify-center transition-transform group-hover:scale-110 duration-500 ${kpi.color} border border-hairline`}>
+                            <kpi.icon size={28} />
                         </div>
                     </div>
                 ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            </div>              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main: Logs Feed */}
                 <div className="lg:col-span-2 space-y-6">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-2">
-                        <h3 className="text-[11px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                            <Terminal size={16} />
-                            Registro de Auditoría en Tiempo Real
-                        </h3>
-                        <div className="flex gap-2 w-full md:w-auto">
-                            <div className="relative flex-1 md:w-64">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 rounded-xl">
+                                <Terminal size={18} className="text-primary" />
+                            </div>
+                            <h3 className="text-[11px] font-bold uppercase tracking-widest text-accent">
+                                Registro de Auditoría en Tiempo Real
+                            </h3>
+                        </div>
+                        <div className="flex gap-3 w-full md:w-auto">
+                            <div className="relative flex-1 md:w-72">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-accent" size={16} />
                                 <input 
                                     type="text"
                                     placeholder="Buscar en logs..."
-                                    className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-bold focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all shadow-sm"
+                                    className="w-full pl-11 pr-4 py-3 bg-surface-soft border border-hairline rounded-[16px] text-[12px] font-bold focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all shadow-sm placeholder:text-accent/50"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
                             </div>
                             <select
-                                className="bg-white border border-gray-200 rounded-xl px-3 py-1.5 text-[10px] font-black uppercase text-gray-500 focus:outline-none shadow-sm"
+                                className="bg-surface-soft border border-hairline rounded-[16px] px-4 py-3 text-[11px] font-bold uppercase tracking-widest text-secondary focus:outline-none shadow-sm cursor-pointer"
                                 onChange={(e) => setFilter(e.target.value)}
                             >
                                 <option value="all">Todo</option>
@@ -303,65 +314,65 @@ const OperationsHub = () => {
                             </select>
                             <button 
                                 onClick={downloadCSV}
-                                className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-primary hover:border-primary/30 transition-all shadow-sm"
+                                className="p-3 bg-surface-soft border border-hairline rounded-[16px] text-accent hover:text-primary hover:border-primary/30 transition-all shadow-sm"
                                 title="Exportar a CSV"
                             >
-                                <FileText size={16} />
+                                <FileText size={18} />
                             </button>
                             <button 
                                 onClick={fetchLogs}
-                                className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-primary hover:border-primary/30 transition-all shadow-sm"
+                                className="p-3 bg-surface-soft border border-hairline rounded-[16px] text-accent hover:text-primary hover:border-primary/30 transition-all shadow-sm"
                                 title="Refrescar"
                             >
-                                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+                                <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
                             </button>
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden min-h-[600px] flex flex-col">
-                        <div className="divide-y divide-gray-50 flex-1 overflow-y-auto">
+                    <div className="bg-canvas rounded-[32px] border border-hairline shadow-sm overflow-hidden min-h-[650px] flex flex-col">
+                        <div className="divide-y divide-hairline flex-1 overflow-y-auto custom-scrollbar">
                             {loading && logs.length === 0 ? (
-                                <div className="h-full flex flex-col items-center justify-center py-20">
-                                    <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-4" />
-                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Sincronizando registros...</p>
+                                <div className="h-full flex flex-col items-center justify-center py-32">
+                                    <RefreshCw className="w-10 h-10 text-primary animate-spin mb-6" />
+                                    <p className="text-[11px] font-bold text-accent uppercase tracking-widest">Sincronizando flujo de auditoría...</p>
                                 </div>
                             ) : filteredLogs.map((log) => (
-                                <div key={log.id} className="p-6 hover:bg-gray-50/50 transition-colors flex items-start gap-5 group">
-                                    <div className={`p-3 rounded-2xl border transition-transform group-hover:scale-110 ${getSeverityStyles(log)}`}>
+                                <div key={log.id} className="p-8 hover:bg-surface-soft/50 transition-all duration-300 flex items-start gap-6 group relative">
+                                    <div className={`w-12 h-12 shrink-0 rounded-[16px] border flex items-center justify-center transition-all group-hover:scale-110 group-hover:rotate-3 ${getSeverityStyles(log)}`}>
                                         {getSeverityIcon(log)}
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex justify-between items-start mb-1">
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <h4 className="font-black text-secondary text-sm tracking-tight truncate">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <h4 className="font-bold text-secondary text-[15px] tracking-tight truncate group-hover:text-primary transition-colors">
                                                     {log.action}
                                                 </h4>
-                                                <span className="hidden sm:inline-flex text-[8px] font-black px-1.5 py-0.5 bg-gray-100 text-gray-400 rounded uppercase tracking-widest shrink-0">
+                                                <span className="hidden sm:inline-flex text-[9px] font-bold px-2 py-0.5 bg-surface-soft text-accent rounded-md uppercase tracking-widest border border-hairline shrink-0">
                                                     {log.module}
                                                 </span>
                                             </div>
-                                            <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1 whitespace-nowrap ml-2">
-                                                <Clock size={10} />
+                                            <div className="flex items-center gap-1.5 text-[11px] font-bold text-accent uppercase tracking-wider whitespace-nowrap ml-4 opacity-60 group-hover:opacity-100 transition-opacity">
+                                                <Clock size={12} className="text-primary" />
                                                 {formatDistanceToNow(parseISO(log.created_at), { addSuffix: true, locale: es })}
-                                            </span>
+                                            </div>
                                         </div>
-                                        <p className="text-xs text-gray-500 leading-relaxed">
-                                            El usuario <span className="font-black text-secondary">{log.user_name || log.user_email}</span> {log.description || 'realizó una acción en el sistema'}.
+                                        <p className="text-[13px] text-accent leading-relaxed font-medium">
+                                            El usuario <span className="font-bold text-secondary">{log.user_name || log.user_email}</span> {log.description || 'realizó una acción en el sistema'}.
                                         </p>
                                         
-                                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                                        <div className="mt-4 flex flex-wrap items-center gap-3">
                                             {log.entity_type && (
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Entidad:</span>
-                                                    <span className="text-[9px] font-black bg-secondary/5 text-secondary px-2 py-0.5 rounded-md border border-secondary/10">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-bold text-accent/40 uppercase tracking-widest">Entidad:</span>
+                                                    <span className="text-[10px] font-bold bg-surface-soft text-secondary px-2.5 py-1 rounded-full border border-hairline">
                                                         {log.entity_type} {log.entity_id ? `#${log.entity_id}` : ''}
                                                     </span>
                                                 </div>
                                             )}
                                             {log.branch_name && (
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">Sede:</span>
-                                                    <span className="text-[9px] font-black bg-primary/5 text-primary px-2 py-0.5 rounded-md border border-primary/10">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[10px] font-bold text-accent/40 uppercase tracking-widest">Sede:</span>
+                                                    <span className="text-[10px] font-bold bg-primary/5 text-primary px-2.5 py-1 rounded-full border border-primary/10">
                                                         {log.branch_name}
                                                     </span>
                                                 </div>
@@ -369,35 +380,39 @@ const OperationsHub = () => {
                                         </div>
                                         
                                         {(log.old_value || log.new_value) && (
-                                            <div className="mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="mt-4">
                                                 <button 
                                                     onClick={() => setSelectedLog(log)}
-                                                    className="text-[9px] font-black uppercase text-primary flex items-center gap-1 hover:underline"
+                                                    className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-primary/5 border border-transparent hover:border-primary/10 transition-all"
                                                 >
-                                                    <Eye size={10} /> Ver detalles técnicos
+                                                    <Eye size={12} /> Ver Auditoría Técnica
                                                 </button>
                                             </div>
                                         )}
-
+                                    </div>
+                                    <div className="absolute right-8 bottom-8 opacity-0 group-hover:opacity-10 transition-opacity">
+                                        <Terminal size={48} className="text-secondary" />
                                     </div>
                                 </div>
                             ))}
                             
                             {!loading && filteredLogs.length === 0 && (
-                                <div className="h-full flex flex-col items-center justify-center py-20 italic text-gray-400">
-                                    <Search className="mb-2 opacity-20" size={40} />
-                                    <p className="text-sm font-bold">No se encontraron registros activos</p>
+                                <div className="h-full flex flex-col items-center justify-center py-32 bg-surface-soft/20">
+                                    <div className="p-6 bg-canvas rounded-full border border-hairline mb-6 shadow-sm">
+                                        <Search className="text-accent/20" size={48} />
+                                    </div>
+                                    <p className="text-[13px] font-bold text-accent uppercase tracking-widest">No se encontraron registros activos</p>
                                 </div>
                             )}
                         </div>
                         
-                        <div className="bg-gray-50/50 p-4 border-t border-gray-100 flex justify-between items-center shrink-0">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                                Mostrando últimos 100 eventos
+                        <div className="bg-surface-soft/30 p-6 border-t border-hairline flex justify-between items-center shrink-0">
+                            <p className="text-[11px] font-bold text-accent uppercase tracking-widest">
+                                Mostrando últimos 100 eventos sincronizados
                             </p>
-                            <div className="flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                                <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter">Conexión Segura Activa</span>
+                            <div className="flex items-center gap-3 px-4 py-2 bg-canvas rounded-full border border-hairline shadow-sm">
+                                <div className="w-2 h-2 bg-success rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+                                <span className="text-[10px] font-bold text-success uppercase tracking-widest">Real-time Node: Active</span>
                             </div>
                         </div>
                     </div>
@@ -405,59 +420,69 @@ const OperationsHub = () => {
 
                 {/* Sidebar: System Info / Active Guards */}
                 <div className="space-y-6">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-gray-400 px-2 mt-1">Seguridad de Datos</h3>
-
-                    <div className="bg-secondary text-white rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden">
-                        <div className="relative z-10 space-y-6">
-                            <div className="flex items-center gap-3">
-                                <div className="p-3 bg-white/10 rounded-2xl">
-                                    <Lock size={20} className="text-primary" />
-                                </div>
-                                <div>
-                                    <h4 className="font-black text-sm tracking-tight">Escudo de Identidad</h4>
-                                    <p className="text-white/40 text-[10px] uppercase font-black tracking-widest">Protección Activa</p>
-                                </div>
-                            </div>
-                            <div className="space-y-3">
-                                <div className="flex items-center gap-2 text-[11px] font-medium text-white/70">
-                                    <ShieldCheck size={14} className="text-primary" />
-                                    <span>RLS Hardening (Multi-tenant)</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-[11px] font-medium text-white/70">
-                                    <ShieldCheck size={14} className="text-primary" />
-                                    <span>Acceso SuperAdmin Configurado</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-[11px] font-medium text-white/70">
-                                    <ShieldCheck size={14} className="text-primary" />
-                                    <span>Auditoría de Acciones Activa</span>
-                                </div>
-                            </div>
-                            <button className="w-full py-3 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border border-white/10">
-                                Estado del Sistema
-                            </button>
-                        </div>
-                        <Unlock className="absolute -right-6 -bottom-6 text-white/5 w-32 h-32" />
+                    <div className="flex items-center gap-3 px-2">
+                        <div className="w-1 h-4 bg-primary rounded-full" />
+                        <h3 className="text-[11px] font-bold uppercase tracking-widest text-accent">Inteligencia de Datos</h3>
                     </div>
 
-                    <div className="bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm space-y-6">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
-                            <Server size={14} /> Servicios Críticos
-                            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse ml-auto" />
-                        </h4>
+                    <div className="bg-secondary text-white rounded-[32px] p-8 shadow-airbnb relative overflow-hidden group">
+                        <div className="relative z-10 space-y-8">
+                            <div className="flex items-center gap-4">
+                                <div className="w-14 h-14 bg-white/10 rounded-[18px] flex items-center justify-center border border-white/10 backdrop-blur-md group-hover:scale-110 transition-transform">
+                                    <ShieldCheck size={28} className="text-primary" />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-[17px] tracking-tight">Escudo de Identidad</h4>
+                                    <p className="text-white/40 text-[10px] uppercase font-bold tracking-widest mt-1">Protección en Tiempo Real</p>
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-3 text-[12px] font-bold text-white/70">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                    <span>RLS Hardening (Multi-tenant)</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-[12px] font-bold text-white/70">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                    <span>Políticas SuperAdmin Activas</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-[12px] font-bold text-white/70">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                    <span>Auditoría de Acciones Granular</span>
+                                </div>
+                            </div>
+                            <button className="w-full py-4 bg-white/10 hover:bg-white/20 text-white rounded-full font-bold text-[11px] uppercase tracking-widest transition-all border border-white/10 active:scale-95 shadow-sm">
+                                Diagnóstico del Sistema
+                            </button>
+                        </div>
+                        <Unlock className="absolute -right-12 -bottom-12 text-white/5 w-48 h-48 pointer-events-none group-hover:scale-125 transition-transform duration-700" />
+                    </div>
 
-                        <div className="space-y-4">
+                    <div className="bg-canvas rounded-[32px] border border-hairline p-8 shadow-sm space-y-8 hover:shadow-airbnb transition-all duration-300">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-[11px] font-bold uppercase tracking-widest text-accent flex items-center gap-2">
+                                <Server size={14} className="text-primary" /> Servicios Críticos
+                            </h4>
+                            <div className="flex items-center gap-2 px-3 py-1 bg-success/10 rounded-full border border-success/20">
+                                <div className="w-1.5 h-1.5 bg-success rounded-full animate-pulse" />
+                                <span className="text-[9px] font-bold text-success uppercase">Online</span>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
                             {[
                                 { name: 'n8n Automations', status: 'Online', perf: '24ms' },
                                 { name: 'Supabase DB', status: 'Online', perf: '18ms' },
                                 { name: 'WhatsApp API', status: 'Online', perf: '145ms' },
                                 { name: 'DIAN Factus API', status: 'Online', perf: '180ms' },
                             ].map((sys, i) => (
-                                <div key={i} className="flex justify-between items-center group">
+                                <div key={i} className="flex justify-between items-center group cursor-default">
                                     <div>
-                                        <p className="text-xs font-black text-secondary">{sys.name}</p>
-                                        <p className="text-[9px] text-emerald-500 font-bold uppercase tracking-tighter">{sys.status}</p>
+                                        <p className="text-[13px] font-bold text-secondary group-hover:text-primary transition-colors">{sys.name}</p>
+                                        <p className="text-[9px] text-accent font-bold uppercase tracking-widest mt-1">Status Nominal</p>
                                     </div>
-                                    <span className="text-[10px] font-mono text-gray-300 group-hover:text-primary transition-colors font-bold">{sys.perf}</span>
+                                    <div className="text-right">
+                                        <span className="text-[11px] font-mono text-accent/40 group-hover:text-primary transition-colors font-bold">{sys.perf}</span>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -465,24 +490,28 @@ const OperationsHub = () => {
 
                     {/* Zona de Mantenimiento (Solo Gerentes) */}
                     {(user?.role === 'gerente' || user?.role === 'admin') && (
-                        <div className="bg-red-50/50 rounded-[2.5rem] border border-red-100 p-8 shadow-sm space-y-6">
-                            <h4 className="text-[10px] font-black uppercase tracking-widest text-red-500 flex items-center gap-2">
-                                <Database size={14} />
-                                Zona de Mantenimiento
-                            </h4>
+                        <div className="bg-danger/5 rounded-[32px] border border-danger/10 p-8 shadow-sm space-y-6 group hover:bg-danger/[0.08] transition-all duration-300">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-danger/10 rounded-lg">
+                                    <Database size={16} className="text-danger" />
+                                </div>
+                                <h4 className="text-[11px] font-bold uppercase tracking-widest text-danger">
+                                    Zona de Mantenimiento
+                                </h4>
+                            </div>
 
-                            <div className="space-y-4">
-                                <p className="text-[11px] text-red-900/60 font-medium leading-relaxed">
-                                    Acciones críticas para reiniciar el flujo de pedidos. No afecta inventarios ni usuarios.
+                            <div className="space-y-6">
+                                <p className="text-[12px] text-danger/70 font-bold leading-relaxed uppercase tracking-wider opacity-60">
+                                    Acciones de purga para flujo de pedidos. No afecta inventarios.
                                 </p>
 
                                 <button
                                     onClick={handleResetDatabase}
                                     disabled={isCleaning}
-                                    className="w-full py-4 bg-white text-red-500 border-2 border-red-100 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-red-500 hover:text-white hover:border-red-500 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
+                                    className="w-full py-4 bg-canvas text-danger border border-danger/20 rounded-full font-bold text-[11px] uppercase tracking-widest hover:bg-danger hover:text-white hover:border-danger active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-sm hover:shadow-airbnb"
                                 >
-                                    {isCleaning ? <RefreshCw className="animate-spin" size={16} /> : <Trash2 size={16} />}
-                                    {isCleaning ? 'Limpiando...' : 'Vaciar Historial Pedidos'}
+                                    {isCleaning ? <RefreshCw className="animate-spin" size={18} /> : <Trash2 size={18} />}
+                                    {isCleaning ? 'Ejecutando Purga...' : 'Vaciar Historial de Pedidos'}
                                 </button>
                             </div>
                         </div>

@@ -327,7 +327,7 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-canvas rounded-[24px] shadow-airbnb w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 border border-hairline">
                 <div className={`p-6 flex justify-between items-center ${formData.status === 'ocupada' ? 'bg-primary' : 'bg-secondary'}`}>
                     <h3 className="text-xl font-black text-white flex items-center gap-2">
                         {formData.status === 'ocupada' ? <Key className="text-white" /> : <Calendar className="text-white" />}
@@ -345,17 +345,17 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
                         <div className="space-y-4">
                             <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Estancia</h4>
 
-                            <div className="bg-gray-100 p-1 rounded-xl flex mb-4">
+                            <div className="bg-surface-soft p-1 rounded-full flex mb-4 border border-hairline">
                                 <button
                                     type="button"
-                                    className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${formData.status === 'reservada' ? 'bg-white text-secondary shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                    className={`flex-1 py-2 rounded-full text-[11px] font-bold uppercase tracking-widest transition-all ${formData.status === 'reservada' ? 'bg-canvas text-secondary shadow-sm border border-hairline' : 'text-accent hover:text-secondary'}`}
                                     onClick={() => setFormData({ ...formData, status: 'reservada' })}
                                 >
                                     Reserva
                                 </button>
                                 <button
                                     type="button"
-                                    className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${formData.status === 'ocupada' ? 'bg-primary text-white shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                                    className={`flex-1 py-2 rounded-full text-[11px] font-bold uppercase tracking-widest transition-all ${formData.status === 'ocupada' ? 'bg-primary text-white shadow-airbnb' : 'text-accent hover:text-secondary'}`}
                                     onClick={() => setFormData({ ...formData, status: 'ocupada' })}
                                 >
                                     Check-In
@@ -363,10 +363,10 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Habitación</label>
+                                <label className="block text-[11px] font-bold text-accent mb-1 uppercase tracking-widest">Habitación</label>
                                 <select
                                     required
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full bg-canvas border border-hairline rounded-[16px] shadow-sm px-4 py-2.5 text-[13px] font-semibold text-secondary focus:outline-none focus:border-primary transition-all"
                                     value={formData.roomId}
                                     onChange={e => setFormData({ ...formData, roomId: e.target.value })}
                                 >
@@ -391,21 +391,21 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">Check-in</label>
+                                    <label className="block text-[11px] font-bold text-accent mb-1 uppercase tracking-widest">Check-in</label>
                                     <input
                                         type="date"
                                         required
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        className="w-full bg-canvas border border-hairline rounded-[16px] shadow-sm px-4 py-2.5 text-[13px] font-semibold text-secondary focus:outline-none focus:border-primary transition-all"
                                         value={formData.checkIn}
                                         onChange={e => setFormData({ ...formData, checkIn: e.target.value })}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">Check-out</label>
+                                    <label className="block text-[11px] font-bold text-accent mb-1 uppercase tracking-widest">Check-out</label>
                                     <input
                                         type="date"
                                         required
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        className="w-full bg-canvas border border-hairline rounded-[16px] shadow-sm px-4 py-2.5 text-[13px] font-semibold text-secondary focus:outline-none focus:border-primary transition-all"
                                         value={formData.checkOut}
                                         onChange={e => setFormData({ ...formData, checkOut: e.target.value })}
                                     />
@@ -433,12 +433,12 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
                             <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-2">Huésped</h4>
 
                             <div className="relative">
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Documento ID</label>
+                                <label className="block text-[11px] font-bold text-accent mb-1 uppercase tracking-widest">Documento ID</label>
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
                                         required
-                                        className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        className="flex-1 bg-canvas border border-hairline rounded-[16px] shadow-sm px-4 py-2.5 text-[13px] font-semibold text-secondary focus:outline-none focus:border-primary transition-all"
                                         value={formData.guestDoc}
                                         onChange={e => setFormData({ ...formData, guestDoc: e.target.value })}
                                         onBlur={handleSearchGuest} // Auto-search on blur
@@ -447,7 +447,7 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
                                     <button
                                         type="button"
                                         onClick={handleSearchGuest}
-                                        className="bg-gray-100 text-gray-500 p-2.5 rounded-xl hover:bg-gray-200"
+                                        className="bg-surface-soft text-secondary border border-hairline shadow-sm p-2.5 rounded-[16px] hover:bg-canvas transition-all"
                                         title="Buscar cliente existente"
                                     >
                                         <Search size={18} />
@@ -456,11 +456,11 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Nombre Completo</label>
+                                <label className="block text-[11px] font-bold text-accent mb-1 uppercase tracking-widest">Nombre Completo</label>
                                 <input
                                     type="text"
                                     required
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full bg-canvas border border-hairline rounded-[16px] shadow-sm px-4 py-2.5 text-[13px] font-semibold text-secondary focus:outline-none focus:border-primary transition-all"
                                     value={formData.guestName}
                                     onChange={e => setFormData({ ...formData, guestName: e.target.value })}
                                 />
@@ -468,19 +468,19 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">Teléfono</label>
+                                    <label className="block text-[11px] font-bold text-accent mb-1 uppercase tracking-widest">Teléfono</label>
                                     <input
                                         type="tel"
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        className="w-full bg-canvas border border-hairline rounded-[16px] shadow-sm px-4 py-2.5 text-[13px] font-semibold text-secondary focus:outline-none focus:border-primary transition-all"
                                         value={formData.guestPhone}
                                         onChange={e => setFormData({ ...formData, guestPhone: e.target.value })}
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 mb-1">Email</label>
+                                    <label className="block text-[11px] font-bold text-accent mb-1 uppercase tracking-widest">Email</label>
                                     <input
                                         type="email"
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        className="w-full bg-canvas border border-hairline rounded-[16px] shadow-sm px-4 py-2.5 text-[13px] font-semibold text-secondary focus:outline-none focus:border-primary transition-all"
                                         value={formData.guestEmail}
                                         onChange={e => setFormData({ ...formData, guestEmail: e.target.value })}
                                     />
@@ -489,13 +489,13 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
                         </div>
                     </div>
 
-                    <div className="mt-8 flex justify-between items-center border-t border-gray-100 pt-6">
+                    <div className="mt-8 flex justify-between items-center border-t border-hairline pt-6">
                         {bookingToEdit && (
                             <div className="flex gap-2">
                                 <button
                                     type="button"
                                     onClick={handleDelete}
-                                    className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest text-red-500 bg-red-50 hover:bg-red-100 transition-all border border-red-100"
+                                    className="px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-widest text-danger bg-danger/10 hover:bg-danger/20 transition-all border border-danger/10"
                                 >
                                     <Trash2 size={14} className="inline mr-1" /> General
                                 </button>
@@ -507,7 +507,7 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
                                 <button
                                     type="button"
                                     onClick={handleCheckOut}
-                                    className="px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-white bg-gray-800 hover:bg-gray-900 transition-all"
+                                    className="px-6 py-3 rounded-full text-[11px] font-bold uppercase tracking-widest text-white bg-secondary hover:bg-ink transition-all shadow-sm"
                                 >
                                     Check-Out
                                 </button>
@@ -517,7 +517,7 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
                                 <button
                                     type="button"
                                     onClick={handleCheckIn}
-                                    className="px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-white bg-blue-600 hover:bg-blue-700 transition-all"
+                                    className="px-6 py-3 rounded-full text-[11px] font-bold uppercase tracking-widest text-white bg-warning hover:opacity-90 transition-all shadow-sm"
                                 >
                                     Check-In Ahora
                                 </button>
@@ -526,14 +526,14 @@ const NewReservationModal = ({ isOpen, onClose, onReservationCreated, rooms, ini
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-gray-400 hover:text-secondary hover:bg-gray-50 transition-all"
+                                className="px-6 py-3 rounded-full text-[11px] font-bold uppercase tracking-widest text-accent hover:text-secondary hover:bg-surface-soft transition-all"
                             >
                                 Cerrar
                             </button>
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="bg-primary text-white px-8 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-premium hover:shadow-lg hover:scale-[1.02] transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="bg-primary text-white px-8 py-3 rounded-full font-bold text-[11px] uppercase tracking-widest shadow-airbnb hover:scale-[1.02] transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {loading ? 'Guardando...' : <><Save size={16} /> {bookingToEdit ? 'Actualizar' : 'Confirmar'}</>}
                             </button>

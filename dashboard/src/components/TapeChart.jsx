@@ -39,22 +39,22 @@ const TapeChart = ({ rooms = [], bookings = [], onBookingClick, onDateChange }) 
     };
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden fade-in">
+        <div className="flex flex-col h-full bg-canvas rounded-[24px] border border-hairline shadow-airbnb overflow-hidden fade-in">
             {/* Toolbar */}
-            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+            <div className="p-5 border-b border-hairline flex items-center justify-between bg-transparent">
                 <div className="flex items-center gap-4">
                     <h3 className="font-black text-secondary flex items-center gap-2">
                         <Calendar size={18} className="text-primary" />
                         Cinta de Reservas
                     </h3>
-                    <div className="flex items-center bg-white rounded-xl border border-gray-200 p-1 shadow-sm">
-                        <button onClick={prevPeriod} className="p-1.5 hover:bg-gray-50 rounded-lg text-gray-400 transition-colors">
+                    <div className="flex items-center bg-canvas rounded-full border border-hairline shadow-sm p-1">
+                        <button onClick={prevPeriod} className="p-1.5 hover:bg-surface-soft rounded-full text-secondary transition-colors">
                             <ChevronLeft size={16} />
                         </button>
-                        <button onClick={goToToday} className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-secondary hover:bg-gray-50 rounded-lg transition-colors">
+                        <button onClick={goToToday} className="px-4 py-1.5 text-[11px] font-bold uppercase tracking-widest text-secondary hover:bg-surface-soft rounded-full transition-colors">
                             Hoy
                         </button>
-                        <button onClick={nextPeriod} className="p-1.5 hover:bg-gray-50 rounded-lg text-gray-400 transition-colors">
+                        <button onClick={nextPeriod} className="p-1.5 hover:bg-surface-soft rounded-full text-secondary transition-colors">
                             <ChevronRight size={16} />
                         </button>
                     </div>
@@ -64,10 +64,10 @@ const TapeChart = ({ rooms = [], bookings = [], onBookingClick, onDateChange }) 
                 </div>
 
                 <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-xl border border-gray-100 text-[10px] font-black uppercase tracking-widest text-gray-400">
-                        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400"></span> Ocupada</div>
-                        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400"></span> Reservada</div>
-                        <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400"></span> Limpieza</div>
+                    <div className="flex items-center gap-4 px-5 py-2.5 bg-canvas rounded-full border border-hairline text-[11px] font-semibold uppercase tracking-widest text-accent">
+                        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-primary"></span> Ocupada</div>
+                        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-warning"></span> Reservada</div>
+                        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-surface-strong"></span> Limpieza</div>
                     </div>
                 </div>
             </div>
@@ -82,16 +82,16 @@ const TapeChart = ({ rooms = [], bookings = [], onBookingClick, onDateChange }) 
                     }}
                 >
                     {/* Header Row: Days */}
-                    <div className="sticky top-0 left-0 z-30 bg-gray-50 border-b border-r border-gray-200 flex items-center justify-center font-black text-[10px] text-gray-400 uppercase tracking-widest">
+                    <div className="sticky top-0 left-0 z-30 bg-surface-soft border-b border-r border-hairline flex items-center justify-center font-bold text-[11px] text-accent uppercase tracking-widest">
                         Habitación
                     </div>
                     {days.map((day, i) => (
                         <div
                             key={i}
-                            className={`sticky top-0 z-20 border-b border-r border-gray-100 flex flex-col items-center justify-center p-1 ${isSameDay(day, new Date()) ? 'bg-primary/5' : 'bg-gray-50'}`}
+                            className={`sticky top-0 z-20 border-b border-r border-hairline flex flex-col items-center justify-center p-1 ${isSameDay(day, new Date()) ? 'bg-primary/5' : 'bg-surface-soft'}`}
                         >
-                            <span className="text-[10px] font-bold text-gray-400 uppercase">{format(day, 'EEE', { locale: es })}</span>
-                            <span className={`text-xs font-black ${isSameDay(day, new Date()) ? 'text-primary' : 'text-secondary'}`}>{format(day, 'd')}</span>
+                            <span className="text-[10px] font-bold text-accent uppercase">{format(day, 'EEE', { locale: es })}</span>
+                            <span className={`text-[13px] font-bold ${isSameDay(day, new Date()) ? 'text-primary' : 'text-secondary'}`}>{format(day, 'd')}</span>
                         </div>
                     ))}
 
@@ -99,32 +99,32 @@ const TapeChart = ({ rooms = [], bookings = [], onBookingClick, onDateChange }) 
                     {rooms.map((room, rowIndex) => (
                         <React.Fragment key={room.id}>
                             {/* Room Header */}
-                            <div className="sticky left-0 z-10 bg-white border-b border-r border-gray-100 px-4 flex flex-col justify-center shadow-[4px_0_8px_-4px_rgba(0,0,0,0.05)]">
+                            <div className="sticky left-0 z-10 bg-canvas border-b border-r border-hairline px-4 flex flex-col justify-center shadow-[4px_0_8px_-4px_rgba(0,0,0,0.05)]">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-sm font-black text-secondary">H. {room.number}</span>
-                                    <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-black uppercase ${room.status === 'limpieza' ? 'bg-amber-100 text-amber-600' :
-                                            room.status === 'mantenimiento' ? 'bg-red-100 text-red-600' :
-                                                'bg-gray-100 text-gray-400'
+                                    <span className="text-[14px] font-bold text-secondary">H. {room.number}</span>
+                                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-widest ${room.status === 'limpieza' ? 'bg-warning/20 text-warning' :
+                                            room.status === 'mantenimiento' ? 'bg-danger/10 text-danger' :
+                                                'bg-surface-strong text-accent'
                                         }`}>
                                         {room.status === 'limpieza' ? 'LIM' : room.status === 'mantenimiento' ? 'MANT' : room.type || 'EST'}
                                     </span>
                                 </div>
-                                <span className="text-[10px] text-gray-400 font-medium truncate">{room.name}</span>
+                                <span className="text-[11px] text-accent font-semibold truncate">{room.name}</span>
                             </div>
 
                             {/* Cells (Background Grid) */}
                             {days.map((day, i) => (
                                 <div
                                     key={i}
-                                    className={`border-b border-r border-gray-50 group hover:bg-gray-50/50 transition-colors relative ${isSameDay(day, new Date()) ? 'bg-primary/[0.02]' : ''}`}
+                                    className={`border-b border-r border-hairline group hover:bg-surface-soft transition-colors relative ${isSameDay(day, new Date()) ? 'bg-primary/[0.02]' : ''}`}
                                 >
                                     {/* Overlay para click en celda vacía para nueva reserva */}
                                     <button
                                         className="absolute inset-0 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
                                         title="Nueva reserva"
                                     >
-                                        <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                                            <span className="text-lg font-bold">+</span>
+                                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center border border-primary/20 shadow-sm">
+                                            <span className="text-[18px] font-bold leading-none mb-0.5">+</span>
                                         </div>
                                     </button>
                                 </div>
@@ -151,15 +151,15 @@ const TapeChart = ({ rooms = [], bookings = [], onBookingClick, onDateChange }) 
                                 key={booking.id}
                                 style={style}
                                 onClick={() => onBookingClick(booking)}
-                                className={`m-1.5 rounded-xl p-2 cursor-pointer shadow-sm transition-all hover:scale-[1.02] hover:shadow-md flex flex-col justify-center overflow-hidden z-10 ${isOccupied
-                                        ? 'bg-emerald-500 text-white shadow-emerald-200'
+                                className={`m-1.5 rounded-[12px] p-2.5 cursor-pointer shadow-sm transition-all hover:scale-[1.02] hover:shadow-airbnb flex flex-col justify-center overflow-hidden z-10 ${isOccupied
+                                        ? 'bg-primary text-white'
                                         : isCheckout
-                                            ? 'bg-gray-200 text-gray-500 line-through'
-                                            : 'bg-blue-500 text-white shadow-blue-200'
+                                            ? 'bg-surface-strong text-accent line-through'
+                                            : 'bg-warning text-white'
                                     }`}
                             >
                                 <div className="flex items-center justify-between gap-2 min-w-0">
-                                    <span className="text-[10px] font-black truncate uppercase tracking-tighter">
+                                    <span className="text-[11px] font-bold truncate uppercase tracking-tighter">
                                         {booking.guest?.full_name || 'Huésped'}
                                     </span>
                                     {isOccupied && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}

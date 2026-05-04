@@ -123,18 +123,18 @@ const RoomModal = ({ isOpen, onClose, onRoomSaved, roomToEdit = null, branchId, 
         }
     };
 
-    const inputCls = 'w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20';
+    const inputCls = 'w-full bg-surface-soft border border-hairline rounded-[16px] px-4 py-3 text-sm font-bold text-secondary focus:outline-none focus:border-primary/50';
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm">
+            <div className="bg-canvas rounded-[24px] shadow-airbnb border border-hairline w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
 
                 {/* Header */}
-                <div className="bg-secondary p-6 flex justify-between items-center">
-                    <h3 className="text-xl font-black text-white">
+                <div className="bg-canvas border-b border-hairline p-6 flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-secondary">
                         {roomToEdit ? `Editar Hab. ${roomToEdit.number}` : 'Nueva Habitación'}
                     </h3>
-                    <button onClick={onClose} className="text-white/60 hover:text-white transition-colors">
+                    <button onClick={onClose} className="text-accent hover:text-secondary transition-colors">
                         <X size={24} />
                     </button>
                 </div>
@@ -199,19 +199,19 @@ const RoomModal = ({ isOpen, onClose, onRoomSaved, roomToEdit = null, branchId, 
                     </div>
 
                     {/* Capacidad */}
-                    <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl">
+                    <div className="grid grid-cols-2 gap-4 bg-surface-soft border border-hairline p-4 rounded-[16px]">
                         {[
                             { label: 'Camas', key: 'beds' },
                             { label: 'Baños', key: 'bathrooms' },
                         ].map(({ label, key }) => (
                             <div key={key}>
-                                <label className="block text-xs font-bold text-gray-400 mb-2 text-center">{label}</label>
+                                <label className="block text-[11px] font-bold text-accent uppercase tracking-widest mb-2 text-center">{label}</label>
                                 <div className="flex items-center justify-center gap-3">
                                     <button type="button" onClick={() => setFormData(prev => ({ ...prev, [key]: Math.max(1, prev[key] - 1) }))}
-                                        className="w-8 h-8 rounded-full bg-white shadow-sm font-black text-secondary hover:bg-gray-100 flex items-center justify-center">−</button>
-                                    <span className="font-black text-xl text-secondary w-6 text-center">{formData[key]}</span>
+                                        className="w-8 h-8 rounded-full bg-canvas border border-hairline shadow-sm font-bold text-secondary hover:bg-surface-soft flex items-center justify-center transition-all">−</button>
+                                    <span className="font-bold text-xl text-secondary w-6 text-center">{formData[key]}</span>
                                     <button type="button" onClick={() => setFormData(prev => ({ ...prev, [key]: prev[key] + 1 }))}
-                                        className="w-8 h-8 rounded-full bg-white shadow-sm font-black text-secondary hover:bg-gray-100 flex items-center justify-center">+</button>
+                                        className="w-8 h-8 rounded-full bg-canvas border border-hairline shadow-sm font-bold text-secondary hover:bg-surface-soft flex items-center justify-center transition-all">+</button>
                                 </div>
                             </div>
                         ))}
@@ -224,13 +224,13 @@ const RoomModal = ({ isOpen, onClose, onRoomSaved, roomToEdit = null, branchId, 
                             {AMENITIES_CONFIG.map(({ key, label, icon: Icon }) => (
                                 <label
                                     key={key}
-                                    className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer transition-all ${formData.features[key] ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-primary/30'}`}
+                                    className={`flex items-center gap-2 p-2.5 rounded-[12px] border cursor-pointer transition-all ${formData.features[key] ? 'border-primary bg-primary/5' : 'border-hairline hover:border-primary/30'}`}
                                 >
                                     <input type="checkbox" className="hidden" checked={!!formData.features[key]} onChange={() => handleFeatureToggle(key)} />
-                                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${formData.features[key] ? 'bg-primary text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                    <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${formData.features[key] ? 'bg-primary text-white' : 'bg-surface-soft text-accent'}`}>
                                         <Icon size={14} />
                                     </div>
-                                    <span className={`text-[10px] font-bold leading-tight ${formData.features[key] ? 'text-primary' : 'text-gray-500'}`}>{label}</span>
+                                    <span className={`text-[10px] font-bold leading-tight ${formData.features[key] ? 'text-primary' : 'text-accent'}`}>{label}</span>
                                 </label>
                             ))}
                         </div>
@@ -256,23 +256,23 @@ const RoomModal = ({ isOpen, onClose, onRoomSaved, roomToEdit = null, branchId, 
                     </div>
 
                     {/* Footer */}
-                    <div className="flex justify-between items-center pt-4 border-t border-gray-100">
+                    <div className="flex justify-between items-center pt-4 border-t border-hairline">
                         {roomToEdit ? (
                             showDeleteConfirm ? (
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-red-500">¿Eliminar?</span>
+                                    <span className="text-[11px] font-bold text-danger uppercase tracking-widest">¿Eliminar?</span>
                                     <button type="button" onClick={handleDelete} disabled={loading}
-                                        className="px-3 py-1.5 rounded-xl bg-red-500 text-white text-xs font-black uppercase hover:bg-red-600 transition-all">
+                                        className="px-4 py-2 rounded-full bg-danger text-white text-[11px] font-bold uppercase tracking-widest hover:bg-red-600 transition-all shadow-sm">
                                         Sí, eliminar
                                     </button>
                                     <button type="button" onClick={() => setShowDeleteConfirm(false)}
-                                        className="px-3 py-1.5 rounded-xl bg-gray-100 text-gray-500 text-xs font-black uppercase hover:bg-gray-200 transition-all">
+                                        className="px-4 py-2 rounded-full bg-surface-soft text-accent text-[11px] font-bold uppercase tracking-widest hover:bg-canvas border border-hairline transition-all shadow-sm">
                                         No
                                     </button>
                                 </div>
                             ) : (
                                 <button type="button" onClick={() => setShowDeleteConfirm(true)}
-                                    className="text-red-400 hover:text-red-600 p-2 rounded-xl hover:bg-red-50 transition-all flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+                                    className="text-danger hover:text-red-600 p-2 rounded-full hover:bg-danger/10 transition-all flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest">
                                     <Trash2 size={16} /> Eliminar
                                 </button>
                             )
@@ -280,11 +280,11 @@ const RoomModal = ({ isOpen, onClose, onRoomSaved, roomToEdit = null, branchId, 
 
                         <div className="flex gap-3">
                             <button type="button" onClick={onClose}
-                                className="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-gray-400 hover:text-secondary hover:bg-gray-50 transition-all">
+                                className="px-5 py-3 rounded-full text-[11px] font-bold uppercase tracking-widest text-accent hover:text-secondary hover:bg-surface-soft transition-all">
                                 Cancelar
                             </button>
                             <button type="submit" disabled={loading}
-                                className="bg-primary text-white px-7 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-sm hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50">
+                                className="bg-primary text-white px-7 py-3 rounded-full font-bold text-[11px] uppercase tracking-widest shadow-airbnb hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50">
                                 {loading ? 'Guardando...' : <><Save size={15} /> Guardar</>}
                             </button>
                         </div>

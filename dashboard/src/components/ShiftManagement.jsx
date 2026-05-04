@@ -295,23 +295,23 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
     return (
         <div className="space-y-8 pb-20 animate-in fade-in duration-500">
             {/* View Selector Toggle */}
-            <div className="flex bg-gray-100 p-1.5 rounded-[2rem] w-fit mx-auto shadow-inner border border-gray-200/50">
+            <div className="flex bg-surface-soft p-1.5 rounded-full w-fit mx-auto shadow-inner border border-hairline">
                 <button 
                     onClick={() => setView('shifts')}
-                    className={`flex items-center gap-3 px-8 py-3 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest transition-all ${
+                    className={`flex items-center gap-3 px-8 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${
                         view === 'shifts' 
-                        ? 'bg-white text-secondary shadow-premium scale-100' 
-                        : 'text-gray-400 hover:text-secondary'
+                        ? 'bg-canvas text-secondary shadow-airbnb scale-100' 
+                        : 'text-accent hover:text-secondary'
                     }`}
                 >
                     <Wallet size={16} /> Control de Cajas
                 </button>
                 <button 
                     onClick={() => setView('reports')}
-                    className={`flex items-center gap-3 px-8 py-3 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest transition-all ${
+                    className={`flex items-center gap-3 px-8 py-3 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${
                         view === 'reports' 
-                        ? 'bg-white text-secondary shadow-premium scale-100' 
-                        : 'text-gray-400 hover:text-secondary'
+                        ? 'bg-canvas text-secondary shadow-airbnb scale-100' 
+                        : 'text-accent hover:text-secondary'
                     }`}
                 >
                     <BarChart3 size={16} /> Reportes de Ventas
@@ -324,17 +324,17 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
                 <>
             {/* Header / Acciones Globales */}
             {!activeShift && (
-                <div className="bg-white p-12 rounded-[3.5rem] border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-center space-y-6 shadow-sm">
-                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center">
-                        <Banknote className="text-gray-300" size={40} />
+                <div className="bg-canvas p-12 rounded-[24px] border border-hairline flex flex-col items-center justify-center text-center space-y-6 shadow-sm">
+                    <div className="w-20 h-20 bg-surface-soft rounded-full flex items-center justify-center">
+                        <Banknote className="text-accent" size={40} />
                     </div>
                     <div>
-                        <h2 className="text-2xl font-black text-secondary">Caja Cerrada</h2>
-                        <p className="text-gray-400 font-medium max-w-sm mx-auto">Debe abrir un turno con una base inicial para comenzar a registrar ventas hoy.</p>
+                        <h2 className="text-2xl font-bold text-secondary">Caja Cerrada</h2>
+                        <p className="text-accent font-medium max-w-sm mx-auto">Debe abrir un turno con una base inicial para comenzar a registrar ventas hoy.</p>
                     </div>
                     <button
                         onClick={() => setShowOpenModal(true)}
-                        className="bg-primary text-white px-10 py-5 rounded-[2rem] font-black uppercase tracking-widest shadow-premium hover:brightness-110 active:scale-95 transition-all text-sm"
+                        className="bg-primary text-white px-10 py-5 rounded-full font-bold uppercase tracking-widest shadow-airbnb hover:brightness-110 active:scale-95 transition-all text-[11px]"
                     >
                         Abrir Caja (Inyectar Base)
                     </button>
@@ -344,17 +344,17 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
             {/* Estado Actual de Caja (Solo si hay turno abierto) */}
             {activeShift && metrics && (
                 <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    <div className="lg:col-span-2 bg-secondary rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-2xl">
+                    <div className="lg:col-span-2 bg-ink rounded-[24px] p-8 text-white relative overflow-hidden shadow-airbnb">
                         <div className="relative z-10 flex flex-col justify-between h-full">
                             <div className="space-y-6">
                                 <div>
                                     <div className="flex items-center gap-3">
-                                        <span className="bg-success text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.2em] animate-pulse">Turno Activo</span>
-                                        <span className="text-white/40 text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
+                                        <span className="bg-success text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.2em] animate-pulse">Turno Activo</span>
+                                        <span className="text-white/40 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
                                             <Clock size={12} /> Iniciado {safeDate(activeShift.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
-                                    <h2 className="text-4xl font-black mt-4">{safeRender(activeShift.cashier_name, 'Cajero')}</h2>
+                                    <h2 className="text-4xl font-bold mt-4 tracking-tight">{safeRender(activeShift.cashier_name, 'Cajero')}</h2>
                                     <p className="text-white/40 text-sm font-medium flex items-center gap-2">
                                         <Building2 size={14} /> Global • {metrics.orderCount} pedidos realizados
                                     </p>
@@ -362,16 +362,16 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
 
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
                                     <div className="space-y-1">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Base Inicial</p>
-                                        <p className="text-xl font-black">${activeShift.initial_cash.toLocaleString()}</p>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">Base Inicial</p>
+                                        <p className="text-xl font-bold">${activeShift.initial_cash.toLocaleString()}</p>
                                     </div>
                                     <div className="space-y-1">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Ventas Efectivo</p>
-                                        <p className="text-xl font-black text-primary">${metrics.cashSales.toLocaleString()}</p>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">Ventas Efectivo</p>
+                                        <p className="text-xl font-bold text-primary">${metrics.cashSales.toLocaleString()}</p>
                                     </div>
                                     <div className="space-y-1">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-white/40">Gastos / Pagos</p>
-                                        <p className="text-xl font-black text-red-400">-${metrics.totalExpenses.toLocaleString()}</p>
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-white/40">Gastos / Pagos</p>
+                                        <p className="text-xl font-bold text-danger">-${metrics.totalExpenses.toLocaleString()}</p>
                                     </div>
                                 </div>
                             </div>
@@ -379,53 +379,53 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
                             <div className="mt-8 flex gap-3">
                                 <button
                                     onClick={() => setShowExpenseModal(true)}
-                                    className="flex-1 bg-white/10 hover:bg-white/20 text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-white/10"
+                                    className="flex-1 bg-white/10 hover:bg-white/20 text-white px-6 py-4 rounded-full font-bold text-[11px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-white/10"
                                 >
                                     <Minus size={18} /> Registrar Gasto
                                 </button>
                                 <button
                                     onClick={() => setShowCloseModal(true)}
-                                    className="flex-1 bg-white text-secondary px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-gray-100 transition-all flex items-center justify-center gap-2"
+                                    className="flex-1 bg-canvas text-secondary px-6 py-4 rounded-full font-bold text-[11px] uppercase tracking-widest shadow-airbnb hover:bg-surface-soft transition-all flex items-center justify-center gap-2"
                                 >
-                                    <XCircle size={18} className="text-red-500" /> Cerrar Jornada
+                                    <XCircle size={18} className="text-danger" /> Cerrar Jornada
                                 </button>
                             </div>
                         </div>
                         <Wallet className="absolute -right-12 -bottom-12 text-white/5 w-64 h-64 rotate-12" />
                     </div>
 
-                    <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-premium flex flex-col justify-between">
+                    <div className="bg-canvas rounded-[24px] p-8 border border-hairline shadow-airbnb flex flex-col justify-between">
                         <div>
-                            <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Efectivo Sugerido en Caja</h3>
-                            <p className="text-4xl font-black text-secondary tracking-tighter">${metrics.expectedInDrawer.toLocaleString()}</p>
+                            <h3 className="text-[10px] font-bold uppercase tracking-widest text-accent mb-1">Efectivo Sugerido en Caja</h3>
+                            <p className="text-4xl font-bold text-secondary tracking-tighter">${metrics.expectedInDrawer.toLocaleString()}</p>
                         </div>
                         <div className="space-y-4">
-                            <h4 className="text-[9px] font-black uppercase tracking-widest text-gray-300 border-b pb-2">Desglose Digital</h4>
+                            <h4 className="text-[9px] font-bold uppercase tracking-widest text-accent border-b border-hairline pb-2">Desglose Digital</h4>
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center text-xs">
-                                    <span className="text-gray-400 font-bold">Nequi/Davi</span>
-                                    <span className="text-secondary font-black">${metrics.digitalBreakdown.nequi.toLocaleString()}</span>
+                                    <span className="text-accent font-semibold">Nequi/Davi</span>
+                                    <span className="text-secondary font-bold">${metrics.digitalBreakdown.nequi.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-xs">
-                                    <span className="text-gray-400 font-bold">Tarjeta</span>
-                                    <span className="text-secondary font-black">${metrics.digitalBreakdown.tarjeta.toLocaleString()}</span>
+                                    <span className="text-accent font-semibold">Tarjeta</span>
+                                    <span className="text-secondary font-bold">${metrics.digitalBreakdown.tarjeta.toLocaleString()}</span>
                                 </div>
-                                <div className="flex justify-between items-center text-xs pt-2 border-t border-gray-50">
-                                    <span className="text-gray-400 font-black">Total Digital</span>
-                                    <span className="text-blue-500 font-black">${metrics.digitalSales.toLocaleString()}</span>
+                                <div className="flex justify-between items-center text-xs pt-2 border-t border-hairline">
+                                    <span className="text-secondary font-bold">Total Digital</span>
+                                    <span className="text-primary font-bold">${metrics.digitalSales.toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-premium flex flex-col justify-center items-center text-center space-y-4">
+                    <div className="bg-canvas rounded-[24px] p-8 border border-hairline shadow-airbnb flex flex-col justify-center items-center text-center space-y-4">
                         <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center">
                             <TrendingUp className="text-success" size={28} />
                         </div>
                         <div>
-                            <p className="text-xs font-black text-secondary">Rendimiento Hoy</p>
-                            <p className="text-3xl font-black text-success">+${(metrics.cashSales + metrics.digitalSales).toLocaleString()}</p>
-                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter mt-1">Ventas Brutas Totales</p>
+                            <p className="text-[13px] font-bold text-secondary">Rendimiento Hoy</p>
+                            <p className="text-3xl font-bold text-success">+${(metrics.cashSales + metrics.digitalSales).toLocaleString()}</p>
+                            <p className="text-[9px] font-bold text-accent uppercase tracking-tighter mt-1">Ventas Brutas Totales</p>
                         </div>
                     </div>
                 </div>
@@ -434,18 +434,18 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
             {/* Historial de Turnos */}
             <div className="space-y-4">
                 <div className="flex justify-between items-center px-2">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-2">
+                    <h3 className="text-[11px] font-bold uppercase tracking-widest text-accent flex items-center gap-2">
                         <History size={16} />
                         Historial de Turnos y Arqueos
                     </h3>
                     <div className="flex gap-2">
-                        <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-black uppercase text-gray-500 hover:bg-gray-50 transition-all">
+                        <button className="flex items-center gap-2 px-4 py-2 bg-canvas border border-hairline rounded-full text-[10px] font-bold uppercase text-accent hover:bg-surface-soft shadow-sm transition-all">
                             <Download size={14} /> Exportar Excel
                         </button>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
+                <div className="bg-canvas rounded-[24px] border border-hairline shadow-sm hover:shadow-airbnb transition-all overflow-hidden overflow-x-auto">
                     {/* Desktop Table */}
                     <table className="w-full text-left border-collapse min-w-[800px] hidden md:table">
                         <thead>
@@ -592,39 +592,39 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
             {/* Modal de Apertura de Caja */}
             {showOpenModal && (
                 <div className="fixed inset-0 bg-secondary/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in slide-in-from-bottom-8">
+                    <div className="bg-canvas rounded-[24px] shadow-airbnb border border-hairline w-full max-w-md overflow-hidden animate-in zoom-in slide-in-from-bottom-8">
                         <div className="bg-gradient-to-br from-primary to-primary/80 p-10 text-white relative overflow-hidden">
                             <div className="relative z-10">
-                                <h3 className="text-3xl font-black tracking-tight">Iniciar Turno</h3>
-                                <p className="text-white/70 text-sm font-medium mt-2">Ingrese la base de efectivo inicial</p>
+                                <h3 className="text-3xl font-bold tracking-tight">Iniciar Turno</h3>
+                                <p className="text-white/70 text-[13px] font-medium mt-2">Ingrese la base de efectivo inicial</p>
                             </div>
                             <Plus className="absolute -right-10 -bottom-10 text-white/10 w-48 h-48 rotate-12" />
                         </div>
                         <div className="p-10 space-y-8">
                             <div className="space-y-4">
-                                <label className="text-xs font-black uppercase text-secondary tracking-[0.2em] ml-2">Efectivo de Apertura</label>
+                                <label className="text-[11px] font-bold uppercase text-secondary tracking-[0.2em] ml-2">Efectivo de Apertura</label>
                                 <div className="relative group">
-                                    <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary font-black text-2xl">$</div>
+                                    <div className="absolute left-6 top-1/2 -translate-y-1/2 text-primary font-bold text-2xl">$</div>
                                     <input
                                         type="number"
                                         autoFocus
                                         value={initialCash}
                                         onChange={(e) => setInitialCash(e.target.value)}
-                                        className="w-full pl-12 pr-8 py-6 bg-gray-50 border-2 border-transparent focus:border-primary/20 rounded-[2rem] focus:outline-none font-black text-3xl text-secondary transition-all"
+                                        className="w-full pl-12 pr-8 py-6 bg-canvas border border-hairline shadow-sm focus:border-primary/50 rounded-[16px] focus:outline-none font-bold text-3xl text-secondary transition-all"
                                         placeholder="0"
                                     />
                                 </div>
-                                <p className="text-[10px] text-gray-400 font-medium italic px-4">Esta cantidad es la que se entrega al cajero para dar vueltas/cambio.</p>
+                                <p className="text-[10px] text-accent font-medium italic px-4">Esta cantidad es la que se entrega al cajero para dar vueltas/cambio.</p>
                             </div>
 
                             <div className="flex flex-col gap-3">
                                 <button
                                     onClick={handleOpenShift}
-                                    className="w-full bg-secondary text-white py-6 rounded-3xl font-black shadow-premium hover:brightness-110 active:scale-95 transition-all text-sm uppercase tracking-[0.2em]"
+                                    className="w-full bg-secondary text-white py-5 rounded-full font-bold shadow-airbnb hover:bg-ink active:scale-95 transition-all text-[11px] uppercase tracking-[0.2em]"
                                 >
                                     Abrir Turno Ahora
                                 </button>
-                                <button onClick={() => setShowOpenModal(false)} className="w-full py-5 text-gray-400 font-black hover:text-red-500 transition-all text-xs uppercase tracking-widest">
+                                <button onClick={() => setShowOpenModal(false)} className="w-full py-4 text-accent font-bold hover:text-danger transition-all text-[11px] uppercase tracking-widest">
                                     Cancelar
                                 </button>
                             </div>
@@ -636,40 +636,40 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
             {/* Modal de Gasto / Salida */}
             {showExpenseModal && (
                 <div className="fixed inset-0 bg-secondary/60 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in slide-in-from-bottom-8">
-                        <div className="bg-red-500 p-8 text-white relative overflow-hidden text-center">
+                    <div className="bg-canvas rounded-[24px] shadow-airbnb border border-hairline w-full max-w-md overflow-hidden animate-in zoom-in slide-in-from-bottom-8">
+                        <div className="bg-danger p-8 text-white relative overflow-hidden text-center">
                             <Minus className="absolute left-[-20px] top-[-20px] text-white/10 w-32 h-32" />
-                            <h3 className="text-2xl font-black tracking-tight relative z-10">Registrar Salida de Efectivo</h3>
+                            <h3 className="text-2xl font-bold tracking-tight relative z-10">Registrar Salida de Efectivo</h3>
                         </div>
                         <div className="p-10 space-y-6">
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Valor de la Salida</label>
+                                <label className="text-[10px] font-bold uppercase text-accent tracking-widest ml-1">Valor de la Salida</label>
                                 <input
                                     type="number"
                                     autoFocus
                                     value={expenseAmount}
                                     onChange={(e) => setExpenseAmount(e.target.value)}
-                                    className="w-full px-8 py-5 bg-gray-50 border-gray-100 rounded-3xl focus:ring-4 focus:ring-red-500/10 focus:outline-none font-black text-2xl text-secondary"
+                                    className="w-full px-8 py-5 bg-canvas border border-hairline shadow-sm rounded-[16px] focus:border-danger/50 focus:outline-none font-bold text-2xl text-secondary"
                                     placeholder="$ 0.00"
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Concepto o Razón</label>
+                                <label className="text-[10px] font-bold uppercase text-accent tracking-widest ml-1">Concepto o Razón</label>
                                 <textarea
                                     value={expenseReason}
                                     onChange={(e) => setExpenseReason(e.target.value)}
-                                    className="w-full px-6 py-4 bg-gray-50 border-gray-100 rounded-2xl focus:ring-2 focus:ring-red-500/20 focus:outline-none text-sm font-medium h-24 resize-none"
+                                    className="w-full px-6 py-4 bg-canvas border border-hairline shadow-sm rounded-[16px] focus:border-danger/30 focus:outline-none text-[13px] font-medium h-24 resize-none"
                                     placeholder="Ej: Pago de cilantro, propina recolectada, etc."
                                 ></textarea>
                             </div>
                             <div className="flex gap-4">
                                 <button
                                     onClick={handleAddExpense}
-                                    className="flex-1 bg-red-500 text-white py-5 rounded-3xl font-black shadow-premium hover:brightness-110 active:scale-95 transition-all text-xs uppercase tracking-widest"
+                                    className="flex-1 bg-danger text-white py-4 rounded-full font-bold shadow-airbnb hover:opacity-90 active:scale-95 transition-all text-[11px] uppercase tracking-widest"
                                 >
                                     Confirmar Salida
                                 </button>
-                                <button onClick={() => setShowExpenseModal(false)} className="px-6 py-5 bg-gray-50 text-secondary rounded-3xl font-black hover:bg-gray-200 transition-all text-xs uppercase tracking-widest">
+                                <button onClick={() => setShowExpenseModal(false)} className="px-6 py-4 bg-surface-soft text-secondary border border-hairline shadow-sm rounded-full font-bold hover:bg-canvas transition-all text-[11px] uppercase tracking-widest">
                                     X
                                 </button>
                             </div>
@@ -681,44 +681,44 @@ const ShiftManagement = ({ orders = [], onPrint, autoOpen = false }) => {
             {/* Modal de Cierre de Caja (Arqueo Ciego) */}
             {showCloseModal && (
                 <div className="fixed inset-0 bg-secondary/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in fade-in duration-200">
+                    <div className="bg-canvas rounded-[24px] shadow-airbnb border border-hairline w-full max-w-lg overflow-hidden animate-in zoom-in fade-in duration-200">
                         <div className="bg-primary p-8 text-white flex justify-between items-center relative overflow-hidden">
                             <div className="relative z-10 text-center w-full">
-                                <h3 className="text-2xl font-black tracking-tight">Arqueo de Caja Final</h3>
-                                <p className="text-white/60 text-xs font-medium mt-1">Verificación manual a puerta cerrada</p>
+                                <h3 className="text-2xl font-bold tracking-tight">Arqueo de Caja Final</h3>
+                                <p className="text-white/60 text-[13px] font-semibold mt-1">Verificación manual a puerta cerrada</p>
                             </div>
                             <Banknote className="absolute -right-8 -bottom-8 text-white/5 w-48 h-48" />
                         </div>
                         <div className="p-10 space-y-8">
                             <div className="text-center space-y-1 py-4">
-                                <AlertCircle className="mx-auto text-amber-500 mb-4" size={48} />
-                                <p className="text-sm font-black text-secondary">IMPORTANTE: Arqueo Ciego</p>
-                                <p className="text-xs text-gray-400 font-medium">Ingrese el total de efectivo físico que tiene antes de ver el esperado del sistema.</p>
+                                <AlertCircle className="mx-auto text-warning mb-4" size={48} />
+                                <p className="text-[13px] font-bold text-secondary">IMPORTANTE: Arqueo Ciego</p>
+                                <p className="text-xs text-accent font-medium">Ingrese el total de efectivo físico que tiene antes de ver el esperado del sistema.</p>
                             </div>
 
                             <div className="space-y-4">
                                 <div className="space-y-2 text-center">
-                                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Efectivo Físico Contado</label>
+                                    <label className="text-[10px] font-bold uppercase text-accent tracking-widest">Efectivo Físico Contado</label>
                                     <input
                                         type="number"
                                         autoFocus
                                         value={countedCash}
                                         onChange={(e) => setCountedCash(e.target.value)}
-                                        className="w-full px-6 py-8 bg-gray-50 border-2 border-primary/10 rounded-[2rem] focus:outline-none font-black text-5xl text-secondary text-center"
+                                        className="w-full px-6 py-8 bg-canvas border border-primary/20 shadow-sm rounded-full focus:border-primary focus:outline-none font-bold text-5xl text-secondary text-center"
                                         placeholder="0"
                                     />
-                                    <p className="text-[10px] text-gray-300 font-bold px-4 pt-2">Cuente billetes y monedas con cuidado.</p>
+                                    <p className="text-[10px] text-accent font-semibold px-4 pt-2">Cuente billetes y monedas con cuidado.</p>
                                 </div>
                             </div>
 
                             <div className="flex gap-4">
                                 <button
                                     onClick={handleCloseShift}
-                                    className="flex-1 bg-secondary text-white py-6 rounded-3xl font-black shadow-premium hover:brightness-110 active:scale-95 transition-all text-sm uppercase tracking-widest"
+                                    className="flex-1 bg-secondary text-white py-4 rounded-full font-bold shadow-airbnb hover:bg-ink active:scale-95 transition-all text-[11px] uppercase tracking-widest"
                                 >
                                     Confirmar y Cerrar
                                 </button>
-                                <button onClick={() => setShowCloseModal(false)} className="px-8 py-6 bg-gray-50 text-secondary rounded-3xl font-black hover:bg-gray-200 transition-all text-sm uppercase tracking-widest">
+                                <button onClick={() => setShowCloseModal(false)} className="px-8 py-4 bg-surface-soft text-secondary border border-hairline shadow-sm rounded-full font-bold hover:bg-canvas transition-all text-[11px] uppercase tracking-widest">
                                     X
                                 </button>
                             </div>

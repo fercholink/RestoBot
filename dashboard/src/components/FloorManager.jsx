@@ -296,23 +296,23 @@ const FloorManager = ({ branchId, onFloorUpdated }) => {
     const sortedFloors = [...floors].sort((a, b) => a.floor_number - b.floor_number);
 
     return (
-        <div className="p-6 bg-white rounded-3xl border border-gray-100 shadow-sm max-w-5xl mx-auto space-y-6">
+        <div className="p-6 bg-canvas rounded-[24px] border border-hairline shadow-airbnb max-w-5xl mx-auto space-y-6">
 
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="p-3 bg-secondary/5 rounded-2xl">
-                        <Layers size={22} className="text-secondary" />
+                    <div className="p-3 bg-primary/10 rounded-full text-primary">
+                        <Layers size={22} />
                     </div>
                     <div>
-                        <h2 className="text-xl font-black text-secondary">Pisos y Zonas</h2>
-                        <p className="text-xs text-gray-400 font-medium">{floors.length} piso(s) configurado(s)</p>
+                        <h2 className="text-xl font-bold text-secondary">Pisos y Zonas</h2>
+                        <p className="text-xs text-accent font-semibold">{floors.length} piso(s) configurado(s)</p>
                     </div>
                 </div>
                 <button
                     onClick={fetchFloors}
                     disabled={loading}
-                    className="p-2 bg-gray-50 text-gray-400 rounded-xl hover:text-primary transition-all"
+                    className="p-2 bg-surface-soft text-secondary border border-hairline rounded-full hover:bg-canvas shadow-sm transition-all"
                 >
                     <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
                 </button>
@@ -321,20 +321,20 @@ const FloorManager = ({ branchId, onFloorUpdated }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                 {/* ── Formulario de nuevo piso ── */}
-                <form onSubmit={handleAddFloor} className="bg-gray-50 p-6 rounded-2xl border border-gray-100 space-y-4">
+                <form onSubmit={handleAddFloor} className="bg-surface-soft p-6 rounded-[18px] border border-hairline space-y-4">
                     <h4 className="text-sm font-black uppercase text-gray-400">Agregar piso / zona</h4>
 
                     <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Número de nivel</label>
+                        <label className="text-xs font-bold text-accent uppercase mb-1 block">Número de nivel</label>
                         <input
                             type="number"
                             required
                             min="1"
                             placeholder="Ej: 2"
-                            className={`w-full bg-white border rounded-xl px-4 py-2.5 text-sm font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-colors ${
+                            className={`w-full bg-canvas border rounded-full px-4 py-2.5 text-[13px] font-semibold text-secondary shadow-sm focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-colors ${
                                 newFloorNumber && floors.some(f => f.floor_number === parseInt(newFloorNumber))
-                                    ? 'border-red-300 bg-red-50'
-                                    : 'border-gray-200'
+                                    ? 'border-danger/50 bg-danger/5'
+                                    : 'border-hairline'
                             }`}
                             value={newFloorNumber}
                             onChange={e => setNewFloorNumber(e.target.value)}
@@ -347,11 +347,11 @@ const FloorManager = ({ branchId, onFloorUpdated }) => {
                     </div>
 
                     <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase mb-1 block">Nombre (opcional)</label>
+                        <label className="text-xs font-bold text-accent uppercase mb-1 block">Nombre (opcional)</label>
                         <input
                             type="text"
                             placeholder="Ej: Terraza VIP, Piso 2"
-                            className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            className="w-full bg-canvas border border-hairline rounded-full shadow-sm px-4 py-2.5 text-[13px] font-semibold text-secondary focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-colors"
                             value={newFloorName}
                             onChange={e => setNewFloorName(e.target.value)}
                         />
@@ -372,12 +372,12 @@ const FloorManager = ({ branchId, onFloorUpdated }) => {
                         </label>
 
                         {shouldCopyConfig && floors.length > 0 && (
-                            <div className="ml-8">
-                                <label className="text-[10px] font-black text-gray-400 uppercase mb-1 block">Piso fuente</label>
+                            <div className="ml-8 mt-2">
+                                <label className="text-[10px] font-bold text-accent uppercase mb-1 block">Piso fuente</label>
                                 <select
                                     value={sourceCopyFloorId}
                                     onChange={e => setSourceCopyFloorId(e.target.value)}
-                                    className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    className="w-full bg-canvas border border-hairline rounded-full shadow-sm px-4 py-2.5 text-[13px] font-semibold text-secondary focus:outline-none focus:ring-1 focus:ring-primary/20 focus:border-primary transition-colors"
                                 >
                                     {sortedFloors.map(f => (
                                         <option key={f.id} value={f.id}>
@@ -392,7 +392,7 @@ const FloorManager = ({ branchId, onFloorUpdated }) => {
                     <button
                         type="submit"
                         disabled={loading || !newFloorNumber || floors.some(f => f.floor_number === parseInt(newFloorNumber))}
-                        className="w-full mt-2 bg-primary text-white py-3 rounded-xl font-black text-xs uppercase hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="w-full mt-4 bg-primary text-white py-3 rounded-full font-bold text-xs uppercase hover:bg-primary/90 shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         {loading
                             ? <RefreshCw size={14} className="animate-spin" />
@@ -411,7 +411,7 @@ const FloorManager = ({ branchId, onFloorUpdated }) => {
                             const isLast  = idx === sortedFloors.length - 1;
 
                             return (
-                                <div key={floor.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                                <div key={floor.id} className="bg-canvas border border-hairline rounded-[18px] p-4 shadow-sm hover:shadow-airbnb transition-all">
 
                                     {/* Fila principal */}
                                     <div className="flex items-start gap-2">
@@ -449,19 +449,19 @@ const FloorManager = ({ branchId, onFloorUpdated }) => {
                                                             if (e.key === 'Enter') handleUpdateFloor(floor.id);
                                                             if (e.key === 'Escape') setEditingId(null);
                                                         }}
-                                                        className="flex-1 border border-primary rounded-xl px-3 py-1.5 text-sm font-bold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                        className="flex-1 border border-primary rounded-full px-4 py-2 text-[13px] font-semibold text-secondary focus:outline-none focus:ring-2 focus:ring-primary/20 shadow-sm"
                                                     />
                                                     <button
                                                         onClick={() => handleUpdateFloor(floor.id)}
-                                                        className="w-8 h-8 flex items-center justify-center rounded-xl bg-primary text-white hover:bg-primary/90 transition-all"
+                                                        className="w-9 h-9 flex items-center justify-center rounded-full bg-primary text-white hover:bg-primary/90 shadow-sm transition-all"
                                                     >
-                                                        <Check size={14} />
+                                                        <Check size={16} />
                                                     </button>
                                                     <button
                                                         onClick={() => setEditingId(null)}
-                                                        className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 text-gray-400 hover:bg-gray-200 transition-all"
+                                                        className="w-9 h-9 flex items-center justify-center rounded-full bg-surface-soft border border-hairline text-accent hover:text-secondary hover:bg-canvas transition-all"
                                                     >
-                                                        <X size={14} />
+                                                        <X size={16} />
                                                     </button>
                                                 </div>
                                             ) : (
@@ -518,17 +518,17 @@ const FloorManager = ({ branchId, onFloorUpdated }) => {
 
                                         {/* Acciones */}
                                         {editingId !== floor.id && (
-                                            <div className="flex gap-1.5 shrink-0">
+                                            <div className="flex gap-1.5 shrink-0 items-center">
                                                 <button
                                                     onClick={() => startEdit(floor)}
-                                                    className="p-2 text-gray-300 hover:text-primary hover:bg-primary/10 rounded-xl transition-all"
+                                                    className="p-2 text-accent hover:text-primary hover:bg-primary/10 rounded-full transition-all border border-transparent hover:border-primary/20"
                                                     title="Editar nombre"
                                                 >
-                                                    <Edit2 size={15} />
+                                                    <Edit2 size={16} />
                                                 </button>
                                                 <button
                                                     onClick={() => setDeleteModal(floor)}
-                                                    className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                                    className="p-2 text-accent hover:text-danger hover:bg-danger/10 rounded-full transition-all border border-transparent hover:border-danger/20"
                                                     title="Eliminar piso"
                                                 >
                                                     <Trash2 size={15} />

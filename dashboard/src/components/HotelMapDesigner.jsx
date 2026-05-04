@@ -179,49 +179,49 @@ const HotelMapDesigner = ({ floors = [], rooms = [], bookings = [], onRoomUpdate
 
     return (
         <div 
-            className="flex bg-gray-50/50 rounded-2xl overflow-hidden border border-gray-100 shadow-premium relative transition-all duration-300"
+            className="flex bg-surface-soft rounded-[24px] overflow-hidden border border-hairline shadow-airbnb relative transition-all duration-300"
             style={{ minHeight: `${containerHeight}px` }}
         >
             {/* Sidebar de Pisos */}
-            <div className="w-64 bg-white border-r border-gray-100 flex flex-col">
-                <div className="p-4 border-b border-gray-50 bg-gray-50/20">
-                    <h2 className="text-lg font-black text-secondary tracking-tight flex items-center gap-2">
-                        <Bed className="text-primary" size={18} /> Mapa del Hotel
+            <div className="w-72 bg-canvas border-r border-hairline flex flex-col">
+                <div className="p-5 border-b border-hairline bg-transparent">
+                    <h2 className="text-xl font-bold text-secondary tracking-tight flex items-center gap-2">
+                        <Bed className="text-primary" size={20} /> Mapa del Hotel
                     </h2>
-                    <p className="text-[9px] font-bold text-accent uppercase tracking-widest mt-0.5">Gestión de pisos y diseño</p>
+                    <p className="text-[11px] font-semibold text-accent uppercase tracking-widest mt-1">Gestión de pisos y diseño</p>
                 </div>
 
-                <div className="p-4 border-b border-gray-50">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                <div className="p-4 border-b border-hairline">
+                    <div className="relative bg-canvas border border-hairline rounded-full shadow-sm">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-accent" size={14} />
                         <input 
                             type="text" 
                             placeholder="Buscar hab..." 
-                            className="w-full bg-gray-50 border-none rounded-xl py-2 pl-9 pr-4 text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                            className="w-full bg-transparent border-none rounded-full py-2 pl-10 pr-4 text-[13px] font-semibold outline-none focus:ring-0 text-secondary transition-all"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
-                    <div className="flex justify-between items-center mb-2 px-2">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tus Pisos</span>
+                <div className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
+                    <div className="flex justify-between items-center mb-3 px-2">
+                        <span className="text-[11px] font-bold text-accent uppercase tracking-widest">Tus Pisos</span>
                     </div>
 
                     {floors.map(floor => (
                         <button
                             key={floor.id}
                             onClick={() => setActiveFloor(floor)}
-                            className={`w-full flex items-center justify-between p-3 rounded-2xl transition-all group ${activeFloor?.id === floor.id ? 'bg-secondary text-white shadow-lg' : 'hover:bg-gray-50 text-secondary'}`}
+                            className={`w-full flex items-center justify-between p-3 rounded-xl transition-all group ${activeFloor?.id === floor.id ? 'bg-surface-soft text-secondary font-bold' : 'hover:bg-surface-soft text-accent hover:text-secondary font-semibold'}`}
                         >
                             <div className="flex items-center gap-3">
-                                <div className={`p-2 rounded-xl ${activeFloor?.id === floor.id ? 'bg-white/10' : 'bg-gray-100'}`}>
-                                    <Layers size={14} />
+                                <div className={`p-2 rounded-full ${activeFloor?.id === floor.id ? 'bg-canvas shadow-sm text-primary' : 'bg-transparent group-hover:bg-canvas group-hover:shadow-sm text-accent'}`}>
+                                    <Layers size={16} />
                                 </div>
-                                <span className="text-sm font-bold truncate text-left">{floor.name || `Piso ${floor.floor_number}`}</span>
+                                <span className="text-[14px] truncate text-left">{floor.name || `Piso ${floor.floor_number}`}</span>
                             </div>
-                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${activeFloor?.id === floor.id ? 'bg-white/20' : 'bg-gray-200 text-gray-500'}`}>
+                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${activeFloor?.id === floor.id ? 'bg-primary/10 text-primary' : 'bg-surface-strong text-accent'}`}>
                                 {localRooms.filter(r => r.floor_id === floor.id).length}
                             </span>
                         </button>
@@ -231,25 +231,24 @@ const HotelMapDesigner = ({ floors = [], rooms = [], bookings = [], onRoomUpdate
                     )}
                 </div>
 
-                {/* Info Habitación Seleccionada */}
                 <AnimatePresence>
                     {selectedRoom && (
                         <motion.div 
                             initial={{ height: 0, opacity: 0 }}
                             animate={{ height: 'auto', opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
-                            className="bg-gray-50 border-t border-gray-100 p-6 overflow-hidden"
+                            className="bg-canvas border-t border-hairline p-6 overflow-hidden"
                         >
                             <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <h4 className="text-sm font-black text-secondary">Habitación {selectedRoom.number}</h4>
-                                    <p className="text-[10px] font-bold text-gray-400 uppercase">{selectedRoom.type}</p>
+                                    <h4 className="text-[15px] font-bold text-secondary">Habitación {selectedRoom.number}</h4>
+                                    <p className="text-[11px] font-bold text-accent uppercase tracking-widest">{selectedRoom.type}</p>
                                 </div>
                             </div>
 
                             {getBookingForRoom(selectedRoom.id) ? (
                                 <div className="space-y-3">
-                                    <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
+                                    <div className="bg-surface-soft p-4 rounded-[16px] border border-hairline">
                                         <div className="flex justify-between items-center mb-2">
                                             <span className="text-[10px] font-black text-gray-400">HUÉSPED</span>
                                         </div>
@@ -265,12 +264,12 @@ const HotelMapDesigner = ({ floors = [], rooms = [], bookings = [], onRoomUpdate
             </div>
 
             {/* Zona de Mapa Principal */}
-            <div className="flex-1 flex flex-col relative bg-[#f1f2f6]">
+            <div className="flex-1 flex flex-col relative bg-surface-soft">
                 {/* Herramientas del Mapa */}
                 <div className="absolute top-6 left-6 right-6 z-10 flex justify-between items-center pointer-events-none">
                     <div className="flex gap-3 pointer-events-auto">
-                        <div className="bg-white shadow-premium rounded-2xl p-1.5 flex gap-1 border border-gray-100">
-                            <button className="p-2.5 hover:bg-gray-50 text-secondary rounded-xl transition-all" title="Zoom In"><Maximize size={16} /></button>
+                        <div className="bg-canvas shadow-airbnb rounded-full p-1.5 flex gap-1 border border-hairline">
+                            <button className="p-2.5 hover:bg-surface-soft text-secondary rounded-full transition-all" title="Zoom In"><Maximize size={18} /></button>
                         </div>
                     </div>
 
@@ -279,14 +278,14 @@ const HotelMapDesigner = ({ floors = [], rooms = [], bookings = [], onRoomUpdate
                             <>
                                 <button 
                                     onClick={() => { setIsEditing(false); setLocalRooms(rooms); }}
-                                    className="bg-white text-rose-500 font-black px-6 py-3 rounded-2xl text-[10px] uppercase tracking-widest shadow-premium hover:bg-rose-50 transition-all border border-rose-100"
+                                    className="bg-canvas text-danger font-bold px-6 py-3 rounded-full text-[11px] uppercase tracking-widest border border-danger/20 hover:bg-danger/10 transition-all"
                                 >
                                     Cancelar
                                 </button>
                                 <button 
                                     onClick={handleSaveLayout}
                                     disabled={loading}
-                                    className="bg-primary text-secondary font-black px-6 py-3 rounded-2xl text-[10px] uppercase tracking-widest shadow-premium hover:brightness-110 transition-all flex items-center gap-2"
+                                    className="bg-secondary text-white font-bold px-6 py-3 rounded-full text-[11px] uppercase tracking-widest shadow-sm hover:brightness-110 transition-all flex items-center gap-2"
                                 >
                                     <Save size={16} /> {loading ? 'Guardando...' : 'Guardar Diseño'}
                                 </button>
@@ -294,7 +293,7 @@ const HotelMapDesigner = ({ floors = [], rooms = [], bookings = [], onRoomUpdate
                         ) : (
                             <button 
                                 onClick={() => setIsEditing(true)}
-                                className="bg-secondary text-white font-black px-6 py-3 rounded-2xl text-[10px] uppercase tracking-widest shadow-premium hover:brightness-110 transition-all flex items-center gap-2"
+                                className="bg-canvas border border-hairline shadow-airbnb text-secondary font-bold px-6 py-3 rounded-full text-[11px] uppercase tracking-widest hover:bg-surface-soft transition-all flex items-center gap-2"
                             >
                                 <Edit3 size={16} /> Editar Mapa
                             </button>
@@ -350,26 +349,26 @@ const HotelMapDesigner = ({ floors = [], rooms = [], bookings = [], onRoomUpdate
                                 className={`
                                     cursor-pointer transition-shadow
                                     flex flex-col items-center justify-center p-2
-                                    ${mapPos.shape === 'circle' ? 'rounded-full' : 'rounded-2xl'}
-                                    ${isSelected ? 'ring-4 ring-primary ring-offset-4 z-40' : 'z-20'}
+                                    ${mapPos.shape === 'circle' ? 'rounded-full' : 'rounded-[16px]'}
+                                    ${isSelected ? 'ring-2 ring-primary ring-offset-4 z-40 shadow-airbnb' : 'z-20'}
                                     ${booking 
-                                        ? 'bg-primary text-white shadow-xl shadow-primary/20' 
-                                        : 'bg-white text-secondary shadow-premium border border-gray-100 hover:border-primary/50'}
+                                        ? 'bg-primary text-white shadow-md' 
+                                        : 'bg-canvas text-secondary shadow-sm border border-hairline hover:border-primary/30'}
                                 `}
                             >
                                 {isEditing && (
-                                    <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <div className="bg-secondary text-white text-[8px] font-black px-2 py-0.5 rounded uppercase">Mover</div>
+                                    <div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="bg-secondary text-white text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-widest shadow-sm">Mover</div>
                                     </div>
                                 )}
 
                                 <div className="flex flex-col items-center pointer-events-none">
-                                    <span className={`text-lg font-black leading-none ${booking ? 'text-white' : 'text-secondary'}`}>
+                                    <span className={`text-[18px] font-bold leading-none ${booking ? 'text-white' : 'text-secondary'}`}>
                                         {room.number}
                                     </span>
                                     {!isEditing && (
                                         <div className="flex flex-col items-center gap-0.5 mt-1">
-                                            <span className={`text-[8px] font-bold ${booking ? 'text-white/70' : 'text-accent'} truncate max-w-full px-1`}>{room.type}</span>
+                                            <span className={`text-[9px] font-bold ${booking ? 'text-white/80' : 'text-accent'} truncate max-w-full px-1`}>{room.type}</span>
                                         </div>
                                     )}
                                 </div>
@@ -388,19 +387,19 @@ const HotelMapDesigner = ({ floors = [], rooms = [], bookings = [], onRoomUpdate
                 </div>
 
                 {/* Footer Info */}
-                <div className="p-6 flex justify-between items-center bg-white border-t border-gray-100">
+                <div className="p-6 flex justify-between items-center bg-canvas border-t border-hairline">
                     <div className="flex gap-6">
                         <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-white border border-gray-200" />
-                            <span className="text-[10px] font-black text-accent uppercase tracking-widest">Disponible</span>
+                            <div className="w-3 h-3 rounded-full bg-canvas border border-hairline shadow-sm" />
+                            <span className="text-[11px] font-semibold text-accent uppercase tracking-widest">Disponible</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="w-3 h-3 rounded-full bg-primary shadow-sm" />
-                            <span className="text-[10px] font-black text-accent uppercase tracking-widest">Ocupada / Reservada</span>
+                            <span className="text-[11px] font-semibold text-accent uppercase tracking-widest">Ocupada / Reservada</span>
                         </div>
                     </div>
                     
-                    <div className="text-[10px] font-bold text-gray-400">
+                    <div className="text-[11px] font-bold text-accent uppercase tracking-widest">
                         {activeFloorRooms.length} habs en {activeFloor?.name || `Piso ${activeFloor?.floor_number}`}
                     </div>
                 </div>

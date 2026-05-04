@@ -817,7 +817,7 @@ function App() {
 
   return (
     <>
-      <div id="main-app-container" className="flex min-h-screen bg-[#f8fafc] text-secondary">
+      <div id="main-app-container" className="flex min-h-screen bg-surface-soft text-secondary">
         {/* Banner Offline / Sincronización */}
         <OfflineBanner />
         <Sidebar
@@ -833,16 +833,16 @@ function App() {
           setActiveAccountingSubTab={setActiveAccountingSubTab}
         />
 
-        <main className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} p-3 md:p-6 pt-16 lg:pt-6 w-full overflow-hidden`}>
-          <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-3 border-b border-gray-100 animate-in fade-in slide-in-from-top-4 duration-700">
+        <main className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'lg:ml-24' : 'lg:ml-72'} p-3 md:p-6 pt-16 lg:pt-6 w-full overflow-hidden`}>
+          <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-3 border-b border-hairline animate-in fade-in slide-in-from-top-4 duration-700">
             <div className="flex items-center gap-3 w-full md:w-auto">
-              <div className="p-2 bg-secondary text-white rounded-xl shadow-lg shadow-secondary/5">
-                <LayoutGrid size={18} />
+              <div className="p-3 bg-canvas text-secondary rounded-full shadow-airbnb border border-hairline">
+                <LayoutGrid size={20} strokeWidth={2.5} />
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-0">
-                  <span className="px-1.5 py-0.5 bg-primary/10 text-primary text-[7px] font-black uppercase tracking-tighter rounded-sm">Portal Corporativo</span>
-                  <h1 className="text-xl md:text-2xl font-black text-secondary tracking-tighter">
+                  <span className="px-2 py-0.5 bg-primary/10 text-primary text-[8px] font-bold uppercase tracking-widest rounded-full">Portal Corporativo</span>
+                  <h1 className="text-2xl md:text-3xl font-bold text-secondary tracking-tight">
                     {activeTab === 'restaurante' ? 'Gestión Restaurante' :
                       activeTab === 'analytics' ? 'Dashboard Global' :
                         activeTab === 'users' ? 'Gestión de Personal' :

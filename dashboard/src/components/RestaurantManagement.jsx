@@ -151,70 +151,81 @@ const RestaurantManagement = ({
     }, [orders]);
 
     return (
-        <div className="flex-1 flex overflow-hidden bg-gray-50/50">
-            {/* Sidebar Izquierdo ELIMINADO - Ahora controlado por Sidebar Principal */}
-
-
-
+        <div className="flex-1 flex overflow-hidden bg-transparent animate-in fade-in duration-700">
             {/* Contenido Principal */}
             <div className="flex-1 overflow-hidden relative">
                 <AnimatePresence mode="wait">
                     {activeSubTab === 'board' && (
                         <motion.div
                             key="board"
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            transition={{ duration: 0.3 }}
-                            className="h-full p-4 overflow-y-auto"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            transition={{ duration: 0.5, ease: "circOut" }}
+                            className="h-full p-6 md:p-8 overflow-y-auto custom-scrollbar"
                         >
-                            <div className="flex justify-between items-center mb-4 px-1">
+                            <div className="flex justify-between items-center mb-8 px-2">
                                 <div>
-                                    <h1 className="text-2xl font-black text-secondary tracking-tight">MONITOR DE PEDIDOS</h1>
-                                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">Gestión en tiempo real</p>
+                                    <h1 className="text-3xl font-black text-secondary tracking-tighter leading-none">PEDIDOS EN VIVO</h1>
+                                    <div className="flex items-center gap-3 mt-2">
+                                        <div className="flex items-center gap-1.5 bg-success/10 px-2.5 py-1 rounded-full">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                                            <span className="text-[10px] font-bold text-success uppercase tracking-widest">Sincronizado</span>
+                                        </div>
+                                        <span className="text-[11px] text-accent font-bold uppercase tracking-widest">{stats.activeOrders} ACTIVOS AHORA</span>
+                                    </div>
                                 </div>
                                 {role !== 'cocina' && role !== 'mesero' && (
                                     <button
                                         onClick={() => setShowPaidModal(true)}
-                                        className="flex items-center gap-2 bg-white px-5 py-2.5 rounded-2xl shadow-sm border border-gray-200 text-xs font-black uppercase tracking-widest text-secondary hover:bg-gray-50 hover:shadow-md transition-all group"
+                                        className="flex items-center gap-3 bg-canvas px-6 py-3.5 rounded-full shadow-sm border border-hairline text-[11px] font-bold uppercase tracking-widest text-secondary hover:shadow-airbnb hover:scale-105 active:scale-95 transition-all group"
                                     >
-                                        <div className="bg-success/10 p-1.5 rounded-lg group-hover:bg-success/20 transition-colors">
-                                            <DollarSign size={16} className="text-success" />
+                                        <div className="bg-primary/10 p-2 rounded-full group-hover:bg-primary/20 transition-colors">
+                                            <DollarSign size={16} className="text-primary" />
                                         </div>
-                                        <span>Ver Pagados</span>
+                                        <span>HISTORIAL DE PAGOS</span>
                                     </button>
                                 )}
                             </div>
 
-                            <div className="flex flex-col lg:flex-row gap-4 w-full items-start">
+                            <div className="flex flex-col xl:flex-row gap-8 w-full items-start">
                                 {['nuevo', 'fabricacion', 'despachado'].map((status) => (
-                                    <div key={status} className={`${status === 'fabricacion' ? 'lg:flex-[2.5]' : 'lg:flex-1'} w-full flex flex-col bg-gray-200/40 rounded-[2.5rem] p-4 border border-gray-300/10 min-w-0 h-fit transition-all duration-300 shadow-sm hover:shadow-md hover:bg-gray-200/60`}>
-                                        <h2 className="uppercase text-xs font-black tracking-widest text-secondary/70 mb-5 px-3 py-1 flex items-center gap-2">
-                                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-sm ${status === 'nuevo' ? 'bg-blue-500 animate-pulse' : status === 'fabricacion' ? 'bg-warning' : status === 'despachado' ? 'bg-purple-500' : 'bg-success'}`} />
-                                            <span className="truncate tracking-tighter">{status}</span>
-                                            <span className="bg-white/80 backdrop-blur-sm text-secondary px-2.5 py-0.5 rounded-lg text-[10px] font-black shadow-sm border border-gray-100/50 ml-auto shrink-0">
+                                    <div 
+                                        key={status} 
+                                        className={`${status === 'fabricacion' ? 'xl:flex-[2.5]' : 'xl:flex-1'} w-full flex flex-col bg-canvas rounded-[32px] p-6 border border-hairline min-w-0 h-fit transition-all duration-500 shadow-sm hover:shadow-airbnb group/col`}
+                                    >
+                                        <div className="flex items-center justify-between mb-6 px-2">
+                                            <h2 className="uppercase text-[11px] font-black tracking-[3px] text-accent flex items-center gap-3">
+                                                <div className={`w-3 h-3 rounded-full shrink-0 shadow-[0_0_12px_rgba(0,0,0,0.1)] ${
+                                                    status === 'nuevo' ? 'bg-primary shadow-primary/40 animate-pulse' : 
+                                                    status === 'fabricacion' ? 'bg-warning shadow-warning/40' : 
+                                                    'bg-violet-500 shadow-violet-500/40'
+                                                }`} />
+                                                {status}
+                                            </h2>
+                                            <span className="bg-surface-soft text-secondary px-3 py-1 rounded-full text-[10px] font-black shadow-sm border border-hairline">
                                                 {filteredOrders.filter(o => o.status === status).length}
                                             </span>
-                                        </h2>
-                                        <div className="space-y-4 pr-1">
+                                        </div>
+
+                                        <div className="space-y-5">
                                             {(() => {
                                                 const ordersInStatus = filteredOrders
                                                     .filter(o => o.status === status)
                                                     .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
-                                                // Lógica Especial para Fabricación (Dividir Mesa vs Domicilio)
                                                 if (status === 'fabricacion') {
                                                     const mesaOrders = ordersInStatus.filter(o => o.table_number && o.table_number !== 'DOMICILIO');
                                                     const domicilioOrders = ordersInStatus.filter(o => !o.table_number || o.table_number === 'DOMICILIO');
 
                                                     return (
-                                                        <div className="flex flex-col xl:flex-row h-full gap-2">
-                                                            {/* Columna Izquierda: Mesas */}
-                                                            <div className="flex-1 flex flex-col bg-white/40 rounded-2xl p-3 min-w-0 md:min-w-[200px] h-fit shadow-inner">
-                                                                <div className="flex items-center gap-2 mb-3 text-[10px] font-black text-secondary/80 uppercase tracking-widest pb-2 border-b border-secondary/5">
-                                                                    <Utensils size={10} /> Mesas
+                                                        <div className="flex flex-col 2xl:flex-row gap-6">
+                                                            {/* Columna Mesas */}
+                                                            <div className="flex-1 flex flex-col bg-surface-soft/50 rounded-[24px] p-4 border border-hairline">
+                                                                <div className="flex items-center gap-2 mb-4 text-[9px] font-black text-accent uppercase tracking-[2px] pb-3 border-b border-hairline/50">
+                                                                    <Utensils size={12} className="text-secondary" /> SERVICIO COMEDOR
                                                                 </div>
-                                                                <div className="space-y-2">
+                                                                <div className="space-y-4">
                                                                     {mesaOrders.map(order => (
                                                                         <OrderCard
                                                                             key={order.id}
@@ -225,19 +236,21 @@ const RestaurantManagement = ({
                                                                             onPrint={onPrint}
                                                                         />
                                                                     ))}
-                                                                    {mesaOrders.length === 0 && <div className="text-[9px] text-gray-400 text-center py-4">Sin pedidos</div>}
+                                                                    {mesaOrders.length === 0 && (
+                                                                        <div className="py-12 flex flex-col items-center justify-center opacity-30">
+                                                                            <Utensils size={32} />
+                                                                            <span className="text-[10px] font-bold mt-2 tracking-widest">VACÍO</span>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
 
-                                                            {/* Divisor Vertical */}
-                                                            <div className="w-px bg-secondary/10 my-2"></div>
-
-                                                            {/* Columna Derecha: Domicilios */}
-                                                            <div className="flex-1 flex flex-col bg-white/40 rounded-xl p-2 min-w-[200px] h-fit">
-                                                                <div className="flex items-center gap-1 mb-2 text-[9px] font-black text-secondary/70 uppercase tracking-wider pb-1 border-b border-secondary/10">
-                                                                    <Truck size={10} /> Domicilios
+                                                            {/* Columna Domicilios */}
+                                                            <div className="flex-1 flex flex-col bg-surface-soft/50 rounded-[24px] p-4 border border-hairline">
+                                                                <div className="flex items-center gap-2 mb-4 text-[9px] font-black text-accent uppercase tracking-[2px] pb-3 border-b border-hairline/50">
+                                                                    <Truck size={12} className="text-secondary" /> ENTREGAS EXTERNAS
                                                                 </div>
-                                                                <div className="space-y-2">
+                                                                <div className="space-y-4">
                                                                     {domicilioOrders.map(order => (
                                                                         <OrderCard
                                                                             key={order.id}
@@ -248,79 +261,75 @@ const RestaurantManagement = ({
                                                                             onPrint={onPrint}
                                                                         />
                                                                     ))}
-                                                                    {domicilioOrders.length === 0 && <div className="text-[9px] text-gray-400 text-center py-4">Sin domicilios</div>}
+                                                                    {domicilioOrders.length === 0 && (
+                                                                        <div className="py-12 flex flex-col items-center justify-center opacity-30">
+                                                                            <Truck size={32} />
+                                                                            <span className="text-[10px] font-bold mt-2 tracking-widest">VACÍO</span>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     );
                                                 }
 
-                                                // Vista Normal para otros estados
-                                                const isCompactView = ordersInStatus.length > 2;
-
-                                                return ordersInStatus.map(order => (
-                                                    <OrderCard
-                                                        key={order.id}
-                                                        order={order}
-                                                        onStatusChange={onStatusChange}
-                                                        onEdit={onEdit}
-                                                        onDelete={onDelete}
-                                                        onPrint={onPrint}
-                                                        isCompact={isCompactView}
-                                                        isMinimal={status === 'pagado'}
-                                                    />
-                                                ));
+                                                return (
+                                                    <div className="space-y-4">
+                                                        {ordersInStatus.map(order => (
+                                                            <OrderCard
+                                                                key={order.id}
+                                                                order={order}
+                                                                onStatusChange={onStatusChange}
+                                                                onEdit={onEdit}
+                                                                onDelete={onDelete}
+                                                                onPrint={onPrint}
+                                                                isCompact={ordersInStatus.length > 3}
+                                                            />
+                                                        ))}
+                                                        {ordersInStatus.length === 0 && (
+                                                            <div className="py-20 text-center opacity-20 flex flex-col items-center">
+                                                                <Package size={40} />
+                                                                <span className="text-[10px] font-bold mt-4 tracking-[4px] uppercase">Sin Pendientes</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
                                             })()}
                                         </div>
-                                        {status === 'pagado' && (
-                                            <div
-                                                onClick={() => setShowPaidTotal(!showPaidTotal)}
-                                                className="mt-4 pt-3 border-t border-gray-300/20 bg-white/50 rounded-xl p-3 flex justify-between items-center group cursor-pointer hover:bg-white transition-all shadow-sm"
-                                            >
-                                                <span className="text-[10px] font-black text-secondary uppercase tracking-widest">Total Pagado</span>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-black text-success text-sm">
-                                                        {showPaidTotal
-                                                            ? `$${filteredOrders.filter(o => o.status === 'pagado').reduce((sum, o) => sum + (o.total || o.total_price || 0), 0).toLocaleString()}`
-                                                            : '••••••'}
-                                                    </span>
-                                                    {showPaidTotal ? <EyeOff size={14} className="text-gray-400 group-hover:text-secondary" /> : <Eye size={14} className="text-gray-400 group-hover:text-secondary" />}
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
                                 ))}
                             </div>
 
-                            {/* Modal de Pedidos Pagados */}
+                            {/* Modal Historial */}
                             <AnimatePresence>
                                 {showPaidModal && (
-                                    <div className="fixed inset-0 bg-secondary/80 backdrop-blur-sm z-50 flex items-center justify-center p-8 animate-in fade-in duration-200">
-                                        <div className="absolute inset-0" onClick={() => setShowPaidModal(false)} />
+                                    <div className="fixed inset-0 bg-secondary/60 backdrop-blur-md z-[100] flex items-center justify-center p-4 md:p-8">
                                         <motion.div
-                                            initial={{ opacity: 0, scale: 0.95 }}
-                                            animate={{ opacity: 1, scale: 1 }}
-                                            exit={{ opacity: 0, scale: 0.95 }}
-                                            className="bg-white rounded-3xl w-full max-w-6xl h-[85vh] flex flex-col overflow-hidden shadow-2xl relative z-10"
+                                            initial={{ opacity: 0, scale: 0.9, y: 40 }}
+                                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.9, y: 40 }}
+                                            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                                            className="bg-canvas rounded-[40px] w-full max-w-6xl h-[90vh] flex flex-col overflow-hidden shadow-2xl border border-hairline relative"
                                         >
-                                            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                                                <h2 className="text-xl font-black text-secondary flex items-center gap-3">
-                                                    <span className="bg-success w-3 h-3 rounded-full shadow-[0_0_10px_rgba(34,197,94,0.5)]"></span>
-                                                    HISTORIAL DE PEDIDOS PAGADOS
-                                                </h2>
+                                            <div className="p-8 border-b border-hairline flex justify-between items-center bg-canvas">
+                                                <div>
+                                                    <h2 className="text-2xl font-black text-secondary tracking-tighter">HISTORIAL DE CIERRE</h2>
+                                                    <p className="text-[10px] font-bold text-accent uppercase tracking-[2px] mt-1">Pedidos finalizados en el turno actual</p>
+                                                </div>
                                                 <button
                                                     onClick={() => setShowPaidModal(false)}
-                                                    className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                                                    className="w-12 h-12 bg-surface-soft hover:bg-canvas border border-hairline rounded-full flex items-center justify-center transition-all shadow-sm active:scale-90"
                                                 >
-                                                    <X size={24} className="text-gray-400" />
+                                                    <X size={20} className="text-secondary" />
                                                 </button>
                                             </div>
 
-                                            <div className="flex-1 overflow-y-auto p-6 bg-gray-50/50 custom-scrollbar">
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                            <div className="flex-1 overflow-y-auto p-8 bg-surface-soft/30 custom-scrollbar">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                                     {filteredOrders.filter(o => o.status === 'pagado').length === 0 ? (
-                                                        <div className="col-span-full py-20 text-center text-gray-400 font-bold uppercase tracking-widest">
-                                                            No hay pedidos pagados hoy
+                                                        <div className="col-span-full py-32 text-center flex flex-col items-center justify-center opacity-20">
+                                                            <Wallet size={64} />
+                                                            <p className="text-sm font-black uppercase tracking-[4px] mt-6">Sin registros de pago</p>
                                                         </div>
                                                     ) : (
                                                         filteredOrders
@@ -341,13 +350,19 @@ const RestaurantManagement = ({
                                                 </div>
                                             </div>
 
-                                            <div className="p-4 bg-white border-t border-gray-100 flex justify-between items-center">
-                                                <div className="text-xs font-black uppercase text-gray-400 tracking-widest">
-                                                    Total Recaudado:
+                                            <div className="p-8 bg-canvas border-t border-hairline flex justify-between items-center">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-black uppercase text-accent tracking-[3px]">Total Recaudado</span>
+                                                    <span className="text-3xl font-black text-success leading-none mt-2">
+                                                        ${filteredOrders.filter(o => o.status === 'pagado').reduce((sum, o) => sum + (o.total || o.total_price || 0), 0).toLocaleString()}
+                                                    </span>
                                                 </div>
-                                                <div className="text-xl font-black text-success">
-                                                    ${filteredOrders.filter(o => o.status === 'pagado').reduce((sum, o) => sum + (o.total || o.total_price || 0), 0).toLocaleString()}
-                                                </div>
+                                                <button 
+                                                    onClick={() => setShowPaidModal(false)}
+                                                    className="px-10 py-4 bg-secondary text-white rounded-full font-black text-[12px] uppercase tracking-widest shadow-airbnb hover:scale-105 active:scale-95 transition-all"
+                                                >
+                                                    Cerrar Vista
+                                                </button>
                                             </div>
                                         </motion.div>
                                     </div>
@@ -359,11 +374,11 @@ const RestaurantManagement = ({
                     {activeSubTab === 'menu' && (
                         <motion.div
                             key="menu"
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            transition={{ duration: 0.3 }}
-                            className="h-full overflow-y-auto"
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.98 }}
+                            transition={{ duration: 0.4 }}
+                            className="h-full overflow-y-auto custom-scrollbar"
                         >
                             <MenuManagement />
                         </motion.div>
@@ -372,11 +387,11 @@ const RestaurantManagement = ({
                     {activeSubTab === 'turnos' && (
                         <motion.div
                             key="turnos"
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            transition={{ duration: 0.3 }}
-                            className="h-full overflow-y-auto"
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.98 }}
+                            transition={{ duration: 0.4 }}
+                            className="h-full overflow-y-auto custom-scrollbar"
                         >
                             <ShiftManagement orders={orders} onPrint={onPrint} autoOpen={shouldAutoOpenShift} />
                         </motion.div>
@@ -385,19 +400,19 @@ const RestaurantManagement = ({
                     {activeSubTab === 'mapa' && (
                         <motion.div
                             key="mapa"
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            transition={{ duration: 0.3 }}
-                            className="h-full overflow-y-auto"
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.98 }}
+                            transition={{ duration: 0.4 }}
+                            className="h-full overflow-y-auto custom-scrollbar"
                         >
                             <TableMapDesigner orders={orders} />
                         </motion.div>
                     )}
                 </AnimatePresence>
-            </div>
         </div>
-    );
+    </div>
+);
 };
 
 export default RestaurantManagement;

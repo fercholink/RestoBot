@@ -100,13 +100,13 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
     const grandTotal = accommodationTotal + chargesTotal;
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 my-auto">
-                <div className="bg-secondary p-6 flex justify-between items-center">
-                    <h3 className="text-xl font-black text-white flex items-center gap-2">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-ink/50 backdrop-blur-sm overflow-y-auto">
+            <div className="bg-canvas rounded-[24px] shadow-airbnb border border-hairline w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 my-auto">
+                <div className="bg-canvas border-b border-hairline p-6 flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-secondary flex items-center gap-2">
                         Reserva #{booking.id.toString().slice(0, 4)}
                     </h3>
-                    <button onClick={onClose} className="text-white/60 hover:text-white transition-colors">
+                    <button onClick={onClose} className="text-accent hover:text-secondary transition-colors">
                         <X size={24} />
                     </button>
                 </div>
@@ -115,28 +115,28 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
                     {/* Columna Izquierda: Detalles */}
                     <div className="space-y-6">
                         {/* Guest Info */}
-                        <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-3">
+                        <div className="bg-surface-soft p-4 rounded-[16px] border border-hairline space-y-3">
                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-black text-lg">
+                                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg">
                                     {booking.guest?.full_name?.charAt(0)}
                                 </div>
                                 <div>
-                                    <p className="font-black text-secondary text-lg leading-tight">{booking.guest?.full_name}</p>
-                                    <p className="text-xs text-gray-400 font-bold uppercase">Huésped</p>
+                                    <p className="font-bold text-secondary text-lg leading-tight">{booking.guest?.full_name}</p>
+                                    <p className="text-[11px] text-accent font-bold uppercase tracking-widest">Huésped</p>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-200/50">
+                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-hairline">
                                 <div>
-                                    <span className="text-[10px] text-gray-400 font-bold uppercase block mb-0.5">Documento</span>
+                                    <span className="text-[10px] text-accent font-bold uppercase block mb-0.5">Documento</span>
                                     <span className="text-xs font-bold text-secondary">{booking.guest?.document_id || 'N/A'}</span>
                                 </div>
                                 <div>
-                                    <span className="text-[10px] text-gray-400 font-bold uppercase block mb-0.5">Teléfono</span>
+                                    <span className="text-[10px] text-accent font-bold uppercase block mb-0.5">Teléfono</span>
                                     <span className="text-xs font-bold text-secondary">{booking.guest?.phone || 'N/A'}</span>
                                 </div>
                                 <div className="col-span-2">
-                                    <span className="text-[10px] text-gray-400 font-bold uppercase block mb-0.5">Email</span>
+                                    <span className="text-[10px] text-accent font-bold uppercase block mb-0.5">Email</span>
                                     <span className="text-xs font-bold text-secondary">{booking.guest?.email || 'N/A'}</span>
                                 </div>
                             </div>
@@ -145,14 +145,14 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
                         {/* Stay Info */}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <span className="text-xs text-gray-400 font-bold uppercase">Entrada</span>
+                                <span className="text-[11px] text-accent font-bold uppercase tracking-widest">Entrada</span>
                                 <div className="flex items-center gap-2 text-secondary font-bold">
                                     <Calendar size={14} className="text-primary" />
                                     {new Date(booking.check_in).toLocaleDateString()}
                                 </div>
                             </div>
                             <div className="space-y-1">
-                                <span className="text-xs text-gray-400 font-bold uppercase">Salida</span>
+                                <span className="text-[11px] text-accent font-bold uppercase tracking-widest">Salida</span>
                                 <div className="flex items-center gap-2 text-secondary font-bold">
                                     <Calendar size={14} className="text-primary" />
                                     {new Date(booking.check_out).toLocaleDateString()}
@@ -163,47 +163,47 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
 
                     {/* Columna Derecha: Totales y Acciones */}
                     <div className="space-y-6">
-                        <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl space-y-2">
-                            <div className="flex justify-between items-center text-xs text-gray-500">
+                        <div className="bg-surface-soft border border-hairline p-4 rounded-[16px] space-y-2">
+                            <div className="flex justify-between items-center text-xs text-accent">
                                 <span>Alojamiento ({nights} noches)</span>
-                                <span className="font-bold">${accommodationTotal.toLocaleString()}</span>
+                                <span className="font-bold text-secondary">${accommodationTotal.toLocaleString()}</span>
                             </div>
 
                             {roomCharges.length > 0 && (
-                                <div className="space-y-1 pt-2 border-t border-gray-200 border-dashed">
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Consumos / Extras</p>
+                                <div className="space-y-1 pt-2 border-t border-hairline border-dashed">
+                                    <p className="text-[10px] font-bold text-accent uppercase tracking-widest mb-1">Consumos / Extras</p>
                                     {roomCharges.map(charge => (
-                                        <div key={charge.id} className="flex justify-between items-center text-xs text-gray-500">
+                                        <div key={charge.id} className="flex justify-between items-center text-xs text-accent">
                                             <span>{charge.description}</span>
-                                            <span className="font-bold">${charge.amount.toLocaleString()}</span>
+                                            <span className="font-bold text-secondary">${charge.amount.toLocaleString()}</span>
                                         </div>
                                     ))}
-                                    <div className="flex justify-between items-center text-xs font-bold text-gray-600 pt-1">
+                                    <div className="flex justify-between items-center text-xs font-bold text-secondary pt-1">
                                         <span>Subtotal Extras</span>
                                         <span>${chargesTotal.toLocaleString()}</span>
                                     </div>
                                 </div>
                             )}
 
-                            <div className="flex justify-between items-center pt-2 border-t border-gray-200 mt-2">
-                                <span className="text-sm font-black text-secondary uppercase">Total a Pagar</span>
-                                <span className="text-xl font-black text-primary">${grandTotal.toLocaleString()}</span>
+                            <div className="flex justify-between items-center pt-2 border-t border-hairline mt-2">
+                                <span className="text-sm font-bold text-secondary uppercase tracking-widest">Total a Pagar</span>
+                                <span className="text-xl font-bold text-primary">${grandTotal.toLocaleString()}</span>
                             </div>
                         </div>
 
                         {/* Section: ELECTRONIC INVOICING */}
                         {booking.status === 'ocupada' && (
-                            <div className="pt-2 border-t border-gray-100">
+                            <div className="pt-2 border-t border-hairline">
                                 <label className="flex items-center gap-3 cursor-pointer group mb-4">
                                     <div
                                         onClick={() => setIsElectronic(!isElectronic)}
-                                        className={`w-12 h-6 rounded-full transition-all relative ${isElectronic ? 'bg-secondary' : 'bg-gray-200'}`}
+                                        className={`w-12 h-6 rounded-full transition-all relative ${isElectronic ? 'bg-secondary' : 'bg-surface-soft border border-hairline'}`}
                                     >
-                                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${isElectronic ? 'left-7' : 'left-1'}`} />
+                                        <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${isElectronic ? 'left-7' : 'left-1 bg-accent'}`} />
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <FileText size={18} className={isElectronic ? 'text-secondary' : 'text-gray-400'} />
-                                        <span className="text-xs font-black uppercase tracking-widest text-secondary">¿Requiere Factura Electrónica?</span>
+                                        <FileText size={18} className={isElectronic ? 'text-secondary' : 'text-accent'} />
+                                        <span className="text-[11px] font-bold uppercase tracking-widest text-secondary">¿Requiere Factura Electrónica?</span>
                                     </div>
                                 </label>
 
@@ -213,7 +213,7 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
                                             <select
                                                 value={taxData.type_person}
                                                 onChange={(e) => setTaxData({ ...taxData, type_person: e.target.value })}
-                                                className="bg-gray-100 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                                className="bg-surface-soft border border-hairline rounded-[16px] px-3 py-3 text-xs font-bold outline-none focus:border-primary/50"
                                             >
                                                 <option value="1">Natural</option>
                                                 <option value="2">Jurídica</option>
@@ -221,7 +221,7 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
                                             <select
                                                 value={taxData.document_type}
                                                 onChange={(e) => setTaxData({ ...taxData, document_type: e.target.value })}
-                                                className="bg-gray-100 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                                className="bg-surface-soft border border-hairline rounded-[16px] px-3 py-3 text-xs font-bold outline-none focus:border-primary/50"
                                             >
                                                 <option value="13">Cédula</option>
                                                 <option value="31">NIT</option>
@@ -232,21 +232,21 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
                                             placeholder="No. Identificación / NIT"
                                             value={taxData.identification}
                                             onChange={(e) => setTaxData({ ...taxData, identification: e.target.value })}
-                                            className="w-full bg-gray-100 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                            className="w-full bg-surface-soft border border-hairline rounded-[16px] px-4 py-3 text-xs font-bold outline-none focus:border-primary/50"
                                         />
                                         <input
                                             type="text"
                                             placeholder="Nombre / Razón Social"
                                             value={taxData.names}
                                             onChange={(e) => setTaxData({ ...taxData, names: e.target.value })}
-                                            className="w-full bg-gray-100 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                            className="w-full bg-surface-soft border border-hairline rounded-[16px] px-4 py-3 text-xs font-bold outline-none focus:border-primary/50"
                                         />
                                         <input
                                             type="email"
                                             placeholder="Email para facturación"
                                             value={taxData.email}
                                             onChange={(e) => setTaxData({ ...taxData, email: e.target.value })}
-                                            className="w-full bg-gray-100 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                            className="w-full bg-surface-soft border border-hairline rounded-[16px] px-4 py-3 text-xs font-bold outline-none focus:border-primary/50"
                                         />
                                     </div>
                                 )}
@@ -254,14 +254,14 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
                         )}
 
                         {/* Actions */}
-                        <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-100">
+                        <div className="grid grid-cols-2 gap-3 pt-4 border-t border-hairline">
                             <button
                                 onClick={() => {
                                     const link = `${window.location.origin}/?id=${booking.id}`;
                                     navigator.clipboard.writeText(link);
                                     alert('Link de Check-in copiado al portapapeles');
                                 }}
-                                className="bg-blue-50 hover:bg-blue-100 text-blue-600 py-3 rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 transition-colors border border-blue-100"
+                                className="bg-surface-soft hover:bg-canvas text-secondary py-3 rounded-full font-bold text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all border border-hairline shadow-sm"
                             >
                                 <Share2 size={16} /> Link Check-in
                             </button>
@@ -271,7 +271,7 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
                                         onEdit(booking);
                                         onClose();
                                     }}
-                                    className="bg-gray-100 hover:bg-gray-200 text-secondary py-3 rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 transition-colors"
+                                    className="bg-surface-soft hover:bg-canvas text-secondary py-3 rounded-full font-bold text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all border border-hairline shadow-sm"
                                 >
                                     <Edit size={16} /> Modificar
                                 </button>
@@ -279,7 +279,7 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
                             {booking.status === 'reservada' && (
                                 <button
                                     onClick={handleDelete}
-                                    className="col-span-2 bg-red-50 hover:bg-red-100 text-red-500 py-3 rounded-xl font-bold text-xs uppercase flex items-center justify-center gap-2 transition-colors mt-1"
+                                    className="col-span-2 bg-danger/10 hover:bg-danger/20 text-danger py-3 rounded-full font-bold text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 transition-colors mt-1"
                                 >
                                     <Trash2 size={16} /> Cancelar Reserva
                                 </button>
@@ -304,7 +304,7 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
                                         alert('Error al realizar check-in: ' + error.message);
                                     }
                                 }}
-                                className="w-full bg-secondary text-white py-4 rounded-xl font-black text-xs uppercase shadow-premium hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
+                                className="w-full bg-secondary text-white py-4 rounded-full font-bold text-[11px] tracking-widest uppercase shadow-airbnb hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
                             >
                                 <LogOut size={18} className="rotate-180" /> Realizar Check-in
                             </button>
@@ -316,7 +316,7 @@ const ReservationDetailsModal = ({ isOpen, onClose, booking, onBookingUpdated, o
                                     // Pass tax data if electronic, plus charges and total for receipt
                                     onCheckOut(booking, isElectronic ? taxData : null, { roomCharges, grandTotal, accommodationTotal });
                                 }}
-                                className="w-full bg-primary text-white py-4 rounded-xl font-black text-xs uppercase shadow-premium hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
+                                className="w-full bg-primary text-white py-4 rounded-full font-bold text-[11px] tracking-widest uppercase shadow-airbnb hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
                             >
                                 <LogOut size={18} /> {isElectronic ? 'Facturar y Salir' : 'Finalizar Estadía'}
                             </button>

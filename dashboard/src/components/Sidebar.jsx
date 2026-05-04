@@ -141,46 +141,46 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
     };
 
     const content = (
-        <div className="flex flex-col h-full bg-secondary transition-all duration-300">
+        <div className="flex flex-col h-full bg-canvas border-r border-hairline transition-all duration-300">
             {/* ... Header igual ... */}
-            <div className={`p-4 border-b border-white/10 text-white flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'}`}>
-                <LayoutPanelLeft className="text-primary" size={isCollapsed ? 24 : 18} />
-                {!isCollapsed && <span className="text-lg font-black tracking-tighter">Nexus</span>}
+            <div className={`p-4 border-b border-hairline text-secondary flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'}`}>
+                <LayoutPanelLeft className="text-primary" size={isCollapsed ? 28 : 22} />
+                {!isCollapsed && <span className="text-xl font-bold tracking-tight">Nexus</span>}
             </div>
 
-            <div className={`p-4 border-b border-white/5 bg-white/5 ${isCollapsed ? 'flex justify-center' : ''}`}>
+            <div className={`p-4 border-b border-hairline bg-surface-soft ${isCollapsed ? 'flex justify-center' : ''}`}>
                 {!isCollapsed ? (
                     <>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Usuario</p>
-                        <p className="text-sm font-bold text-white truncate">{user?.name}</p>
-                        <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-md font-black uppercase mt-1 inline-block">
+                        <p className="text-[11px] font-semibold text-accent uppercase tracking-widest mb-1">Usuario</p>
+                        <p className="text-sm font-semibold text-secondary truncate">{user?.name}</p>
+                        <span className="text-[11px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold mt-2 inline-block">
                             {user?.role}
                         </span>
                     </>
                 ) : (
-                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-black text-xs uppercase">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm uppercase">
                         {user?.name?.charAt(0)}
                     </div>
                 )}
             </div>
 
-            <nav className="flex-1 mt-6 overflow-y-auto custom-scrollbar">
+            <nav className="flex-1 mt-4 px-3 overflow-y-auto custom-scrollbar">
                 {menuItems.map((item) => (
-                    <div key={item.id}>
+                    <div key={item.id} className="mb-1">
                         <button
                             onClick={() => handleItemClick(item)}
-                            className={`w-full flex items-center transition-all duration-200 border-l-4 ${isCollapsed ? 'justify-center px-0 py-4' : 'gap-3 px-5 py-3'} ${activeTab === item.id
-                                ? 'bg-primary/10 text-primary border-primary'
-                                : 'text-gray-400 border-transparent hover:bg-white/5 hover:text-white'
+                            className={`w-full flex items-center transition-all duration-200 rounded-lg ${isCollapsed ? 'justify-center px-0 py-3' : 'gap-3 px-4 py-3'} ${activeTab === item.id
+                                ? 'bg-surface-soft text-secondary font-semibold'
+                                : 'text-accent hover:bg-surface-soft hover:text-secondary'
                                 }`}
                             title={isCollapsed ? item.label : ''}
                         >
-                            <item.icon size={isCollapsed ? 20 : 18} strokeWidth={activeTab === item.id ? 2.5 : 2} />
+                            <item.icon size={isCollapsed ? 22 : 20} strokeWidth={activeTab === item.id ? 2.5 : 2} className={activeTab === item.id ? 'text-primary' : ''} />
                             {!isCollapsed && (
                                 <div className="flex-1 flex justify-between items-center">
-                                    <span className="font-bold text-sm tracking-wide">{item.label}</span>
+                                    <span className="text-[15px]">{item.label}</span>
                                     {item.hasSubmenu && (
-                                        <ChevronRight size={14} className={`transition-transform duration-200 ${expandedMenu === item.id ? 'rotate-90' : ''}`} />
+                                        <ChevronRight size={16} className={`transition-transform duration-200 ${expandedMenu === item.id ? 'rotate-90' : ''}`} />
                                     )}
                                 </div>
                             )}
@@ -188,7 +188,7 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
 
                         {/* Submenu Render */}
                         {!isCollapsed && item.hasSubmenu && expandedMenu === item.id && (
-                            <div className="bg-black/20 animate-in slide-in-from-top-2 duration-200">
+                            <div className="mt-1 mb-2 ml-4 border-l-2 border-surface-strong animate-in slide-in-from-top-2 duration-200">
                                 {item.id === 'restaurante' && restaurantSubItems.map(sub => (
                                     <button
                                         key={sub.id}
@@ -198,12 +198,12 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
                                             setActiveRestaurantSubTab && setActiveRestaurantSubTab(sub.id);
                                             setIsOpen(false);
                                         }}
-                                        className={`w-full flex items-center gap-3 pl-16 pr-6 py-3 transition-all text-xs font-bold ${activeTab === 'restaurante' && activeRestaurantSubTab === sub.id
-                                            ? 'text-white bg-white/5'
-                                            : 'text-gray-500 hover:text-gray-300'
+                                        className={`w-full flex items-center gap-3 pl-6 pr-4 py-2.5 transition-all text-[14px] rounded-r-lg ${activeTab === 'restaurante' && activeRestaurantSubTab === sub.id
+                                            ? 'text-secondary font-semibold bg-surface-soft'
+                                            : 'text-accent hover:text-secondary hover:bg-surface-soft'
                                             }`}
                                     >
-                                        <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'restaurante' && activeRestaurantSubTab === sub.id ? 'bg-primary' : 'bg-gray-600'}`} />
+                                        <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'restaurante' && activeRestaurantSubTab === sub.id ? 'bg-primary' : 'bg-surface-strong'}`} />
                                         {sub.label}
                                     </button>
                                 ))}
@@ -216,12 +216,12 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
                                             setActiveHotelSubTab && setActiveHotelSubTab(sub.id);
                                             setIsOpen(false);
                                         }}
-                                        className={`w-full flex items-center gap-3 pl-16 pr-6 py-3 transition-all text-xs font-bold ${activeTab === 'hotels' && activeHotelSubTab === sub.id
-                                            ? 'text-white bg-white/5'
-                                            : 'text-gray-500 hover:text-gray-300'
+                                        className={`w-full flex items-center gap-3 pl-6 pr-4 py-2.5 transition-all text-[14px] rounded-r-lg ${activeTab === 'hotels' && activeHotelSubTab === sub.id
+                                            ? 'text-secondary font-semibold bg-surface-soft'
+                                            : 'text-accent hover:text-secondary hover:bg-surface-soft'
                                             }`}
                                     >
-                                        <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'hotels' && activeHotelSubTab === sub.id ? 'bg-primary' : 'bg-gray-600'}`} />
+                                        <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'hotels' && activeHotelSubTab === sub.id ? 'bg-primary' : 'bg-surface-strong'}`} />
                                         {sub.label}
                                     </button>
                                 ))}
@@ -234,12 +234,12 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
                                             setActiveAccountingSubTab && setActiveAccountingSubTab(sub.id);
                                             setIsOpen(false);
                                         }}
-                                        className={`w-full flex items-center gap-3 pl-16 pr-6 py-3 transition-all text-xs font-bold ${activeTab === 'contabilidad' && activeAccountingSubTab === sub.id
-                                            ? 'text-white bg-white/5'
-                                            : 'text-gray-500 hover:text-gray-300'
+                                        className={`w-full flex items-center gap-3 pl-6 pr-4 py-2.5 transition-all text-[14px] rounded-r-lg ${activeTab === 'contabilidad' && activeAccountingSubTab === sub.id
+                                            ? 'text-secondary font-semibold bg-surface-soft'
+                                            : 'text-accent hover:text-secondary hover:bg-surface-soft'
                                             }`}
                                     >
-                                        <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'contabilidad' && activeAccountingSubTab === sub.id ? 'bg-primary' : 'bg-gray-600'}`} />
+                                        <div className={`w-1.5 h-1.5 rounded-full ${activeTab === 'contabilidad' && activeAccountingSubTab === sub.id ? 'bg-primary' : 'bg-surface-strong'}`} />
                                         {sub.label}
                                     </button>
                                 ))}
@@ -249,26 +249,25 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
                 ))}
             </nav>
 
-            <div className={`p-6 border-t border-white/5 flex flex-col gap-3 ${isCollapsed ? 'items-center' : ''}`}>
+            <div className={`p-6 border-t border-hairline flex flex-col gap-3 ${isCollapsed ? 'items-center px-2' : ''}`}>
                 <button
                     onClick={logout}
-                    className={`flex items-center text-red-400 hover:text-red-300 transition-colors font-bold text-sm ${isCollapsed ? 'justify-center' : 'gap-3 px-2'}`}
+                    className={`flex items-center text-secondary hover:text-danger transition-colors font-semibold text-[15px] ${isCollapsed ? 'justify-center' : 'gap-3 px-2'}`}
                     title={isCollapsed ? 'Cerrar Sesión' : ''}
                 >
-                    <LogOut size={isCollapsed ? 22 : 18} />
+                    <LogOut size={isCollapsed ? 22 : 20} />
                     {!isCollapsed && <span>Cerrar Sesión</span>}
                 </button>
                 {!isCollapsed && (
-                    <div className="px-4 py-2 bg-white/5 rounded-lg text-[10px] text-gray-500 font-mono text-center">
+                    <div className="px-4 py-2 mt-2 bg-surface-soft rounded-lg text-xs text-accent text-center">
                         CLOUD API v1.1.0
                     </div>
                 )}
             </div>
 
-            {/* Desktop Toggle Button */}
             <button
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className="hidden lg:flex absolute -right-3 top-20 bg-primary text-white w-6 h-6 rounded-full items-center justify-center shadow-lg hover:scale-110 active:scale-90 transition-all z-50 border-2 border-secondary"
+                className="hidden lg:flex absolute -right-3 top-20 bg-canvas text-secondary w-6 h-6 rounded-full items-center justify-center shadow-airbnb hover:scale-110 active:scale-90 transition-all z-50 border border-hairline"
             >
                 {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
             </button>
@@ -280,31 +279,31 @@ const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, activeR
     return (
         <>
             {/* Mobile Header */}
-            <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-secondary flex items-center justify-between px-6 z-40 border-b border-white/5 shadow-md">
+            <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-canvas flex items-center justify-between px-6 z-40 border-b border-hairline">
                 <div className="flex items-center gap-2">
                     <LayoutPanelLeft className="text-primary" size={24} />
-                    <span className="text-white font-black tracking-tighter text-xl">Nexus</span>
+                    <span className="text-secondary font-bold tracking-tight text-xl">Nexus</span>
                 </div>
-                <button onClick={() => setIsOpen(!isOpen)} className="text-white p-2">
+                <button onClick={() => setIsOpen(!isOpen)} className="text-secondary p-2">
                     {isOpen ? <X size={28} /> : <Menu size={28} />}
                 </button>
             </div>
 
             {/* Desktop Sidebar */}
-            <aside className={`hidden lg:flex ${isCollapsed ? 'w-20' : 'w-64'} bg-secondary text-white h-screen flex-col fixed left-0 top-0 z-30 shadow-2xl transition-all duration-300`}>
+            <aside className={`hidden lg:flex ${isCollapsed ? 'w-24' : 'w-72'} bg-canvas text-secondary h-screen flex-col fixed left-0 top-0 z-30 transition-all duration-300 border-r border-hairline`}>
                 {content}
             </aside>
 
             {/* Mobile Sidebar Overlay */}
             {isOpen && (
                 <div
-                    className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+                    className="lg:hidden fixed inset-0 bg-secondary/20 backdrop-blur-sm z-40"
                     onClick={() => setIsOpen(false)}
                 />
             )}
 
             {/* Mobile Drawer */}
-            <aside className={`lg:hidden fixed top-0 left-0 bottom-0 w-72 bg-secondary text-white z-50 transition-transform duration-300 transform ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+            <aside className={`lg:hidden fixed top-0 left-0 bottom-0 w-[280px] bg-canvas text-secondary z-50 transition-transform duration-300 transform ${isOpen ? 'translate-x-0' : '-translate-x-full'} shadow-airbnb`}>
                 {content}
             </aside>
         </>
