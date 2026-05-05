@@ -87,6 +87,10 @@ function App() {
   const [autoAdvanceEnabled, setAutoAdvanceEnabled] = useState(true);
 
   const [orders, setOrders] = useState([]);
+  // Ref always pointing to the latest orders — used by the auto-advance interval
+  // to avoid stale closures without adding [orders] to the effect's dependency array.
+  const ordersRef = useRef([]);
+  const advancingOrders = useRef(new Set()); // prevents duplicate calls during async transitions
   const [activeShift, setActiveShift] = useState(null); // Estado para el turno activo
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -296,46 +300,55 @@ function App() {
     }
   };
 
-  // AUTO-ADVANCE: Mover pedidos de 'nuevo' a 'fabricacion' después de 5 segundos
-  // LIMITADO: Solo si hay menos de 3 pedidos en fabricación por tipo (Mesa vs Domicilio)
+  // Mantener ordersRef sincronizado con el estado actual (sin re-crear el interval)
+  useEffect(() => { ordersRef.current = orders; }, [orders]);
+
+  // AUTO-ADVANCE: Mover pedidos de 'nuevo' a 'fabricacion' después de 20 segundos.
+  // Usa ordersRef para leer la lista más reciente sin depender de [orders],
+  // lo que evita destruir y re-crear el interval en cada cambio de estado.
+  // advancingOrders actúa como candado para prevenir llamadas duplicadas
+  // mientras handleStatusChange (async) no ha terminado de actualizar el estado.
   useEffect(() => {
+    const AUTO_ADVANCE_SECONDS = 20;
+    const MAX_CONCURRENT = 3;
+
     const interval = setInterval(() => {
+      if (!autoAdvanceEnabled) return;
+
       const now = new Date();
+      const currentOrders = ordersRef.current;
 
-      // Contar pedidos actuales en fabricación para verificar límites
-      let fabricacionMesa = orders.filter(o => o.status === 'fabricacion' && o.table_number && o.table_number !== 'DOMICILIO').length;
-      let fabricacionDomicilio = orders.filter(o => o.status === 'fabricacion' && (!o.table_number || o.table_number === 'DOMICILIO')).length;
+      let fabricacionMesa = currentOrders.filter(
+        o => o.status === 'fabricacion' && o.table_number && o.table_number !== 'DOMICILIO'
+      ).length;
+      let fabricacionDomicilio = currentOrders.filter(
+        o => o.status === 'fabricacion' && (!o.table_number || o.table_number === 'DOMICILIO')
+      ).length;
 
-      orders.forEach(order => {
-        if (order.status === 'nuevo') {
-          const createdAt = new Date(order.created_at);
-          const diffTime = Math.abs(now - createdAt);
-          const diffSeconds = Math.ceil(diffTime / 1000);
+      currentOrders.forEach(order => {
+        if (order.status !== 'nuevo') return;
+        if (advancingOrders.current.has(order.id)) return; // ya en proceso
 
-          if (diffSeconds >= 20) {
-            const isMesa = order.table_number && order.table_number !== 'DOMICILIO';
+        const diffSeconds = Math.ceil(Math.abs(now - new Date(order.created_at)) / 1000);
+        if (diffSeconds < AUTO_ADVANCE_SECONDS) return;
 
-            // Verificar capacidad antes de mover
-            if (isMesa) {
-              if (fabricacionMesa < 3) {
-                console.log(`Auto-advancing Mesa order ${order.id}`);
-                handleStatusChange(order.id, 'fabricacion');
-                fabricacionMesa++; // Prevenir mover múltiples en el mismo tick si excede límite
-              }
-            } else {
-              if (fabricacionDomicilio < 3) {
-                console.log(`Auto-advancing Domicilio order ${order.id}`);
-                handleStatusChange(order.id, 'fabricacion');
-                fabricacionDomicilio++;
-              }
-            }
-          }
-        }
+        const isMesa = order.table_number && order.table_number !== 'DOMICILIO';
+        const atCapacity = isMesa ? fabricacionMesa >= MAX_CONCURRENT : fabricacionDomicilio >= MAX_CONCURRENT;
+        if (atCapacity) return;
+
+        // Reservar el slot antes de la llamada async para que el siguiente tick no duplique
+        advancingOrders.current.add(order.id);
+        if (isMesa) fabricacionMesa++;
+        else fabricacionDomicilio++;
+
+        handleStatusChange(order.id, 'fabricacion').finally(() => {
+          advancingOrders.current.delete(order.id);
+        });
       });
-    }, 1000); // Check every second
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [orders]); // Re-run when orders change to avoid stale closures
+  }, [autoAdvanceEnabled]); // solo se recrea si el toggle cambia
 
   const handleStatusChange = async (orderId, newStatus, paymentDetails = null) => {
     const order = orders.find(o => o.id === orderId);
