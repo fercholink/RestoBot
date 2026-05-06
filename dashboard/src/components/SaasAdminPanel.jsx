@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useAdminLog } from '../hooks/useAdminLog';
-import { Search, Building2, Server, Power, Loader2, Plus, Trash2, Edit2, X, TrendingUp, Clock, Activity, LayoutGrid, RefreshCw, ScrollText, Mail, Hotel, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, Building2, Server, Power, Loader2, Plus, Trash2, Edit2, X, TrendingUp, Activity, LayoutGrid, RefreshCw, ScrollText, Mail, Hotel } from 'lucide-react';
 import { sileo } from 'sileo';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -47,7 +47,6 @@ export default function SaasAdminPanel() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState('list');
-    const [pendingWipeId, setPendingWipeId] = useState(null);
 
     // Modal Crear
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -114,7 +113,7 @@ export default function SaasAdminPanel() {
             setOrgMetrics(metrics);
         } catch (error) {
             console.error('Error fetching orgs or metrics:', error);
-            sileo.error({ title: 'Error de Datos', description: 'No se pudieron cargar los inquilinos.' });
+            sileo.error({ title: 'Error de Datos', description: 'No se pudieron cargar los hoteles.' });
         } finally {
             setLoading(false);
         }
@@ -287,7 +286,7 @@ export default function SaasAdminPanel() {
                     onClick={() => setActiveTab('list')}
                     className={`px-8 py-3 rounded-[16px] text-[11px] font-bold uppercase tracking-widest transition-all duration-300 ${activeTab === 'list' ? 'bg-canvas text-secondary shadow-airbnb border border-hairline' : 'text-accent hover:text-secondary'}`}
                 >
-                    Inquilinos
+                    Hoteles
                 </button>
                 <button
                     onClick={() => setActiveTab('dashboard')}
@@ -516,7 +515,7 @@ export default function SaasAdminPanel() {
                     <div className="p-8 md:p-10 border-b border-hairline flex flex-col md:flex-row md:items-center justify-between gap-6 bg-surface-soft/30">
                         <div>
                             <span className="text-[11px] font-bold text-accent uppercase tracking-widest mb-1 block">Panel de Control B2B</span>
-                            <h2 className="text-2xl font-bold text-secondary tracking-tight">Gestión Inquilinos</h2>
+                            <h2 className="text-2xl font-bold text-secondary tracking-tight">Gestión Hoteles</h2>
                         </div>
                         <div className="flex flex-col sm:flex-row items-center gap-4">
                             <div className="relative w-full sm:w-80">
@@ -547,7 +546,7 @@ export default function SaasAdminPanel() {
                         ) : filteredOrgs.length === 0 ? (
                             <div className="p-32 text-center bg-surface-soft/20">
                                 <Building2 className="mx-auto text-accent/20 mb-6" size={64} />
-                                <p className="font-bold text-[13px] text-accent uppercase tracking-widest">Sin inquilinos</p>
+                                <p className="font-bold text-[13px] text-accent uppercase tracking-widest">Sin hoteles</p>
                             </div>
                         ) : (
                             <table className="w-full text-left border-collapse">
