@@ -488,46 +488,37 @@ function App() {
         handlePrint({ ...order, status: 'pagado', preparation_time_seconds: prepTime }, 'recibo');
       }
 
-      // Delegar la actualización a n8n para activar triggers (ej. WhatsApp, Factus)
-      if (isOnline) {
-        await updateOrderStatus(orderId, newStatus);
-        
-        // Audit Log
-        adminLog({
-          action: 'Cambio de Estado',
-          module: 'restaurante',
-          entity_type: 'pedido',
-          entity_id: orderId,
-          description: `cambió el estado del pedido #${orderId} de ${order?.status} a ${newStatus}`,
-          new_value: { status: newStatus }
-        });
-      } else {
-
-        throw new Error("Offline");
+      // Persistir directo en Supabase (~200ms). cargo_habitacion ya hizo su propio update arriba.
+      if (!(newStatus === 'pagado' && paymentDetails?.method === 'cargo_habitacion')) {
+        let updatePayload = { status: newStatus };
+        if (newStatus === 'pagado' && order?.created_at) {
+          updatePayload.preparation_time_seconds = Math.max(0, differenceInSeconds(new Date(), parseISO(order.created_at)));
+        }
+        const { error: directSbErr } = await supabase.from('orders').update(updatePayload).eq('id', orderId);
+        if (directSbErr) throw directSbErr;
       }
+
+      // Notificar a n8n sin bloquear (triggers WhatsApp, Factus, etc.)
+      if (isOnline) {
+        updateOrderStatus(orderId, newStatus).catch(e =>
+          console.warn('[StatusChange] n8n notificación fallida (no crítico):', e.message)
+        );
+      }
+
+      // Audit Log
+      adminLog({
+        action: 'Cambio de Estado',
+        module: 'restaurante',
+        entity_type: 'pedido',
+        entity_id: orderId,
+        description: `cambió el estado del pedido #${orderId} de ${order?.status} a ${newStatus}`,
+        new_value: { status: newStatus }
+      });
 
     } catch (error) {
-      console.error("Error actualizando estado (n8n o Red):", error);
+      console.error("Error actualizando estado:", error);
 
-      // Fallback 1: Actualizar directamente en Supabase si n8n falla pero hay red
-      if (isOnline) {
-        try {
-          let updatePayload = { status: newStatus };
-          const curOrder = orders.find(o => o.id === orderId);
-          if (newStatus === 'pagado' && curOrder?.created_at) {
-            updatePayload.preparation_time_seconds = Math.max(0, differenceInSeconds(new Date(), parseISO(curOrder.created_at)));
-          }
-
-          const { error: sbError } = await supabase.from('orders').update(updatePayload).eq('id', orderId);
-          if (sbError) throw sbError;
-          
-          return;
-        } catch (sbErr) {
-          console.error("Error fallback Supabase:", sbErr);
-        }
-      }
-
-      // Fallback 2: MODO OFFLINE - Guardar en cola de sincronización local
+      // Fallback OFFLINE: Guardar en cola de sincronización local
       try {
         await db.orders.update(orderId, { status: newStatus });
         await db.pending_sync.add({
