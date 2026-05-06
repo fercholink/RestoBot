@@ -65,6 +65,11 @@ const UserManagement = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [activeTab, setActiveTab] = useState('info'); // 'info' | 'permisos'
     const [selectedRoleTemplate, setSelectedRoleTemplate] = useState(null);
+    const [pendingDeleteUserId, setPendingDeleteUserId] = useState(null);
+
+    const isGerente = currentUser?.role === 'gerente';
+    // Roles que un gerente puede asignar a su equipo (no puede crear otros gerentes)
+    const GERENTE_ALLOWED_ROLES = ['admin', 'recepcion', 'cajero', 'mesero', 'cocina', 'camarera'];
 
     // Construir ROLE_TEMPLATES dinámicamente de la BD
     // Si la BD no tiene permisos para un rol, usa los DEFAULT_PERMISSIONS de roles.js
@@ -396,11 +401,17 @@ const UserManagement = () => {
     };
 
     const handleDeleteUser = async (id, name) => {
-        if (!window.confirm(`¿Está seguro de eliminar a "${name}"? Esta acción no se puede deshacer.`)) return;
+        if (pendingDeleteUserId !== id) {
+            setPendingDeleteUserId(id);
+            showToast(`⚠️ Clic de nuevo para eliminar a "${name}"`, 'warning');
+            setTimeout(() => setPendingDeleteUserId(null), 3500);
+            return;
+        }
+        setPendingDeleteUserId(null);
         try {
             const { error } = await supabase.from('profiles').delete().eq('id', id);
             if (error) throw error;
-            showToast(`🗑️ Usuario eliminado correctamente`);
+            showToast(`Usuario "${name}" eliminado correctamente`);
             fetchData();
         } catch (error) {
             showToast('❌ Error eliminando usuario: ' + error.message, 'error');
@@ -408,8 +419,6 @@ const UserManagement = () => {
     };
 
     const toggleUserStatus = async (targetUser) => {
-        const action = targetUser.active ? 'desactivar' : 'activar';
-        if (!window.confirm(`¿${action.charAt(0).toUpperCase() + action.slice(1)} acceso para ${targetUser.full_name}?`)) return;
         try {
             const { error } = await supabase.from('profiles').update({ active: !targetUser.active }).eq('id', targetUser.id);
             if (error) throw error;
@@ -693,7 +702,6 @@ const UserManagement = () => {
                                                                 { icon: Mail, color: 'blue', action: () => sendInvite(u), tip: 'Invitar' },
                                                                 { icon: Key, color: 'amber', action: () => { setSelectedUserForPass(u); setShowPassModal(true); }, tip: 'Clave' },
                                                                 { icon: Edit2, color: 'primary', action: () => handleOpenEdit(u), tip: 'Editar' },
-                                                                { icon: Trash2, color: 'rose', action: () => handleDeleteUser(u.id, u.full_name || u.name), tip: 'Eliminar' }
                                                             ].map((btn, i) => (
                                                                 <button
                                                                     key={i}
@@ -701,14 +709,20 @@ const UserManagement = () => {
                                                                     className={`p-2.5 rounded-xl transition-all duration-300 hover:scale-110 active:scale-95 ${
                                                                         btn.color === 'blue' ? 'text-blue-400 hover:bg-blue-50' :
                                                                         btn.color === 'amber' ? 'text-amber-400 hover:bg-amber-50' :
-                                                                        btn.color === 'primary' ? 'text-primary hover:bg-primary/10' :
-                                                                        'text-rose-400 hover:bg-rose-50'
+                                                                        'text-primary hover:bg-primary/10'
                                                                     }`}
                                                                     title={btn.tip}
                                                                 >
                                                                     <btn.icon size={16} strokeWidth={2.5} />
                                                                 </button>
                                                             ))}
+                                                            <button
+                                                                onClick={() => handleDeleteUser(u.id, u.full_name || u.name)}
+                                                                className={`p-2.5 rounded-xl transition-all duration-300 hover:scale-110 active:scale-95 ${pendingDeleteUserId === u.id ? 'bg-rose-500 text-white animate-pulse' : 'text-rose-400 hover:bg-rose-50'}`}
+                                                                title={pendingDeleteUserId === u.id ? 'Clic de nuevo para confirmar' : 'Eliminar'}
+                                                            >
+                                                                <Trash2 size={16} strokeWidth={2.5} />
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -935,7 +949,7 @@ const UserManagement = () => {
                                                         <Sparkles size={16} className="text-amber-500 animate-pulse" />
                                                     </div>
                                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                                        {Object.entries(ROLE_TEMPLATES).map(([key, template]) => {
+                                                        {Object.entries(ROLE_TEMPLATES).filter(([key]) => !isGerente || GERENTE_ALLOWED_ROLES.includes(key)).map(([key, template]) => {
                                                             const Icon = template.icon;
                                                             const isSelected = selectedRoleTemplate === key;
                                                             const tColor = template.color || '#6b7280';

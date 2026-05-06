@@ -86,6 +86,15 @@ export const ROLE_DEFINITIONS = {
         defaultTab: 'operaciones',
         sidebarCollapsed: false,
     },
+    camarera: {
+        label: 'Camarera',
+        description: 'Servicio de habitaciones y limpieza',
+        color: '#fd79a8',
+        bgColor: '#fef0f5',
+        icon: '🛎️',
+        defaultTab: 'hotel',
+        sidebarCollapsed: true,
+    },
 };
 
 /**
@@ -107,7 +116,7 @@ export const DEFAULT_PERMISSIONS = {
         restaurante: { create: true, read: true, update: true, delete: true },
         hotel: { create: true, read: true, update: true, delete: true },
         financiero: { create: true, read: true, update: false, delete: false },
-        usuarios: { create: false, read: true, update: false, delete: false },
+        usuarios: { create: true, read: true, update: true, delete: true },
         sedes: { create: false, read: true, update: false, delete: false },
         marketing: { create: true, read: true, update: true, delete: false },
         qr_tools: { create: true, read: true, update: true, delete: false },
@@ -162,6 +171,16 @@ export const DEFAULT_PERMISSIONS = {
         marketing: { create: false, read: true, update: false, delete: false },
         qr_tools: { create: false, read: false, update: false, delete: false },
         operaciones: { create: false, read: true, update: false, delete: false },
+    },
+    camarera: {
+        restaurante: { create: false, read: true, update: false, delete: false },
+        hotel: { create: false, read: true, update: true, delete: false },
+        financiero: { create: false, read: false, update: false, delete: false },
+        usuarios: { create: false, read: false, update: false, delete: false },
+        sedes: { create: false, read: false, update: false, delete: false },
+        marketing: { create: false, read: false, update: false, delete: false },
+        qr_tools: { create: false, read: false, update: false, delete: false },
+        operaciones: { create: false, read: false, update: false, delete: false },
     },
 };
 

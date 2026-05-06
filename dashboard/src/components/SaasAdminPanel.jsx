@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useAdminLog } from '../hooks/useAdminLog';
-import { Search, Building2, Server, Power, Loader2, Plus, Trash2, Edit2, X, TrendingUp, Activity, LayoutGrid, RefreshCw, ScrollText, Mail, Hotel } from 'lucide-react';
+import { Search, Building2, Server, Power, Loader2, Plus, Trash2, Edit2, X, TrendingUp, Activity, LayoutGrid, RefreshCw, ScrollText, Mail, Hotel, Key, Eye, EyeOff } from 'lucide-react';
 import { sileo } from 'sileo';
+import { resetPassword } from '../api';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -60,6 +61,14 @@ export default function SaasAdminPanel() {
 
     // Eliminar con confirmación
     const [pendingDeleteId, setPendingDeleteId] = useState(null);
+
+    // Reset contraseña admin de un hotel
+    const [resetPassOrg, setResetPassOrg] = useState(null);
+    const [resetPassValue, setResetPassValue] = useState('');
+    const [showResetPass, setShowResetPass] = useState(false);
+    const [resettingPass, setResettingPass] = useState(false);
+    // Show/hide en modal crear
+    const [showNewPass, setShowNewPass] = useState(false);
 
     const isSubmittingRef = useRef(false);
 
@@ -241,21 +250,47 @@ export default function SaasAdminPanel() {
             const { error } = await supabase.rpc('create_saas_tenant', {
                 p_empresa_nombre: newOrg.name,
                 p_admin_email: newOrg.admin_email,
-                p_admin_password: 'Password123!', // Pass default or generate
-                p_modulos: newOrg.hotel_pack ? ['hotel', 'restaurante', 'usuarios'] : ['restaurante', 'usuarios']
+                p_admin_password: newOrg.admin_password || 'Password123!',
+                p_modulos: newOrg.hotel_pack ? ['hotel', 'restaurante', 'usuarios', 'financiero'] : ['restaurante', 'usuarios']
             });
 
             if (error) throw error;
 
-            sileo.success({ title: 'Tenant Creado', description: 'La nueva organización ha sido inicializada.' });
+            sileo.success({ title: 'Hotel Creado', description: `"${newOrg.name}" ha sido inicializado. El gerente puede ingresar con ${newOrg.admin_email}.` });
             setIsAddModalOpen(false);
-            setNewOrg({ name: '', admin_email: '', hotel_pack: false });
+            setNewOrg({ name: '', admin_email: '', admin_password: '', hotel_pack: false });
+            setShowNewPass(false);
             fetchOrganizations();
         } catch (err) {
             sileo.error({ title: 'Operación Fallida', description: err.message });
         } finally {
             isSubmittingRef.current = false;
             setCreating(false);
+        }
+    };
+
+    const handleResetAdminPass = async (e) => {
+        e.preventDefault();
+        if (!resetPassOrg?.owner_id) {
+            sileo.error({ title: 'Error', description: 'No se encontró el usuario administrador de este hotel.' });
+            return;
+        }
+        if (!resetPassValue || resetPassValue.length < 6) {
+            sileo.error({ title: 'Contraseña inválida', description: 'Mínimo 6 caracteres.' });
+            return;
+        }
+        setResettingPass(true);
+        try {
+            await resetPassword(resetPassOrg.owner_id, resetPassValue);
+            sileo.success({ title: 'Contraseña actualizada', description: `Acceso de "${resetPassOrg.name}" actualizado correctamente.` });
+            log({ action: 'UPDATE', module: 'saas', entity_type: 'organization', entity_id: resetPassOrg.id, description: `Contraseña del gerente de "${resetPassOrg.name}" reseteada` });
+            setResetPassOrg(null);
+            setResetPassValue('');
+            setShowResetPass(false);
+        } catch (err) {
+            sileo.error({ title: 'Error al resetear', description: err.message });
+        } finally {
+            setResettingPass(false);
         }
     };
 
@@ -607,12 +642,21 @@ export default function SaasAdminPanel() {
                                                         <button
                                                             onClick={() => { setEditingOrg(org); setIsEditModalOpen(true); }}
                                                             className="p-2.5 rounded-full border border-hairline bg-canvas text-accent hover:text-secondary shadow-sm transition-all"
+                                                            title="Editar"
                                                         >
                                                             <Edit2 size={18} />
                                                         </button>
                                                         <button
+                                                            onClick={() => { setResetPassOrg(org); setResetPassValue(''); setShowResetPass(false); }}
+                                                            className="p-2.5 rounded-full border border-hairline bg-canvas text-amber-500 hover:bg-amber-50 shadow-sm transition-all"
+                                                            title="Resetear contraseña del gerente"
+                                                        >
+                                                            <Key size={18} />
+                                                        </button>
+                                                        <button
                                                             onClick={() => handleDeleteOrg(org)}
                                                             className={`p-2.5 rounded-full border transition-all ${pendingDeleteId === org.id ? 'bg-danger text-white border-danger animate-pulse' : 'bg-canvas text-accent border-hairline hover:text-danger hover:bg-danger/5'}`}
+                                                            title="Eliminar"
                                                         >
                                                             <Trash2 size={18} />
                                                         </button>
@@ -633,7 +677,7 @@ export default function SaasAdminPanel() {
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-secondary/40 backdrop-blur-md">
                     <div className="bg-canvas w-full max-w-lg rounded-[32px] border border-hairline shadow-2xl overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-8 duration-500">
                         <div className="p-8 border-b border-hairline flex items-center justify-between">
-                            <h2 className="text-2xl font-bold text-secondary tracking-tight">Nuevo Inquilino B2B</h2>
+                            <h2 className="text-2xl font-bold text-secondary tracking-tight">Nuevo Hotel B2B</h2>
                             <button onClick={() => setIsAddModalOpen(false)} className="w-10 h-10 rounded-full hover:bg-surface-soft flex items-center justify-center text-accent transition-colors"><X size={20} /></button>
                         </div>
                         <form onSubmit={handleAddOrganization} className="p-8 space-y-6">
@@ -652,16 +696,33 @@ export default function SaasAdminPanel() {
                                     </div>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-bold text-accent uppercase tracking-widest ml-4">Admin Email</label>
+                                    <label className="text-[11px] font-bold text-accent uppercase tracking-widest ml-4">Email del Gerente</label>
                                     <div className="relative">
                                         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-accent" size={18} />
                                         <input
                                             type="email" required
                                             className="w-full pl-12 pr-4 py-4 bg-surface-soft border border-hairline rounded-[20px] text-[15px] font-bold text-secondary focus:outline-none focus:border-primary/30"
-                                            placeholder="admin@hotel.com"
+                                            placeholder="gerente@hotel.com"
                                             value={newOrg.admin_email}
                                             onChange={e => setNewOrg({...newOrg, admin_email: e.target.value})}
                                         />
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-bold text-accent uppercase tracking-widest ml-4">Contraseña de Acceso</label>
+                                    <div className="relative">
+                                        <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-accent" size={18} />
+                                        <input
+                                            type={showNewPass ? 'text' : 'password'} required
+                                            minLength={6}
+                                            className="w-full pl-12 pr-12 py-4 bg-surface-soft border border-hairline rounded-[20px] text-[15px] font-bold text-secondary focus:outline-none focus:border-primary/30"
+                                            placeholder="Mínimo 6 caracteres"
+                                            value={newOrg.admin_password}
+                                            onChange={e => setNewOrg({...newOrg, admin_password: e.target.value})}
+                                        />
+                                        <button type="button" onClick={() => setShowNewPass(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-accent hover:text-secondary">
+                                            {showNewPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </button>
                                     </div>
                                 </div>
                                 <div className="p-6 bg-surface-soft rounded-[24px] border border-hairline flex items-center justify-between">
@@ -683,7 +744,49 @@ export default function SaasAdminPanel() {
                                 className="w-full py-5 bg-secondary text-white rounded-[20px] font-bold text-[14px] uppercase tracking-[2px] shadow-airbnb transition-all disabled:opacity-50 flex items-center justify-center gap-3"
                             >
                                 {creating ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
-                                Provisionar Inquilino
+                                Provisionar Hotel
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL RESET CONTRASEÑA GERENTE */}
+            {resetPassOrg && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-secondary/40 backdrop-blur-md">
+                    <div className="bg-canvas w-full max-w-md rounded-[32px] border border-hairline shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+                        <div className="p-8 border-b border-hairline flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-bold text-secondary tracking-tight">Resetear Contraseña</h2>
+                                <p className="text-[12px] text-accent font-medium mt-1">{resetPassOrg.name}</p>
+                            </div>
+                            <button onClick={() => setResetPassOrg(null)} className="w-10 h-10 rounded-full hover:bg-surface-soft flex items-center justify-center text-accent transition-colors"><X size={20} /></button>
+                        </div>
+                        <form onSubmit={handleResetAdminPass} className="p-8 space-y-5">
+                            <div className="space-y-1.5">
+                                <label className="text-[11px] font-bold text-accent uppercase tracking-widest ml-1">Nueva Contraseña del Gerente</label>
+                                <div className="relative">
+                                    <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-accent" size={18} />
+                                    <input
+                                        type={showResetPass ? 'text' : 'password'} required minLength={6}
+                                        className="w-full pl-12 pr-12 py-4 bg-surface-soft border border-hairline rounded-[20px] text-[15px] font-bold text-secondary focus:outline-none focus:border-amber-400"
+                                        placeholder="Nueva contraseña (mín. 6 caracteres)"
+                                        value={resetPassValue}
+                                        onChange={e => setResetPassValue(e.target.value)}
+                                        autoFocus
+                                    />
+                                    <button type="button" onClick={() => setShowResetPass(v => !v)} className="absolute right-4 top-1/2 -translate-y-1/2 text-accent hover:text-secondary">
+                                        {showResetPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                                    </button>
+                                </div>
+                                <p className="text-[11px] text-accent/60 font-medium ml-1">El gerente podrá acceder con esta nueva contraseña.</p>
+                            </div>
+                            <button
+                                type="submit" disabled={resettingPass}
+                                className="w-full py-4 bg-amber-500 text-white rounded-[20px] font-bold text-[13px] uppercase tracking-widest shadow-lg hover:bg-amber-600 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                            >
+                                {resettingPass ? <Loader2 className="animate-spin" size={18} /> : <Key size={18} />}
+                                {resettingPass ? 'Actualizando...' : 'Actualizar Contraseña'}
                             </button>
                         </form>
                     </div>
