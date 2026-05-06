@@ -175,6 +175,11 @@ export default function SaasAdminPanel() {
         }
         setPendingDeleteId(null);
         try {
+            // Limpiar dependencias con FK directa a organizations antes de llamar al RPC.
+            // Esto cubre tablas que el RPC legacy no maneja (guests, tenant_accounting_config).
+            await supabase.from('guests').update({ organization_id: null }).eq('organization_id', org.id);
+            await supabase.from('tenant_accounting_config').delete().eq('organization_id', org.id);
+
             const { error } = await supabase.rpc('delete_saas_tenant', { p_org_id: org.id });
             if (error) throw error;
             sileo.success({ title: 'Tenant eliminado', description: `"${org.name}" fue eliminado.` });
