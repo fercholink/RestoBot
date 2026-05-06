@@ -350,9 +350,34 @@ function App() {
         if (isMesa) fabricacionMesa++;
         else fabricacionDomicilio++;
 
-        handleStatusChange(order.id, 'fabricacion').finally(() => {
-          advancingOrders.current.delete(order.id);
-        });
+        // Auto-advance actualiza Supabase DIRECTAMENTE, sin pasar por n8n.
+        // Problema resuelto: n8n tiene un timeout de 10s en axios; si n8n tarda,
+        // el cliente cancela pero n8n sigue corriendo y hace su propio UPDATE
+        // con el status anterior ('nuevo'), revirtiendo el estado en la BD.
+        // Al ir directo a Supabase (~200ms) el ciclo se elimina.
+        // n8n se notifica en background (fire-and-forget) para triggers opcionales.
+        const _oid = order.id;
+        pendingStatusUpdates.current.set(_oid, 'fabricacion');
+        setOrders(prev => prev.map(o => o.id === _oid ? { ...o, status: 'fabricacion' } : o));
+
+        supabase.from('orders')
+          .update({ status: 'fabricacion' })
+          .eq('id', _oid)
+          .then(({ error: sbErr }) => {
+            if (sbErr) {
+              console.error('[AutoAdvance] Error Supabase:', sbErr.message);
+              setOrders(prev => prev.map(o => o.id === _oid ? { ...o, status: 'nuevo' } : o));
+            } else {
+              // Notificar n8n sin bloquear — si falla no revierte el estado
+              updateOrderStatus(_oid, 'fabricacion').catch(e =>
+                console.warn('[AutoAdvance] n8n notificación fallida (no crítico):', e.message)
+              );
+            }
+          })
+          .finally(() => {
+            pendingStatusUpdates.current.delete(_oid);
+            advancingOrders.current.delete(_oid);
+          });
       });
     }, 1000);
 
