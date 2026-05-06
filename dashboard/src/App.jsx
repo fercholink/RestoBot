@@ -90,7 +90,8 @@ function App() {
   // Ref always pointing to the latest orders — used by the auto-advance interval
   // to avoid stale closures without adding [orders] to the effect's dependency array.
   const ordersRef = useRef([]);
-  const advancingOrders = useRef(new Set()); // prevents duplicate calls during async transitions
+  const advancingOrders = useRef(new Set());     // prevents duplicate auto-advance calls
+  const pendingStatusUpdates = useRef(new Map()); // guards optimistic state from stale fetchOrders overwrites
   const [activeShift, setActiveShift] = useState(null); // Estado para el turno activo
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -278,16 +279,24 @@ function App() {
 
       const { data, error } = await query;
 
+      // Merge helper: if a status update is in flight, don't let a stale DB read overwrite it
+      const applyPending = (rows) => {
+        if (pendingStatusUpdates.current.size === 0) return rows;
+        return rows.map(o => {
+          const pending = pendingStatusUpdates.current.get(o.id);
+          return pending !== undefined ? { ...o, status: pending } : o;
+        });
+      };
+
       if (error) {
         console.error('[fetchOrders] Error:', error);
-        // Fallback local en caso de error de red
         const localOrders = await db.orders.toArray();
-        setOrders(localOrders);
+        setOrders(applyPending(localOrders));
         return;
       }
 
       console.log(`[fetchOrders] ✅ ${data?.length || 0} pedidos (rol: ${user?.role})`);
-      setOrders(data || []);
+      setOrders(applyPending(data || []));
       
       // Actualizar cache local
       if (data) {
@@ -377,6 +386,10 @@ function App() {
       }
     }
 
+    // Registrar la actualización pendiente ANTES del update optimista.
+    // fetchOrders() (Realtime + polling) respetará este valor mientras el async update está en vuelo,
+    // evitando que datos viejos de la BD sobreescriban el estado local.
+    pendingStatusUpdates.current.set(orderId, newStatus);
     try {
       // LOGICA ESPECIAL: CARGO A HABITACIÓN (Desde botón rápido)
       if (newStatus === 'pagado' && paymentDetails?.method === 'cargo_habitacion') {
@@ -508,6 +521,12 @@ function App() {
         sileo.error({ title: 'Error crítico', description: 'No se pudo guardar el cambio.' });
         fetchOrders(); // Revertir UI
       }
+    } finally {
+      // Siempre liberar el candado — sea éxito, fallback o error fatal.
+      // Si llegamos aquí vía error fatal + fetchOrders(), el delete ya ocurrió
+      // antes de que fetchOrders resuelva (es fire-and-forget), por lo que
+      // la reversión leerá correctamente el estado de la BD.
+      pendingStatusUpdates.current.delete(orderId);
     }
   };
 
