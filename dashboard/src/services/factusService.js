@@ -5,11 +5,9 @@ import { supabase } from '../lib/supabase';
 // Docs: https://developers.factus.com.co/
 // ================================================================
 
-// Las llamadas van a rutas relativas — en dev Vite las proxea,
-// en prod el servidor Express las proxea server-side (sin exponer credenciales al browser).
-const FACTUS_PROXY = {
-    sandbox:    '/api/factus/sandbox',
-    production: '/api/factus/production'
+const ENVIRONMENTS = {
+    sandbox:    'https://api-sandbox.factus.com.co',
+    production: 'https://api.factus.com.co'
 };
 
 // ----------------------------------------------------------------
@@ -64,7 +62,7 @@ const _fetchWithTimeout = async (url, options = {}, timeoutMs = 15_000) => {
 const _getBaseUrl = async () => {
     const creds = await factusService.getCredentials();
     const env = creds?.environment || 'sandbox';
-    return { baseUrl: FACTUS_PROXY[env] ?? FACTUS_PROXY.sandbox, env };
+    return { baseUrl: ENVIRONMENTS[env] ?? ENVIRONMENTS.sandbox, env };
 };
 
 // ----------------------------------------------------------------
@@ -88,9 +86,9 @@ const _parseFactusError = (data, status) => {
             parts.push(errors.join('\n'));
         }
         const result = parts.join('\n');
-        return (result || 'Error Desconocido') + `\n\nDEBUG_DATA: ${JSON.stringify(data)}`;
+        return result || `Error HTTP ${status} de Factus`;
     } catch (e) {
-        return `Error Crítico Parsing: ${e.message}\n\nDEBUG_DATA: ${JSON.stringify(data)}`;
+        return `Error HTTP ${status}: ${JSON.stringify(data)}`;
     }
 };
 
@@ -102,7 +100,7 @@ const factusService = {
 
     login: async (credentials) => {
         const env = credentials.environment || 'sandbox';
-        const baseUrl = FACTUS_PROXY[env] ?? FACTUS_PROXY.sandbox;
+        const baseUrl = ENVIRONMENTS[env] ?? ENVIRONMENTS.sandbox;
 
         const response = await _fetchWithTimeout(`${baseUrl}/oauth/token`, {
             method: 'POST',

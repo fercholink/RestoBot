@@ -45,11 +45,10 @@ const buildCSP = (supabaseOrigin) => {
         // Fuentes: self + data: (fuentes embebidas en CSS)
         "font-src 'self' data:",
 
-        // Conexiones de red: self cubre /api/factus/* y /webhook (proxied).
-        // Supabase JS client se conecta directamente (REST + Auth + Realtime WS).
+        // Conexiones de red: Supabase (REST + Auth + Realtime WS) + Factus API directa.
         sb
-            ? `connect-src 'self' ${sb} ${sb.replace(/^https:/, 'wss:')}`
-            : "connect-src 'self'",
+            ? `connect-src 'self' ${sb} ${sb.replace(/^https:/, 'wss:')} https://api-sandbox.factus.com.co https://api.factus.com.co`
+            : "connect-src 'self' https://api-sandbox.factus.com.co https://api.factus.com.co",
 
         // Workers: Service Worker del PWA (Workbox) + blobs de web workers
         "worker-src 'self' blob:",
