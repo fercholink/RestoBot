@@ -6,7 +6,6 @@ import {
     Eye, EyeOff, Crown, Users, ChefHat, CreditCard, ConciergeBell,
     BarChart3, Briefcase
 } from 'lucide-react';
-import { resetPassword } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 import RoleManagement from './RoleManagement';
@@ -258,7 +257,11 @@ const UserManagement = () => {
 
         setIsResetting(true);
         try {
-            await resetPassword(selectedUserForPass.id, newPass);
+            const { error: rpcErr } = await supabase.rpc('reset_user_password', {
+                p_user_id: selectedUserForPass.id,
+                p_new_password: newPass,
+            });
+            if (rpcErr) throw rpcErr;
             
             // Log activity
             adminLog({

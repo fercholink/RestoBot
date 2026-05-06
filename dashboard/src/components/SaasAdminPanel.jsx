@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { useAdminLog } from '../hooks/useAdminLog';
 import { Search, Building2, Server, Power, Loader2, Plus, Trash2, Edit2, X, TrendingUp, Activity, LayoutGrid, RefreshCw, ScrollText, Mail, Hotel, Key, Eye, EyeOff } from 'lucide-react';
 import { sileo } from 'sileo';
-import { resetPassword } from '../api';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -281,7 +280,11 @@ export default function SaasAdminPanel() {
         }
         setResettingPass(true);
         try {
-            await resetPassword(resetPassOrg.owner_id, resetPassValue);
+            const { error: rpcErr } = await supabase.rpc('reset_user_password', {
+                p_user_id: resetPassOrg.owner_id,
+                p_new_password: resetPassValue,
+            });
+            if (rpcErr) throw rpcErr;
             sileo.success({ title: 'Contraseña actualizada', description: `Acceso de "${resetPassOrg.name}" actualizado correctamente.` });
             log({ action: 'UPDATE', module: 'saas', entity_type: 'organization', entity_id: resetPassOrg.id, description: `Contraseña del gerente de "${resetPassOrg.name}" reseteada` });
             setResetPassOrg(null);
