@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
     UserPlus, Search, Edit2, Trash2, Shield, User, Mail, Building2,
     Key, Check, Info, X, Save, AlertCircle, Ban, ChevronDown,
@@ -412,7 +412,7 @@ const UserManagement = () => {
         }
         setPendingDeleteUserId(null);
         try {
-            const { error } = await supabase.from('profiles').delete().eq('id', id);
+            const { error } = await supabase.rpc('delete_user_with_auth', { p_user_id: id });
             if (error) throw error;
             showToast(`Usuario "${name}" eliminado correctamente`);
             fetchData();
